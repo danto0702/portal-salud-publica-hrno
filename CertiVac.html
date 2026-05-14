@@ -1191,6 +1191,20 @@ function hideLoad(){$('lo').classList.remove('show')}
 // 3. Apps Script puede tardar 10-30 seg en lotes grandes → timeout extendido.
 // ═══════════════════════════════════════════════════════════════════════
 
+// ── Auto-configuración por parámetro ?api= en la URL ──────────────────
+(function(){
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const apiParam = params.get('api');
+    if(apiParam && apiParam.startsWith('https://')){
+      localStorage.setItem('certivac_api_url', apiParam);
+      // Limpiar el parámetro de la barra de dirección (sin recargar)
+      const clean = window.location.pathname + window.location.hash;
+      history.replaceState(null, '', clean);
+    }
+  } catch(e){}
+})();
+
 // Lee la URL guardada en localStorage si no está hardcodeada
 function getApiUrl(){
   if(API_URL && API_URL !== 'PEGAR_URL_APPS_SCRIPT_AQUI') return API_URL;
