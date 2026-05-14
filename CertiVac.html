@@ -1196,13 +1196,18 @@ function hideLoad(){$('lo').classList.remove('show')}
   try {
     const params = new URLSearchParams(window.location.search);
     const apiParam = (params.get('api') || '').trim();
+    const debug   = params.get('debug') === '1';
     if(apiParam){
       localStorage.setItem('certivac_api_url', apiParam);
-      // Limpiar el parámetro de la barra de dirección (sin recargar)
-      history.replaceState(null, '', window.location.pathname + window.location.hash);
-      // Mostrar toast de bienvenida al cargar la página
       window.__apiAutoConfig = true;
+      if(debug) alert('[AutoConfig] URL guardada:\n' + apiParam);
+    } else if(debug){
+      const stored = localStorage.getItem('certivac_api_url') || '(vacío)';
+      alert('[Debug] Parámetro ?api= no detectado.\nLocalStorage actual:\n' + stored);
     }
+    // Limpiar parámetros de la barra de dirección (sin recargar)
+    if(apiParam || debug)
+      history.replaceState(null, '', window.location.pathname + window.location.hash);
   } catch(e){ console.error('[AutoConfig]', e); }
 })();
 
