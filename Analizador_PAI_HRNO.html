@@ -1,0 +1,2139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analizador PAI 2025-2026 | ESE HRNO</title>
+<script src="libs/xlsx.full.min.js"></script>
+<script src="libs/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0d1117;
+  --card: #161b22;
+  --card2: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --red: #e94560;
+  --purple: #7c1d6f;
+  --blue: #4a6fa5;
+  --green: #38c793;
+  --yellow: #ffb432;
+  --orange: #f0883e;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+a{color:var(--blue);text-decoration:none}
+button{cursor:pointer;border:none;outline:none;font-family:inherit}
+select,input{font-family:inherit}
+
+/* HEADER */
+.header{background:linear-gradient(135deg,#0a0f16 0%,#12192a 50%,#0d1117 100%);
+  border-bottom:1px solid var(--border);padding:16px 24px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.header-brand{display:flex;align-items:center;gap:14px}
+.header-logo{width:46px;height:46px;background:linear-gradient(135deg,var(--purple),var(--red));
+  border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;
+  box-shadow:0 4px 12px rgba(233,69,96,.3)}
+.header-title h1{font-size:18px;font-weight:700;color:var(--text)}
+.header-title p{font-size:12px;color:var(--muted);margin-top:2px}
+.header-badge{background:rgba(56,199,147,.12);border:1px solid rgba(56,199,147,.25);
+  color:var(--green);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600}
+
+/* MAIN */
+.main{max-width:1400px;margin:0 auto;padding:24px 20px}
+
+/* UPLOAD ZONE */
+.upload-zone{border:2px dashed var(--border);border-radius:12px;
+  background:var(--card);padding:32px;text-align:center;cursor:pointer;
+  transition:all .2s;position:relative;margin-bottom:24px}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--blue);background:rgba(74,111,165,.08)}
+.upload-zone.loaded{border-color:var(--green);border-style:solid;background:rgba(56,199,147,.05)}
+.upload-icon{font-size:36px;margin-bottom:12px}
+.upload-zone h3{font-size:16px;margin-bottom:6px}
+.upload-zone p{color:var(--muted);font-size:13px}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.file-info{margin-top:10px;font-size:13px;color:var(--green);font-weight:600;display:none}
+.file-info.visible{display:block}
+
+/* FILTER BAR */
+.filter-bar{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:16px 20px;margin-bottom:24px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end}
+.filter-group{display:flex;flex-direction:column;gap:6px;flex:1;min-width:160px}
+.filter-group label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.filter-group select{background:var(--card2);border:1px solid var(--border);color:var(--text);
+  padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer;transition:border-color .2s}
+.filter-group select:focus{border-color:var(--blue);outline:none}
+.btn-filter{background:var(--blue);color:white;padding:8px 20px;border-radius:8px;
+  font-size:13px;font-weight:600;transition:all .2s;white-space:nowrap;align-self:flex-end}
+.btn-filter:hover{background:#3a5a8a;transform:translateY(-1px)}
+.btn-reset{background:var(--card2);color:var(--muted);padding:8px 16px;border-radius:8px;
+  font-size:13px;font-weight:600;border:1px solid var(--border);transition:all .2s;align-self:flex-end}
+.btn-reset:hover{border-color:var(--muted);color:var(--text)}
+
+/* STATS CARDS */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px;position:relative;overflow:hidden;transition:transform .2s}
+.stat-card:hover{transform:translateY(-2px)}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat-card.blue::before{background:var(--blue)}
+.stat-card.green::before{background:var(--green)}
+.stat-card.red::before{background:var(--red)}
+.stat-card.yellow::before{background:var(--yellow)}
+.stat-card.purple::before{background:var(--purple)}
+.stat-icon{font-size:28px;margin-bottom:12px}
+.stat-value{font-size:32px;font-weight:700;line-height:1;margin-bottom:6px;
+  font-variant-numeric:tabular-nums}
+.stat-label{font-size:13px;color:var(--muted)}
+.stat-sub{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* CHARTS */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:900px){.charts-grid{grid-template-columns:1fr}}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.chart-card h3{font-size:14px;font-weight:600;margin-bottom:16px;color:var(--text)}
+.chart-card.full{grid-column:1/-1}
+.chart-wrap{position:relative;height:240px}
+
+/* SECTION HEADER */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+.section-header h2{font-size:16px;font-weight:700}
+.section-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* TABLE SECTION */
+.table-section{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px;margin-bottom:24px}
+.search-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.search-input{background:var(--card2);border:1px solid var(--border);color:var(--text);
+  padding:8px 12px;border-radius:8px;font-size:13px;flex:1;min-width:200px}
+.search-input:focus{border-color:var(--blue);outline:none}
+.table-count{font-size:12px;color:var(--muted)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead tr{border-bottom:1px solid var(--border)}
+th{padding:10px 12px;text-align:left;font-size:11px;font-weight:600;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.4px;cursor:pointer;white-space:nowrap;
+  user-select:none;transition:color .2s}
+th:hover{color:var(--text)}
+th .sort-icon{margin-left:4px;opacity:.5}
+td{padding:10px 12px;border-bottom:1px solid rgba(48,54,61,.5);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-green{background:rgba(56,199,147,.12);color:var(--green);border:1px solid rgba(56,199,147,.2)}
+.badge-red{background:rgba(233,69,96,.12);color:var(--red);border:1px solid rgba(233,69,96,.2)}
+.badge-yellow{background:rgba(255,180,50,.12);color:var(--yellow);border:1px solid rgba(255,180,50,.2)}
+.badge-blue{background:rgba(74,111,165,.15);color:#7ea8d8;border:1px solid rgba(74,111,165,.25)}
+
+/* PAGINATION */
+.pagination{display:flex;justify-content:space-between;align-items:center;
+  margin-top:16px;flex-wrap:wrap;gap:10px}
+.page-btns{display:flex;gap:4px}
+.page-btn{background:var(--card2);border:1px solid var(--border);color:var(--text);
+  padding:5px 10px;border-radius:6px;font-size:13px;cursor:pointer;transition:all .2s}
+.page-btn:hover{border-color:var(--blue)}
+.page-btn.active{background:var(--blue);border-color:var(--blue);color:white}
+.page-btn:disabled{opacity:.4;cursor:not-allowed}
+.page-info{font-size:12px;color:var(--muted)}
+
+/* SUSCEPTIBLES SECTION */
+.suscept-section{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px;margin-bottom:24px}
+.suscept-header{background:rgba(233,69,96,.08);border:1px solid rgba(233,69,96,.2);
+  border-radius:10px;padding:16px 20px;margin-bottom:16px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.suscept-header h3{font-size:15px;font-weight:700;color:var(--red);display:flex;align-items:center;gap:8px}
+.suscept-count{font-size:28px;font-weight:700;color:var(--red);font-variant-numeric:tabular-nums}
+.suscept-detail{font-size:12px;color:var(--muted);margin-top:2px}
+.btn-download{background:var(--green);color:#0d1117;padding:9px 18px;border-radius:8px;
+  font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;transition:all .2s}
+.btn-download:hover{background:#2fa87d;transform:translateY(-1px)}
+.btn-secondary{background:var(--card2);color:var(--text);padding:9px 18px;border-radius:8px;
+  font-size:13px;font-weight:600;border:1px solid var(--border);
+  display:flex;align-items:center;gap:6px;transition:all .2s}
+.btn-secondary:hover{border-color:var(--muted)}
+.vacp-list{display:flex;flex-wrap:wrap;gap:4px}
+.vacp{background:rgba(233,69,96,.1);border:1px solid rgba(233,69,96,.2);
+  color:var(--red);padding:2px 7px;border-radius:4px;font-size:11px}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:48px 24px}
+.empty-state .empty-icon{font-size:48px;margin-bottom:16px;opacity:.4}
+.empty-state p{color:var(--muted);font-size:14px}
+.empty-state h3{color:var(--text);margin-bottom:8px}
+
+/* LOADING */
+.loading{text-align:center;padding:32px;color:var(--muted)}
+.spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--border);
+  border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TABS for table */
+.tab-bar{display:flex;gap:2px;background:var(--card2);border-radius:8px;padding:3px;margin-bottom:16px;width:fit-content}
+.tab{padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;
+  color:var(--muted);transition:all .2s;border:none;background:none}
+.tab.active{background:var(--card);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+
+/* TOOLTIP */
+.tooltip{position:relative;cursor:help}
+.tooltip:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;
+  transform:translateX(-50%);background:#000;color:#fff;padding:4px 8px;border-radius:4px;
+  font-size:11px;white-space:nowrap;z-index:100;pointer-events:none}
+
+/* PROGRESS BAR */
+.prog-bar{height:6px;background:var(--card2);border-radius:3px;overflow:hidden;margin-top:8px}
+.prog-fill{height:100%;border-radius:3px;transition:width .6s ease}
+
+/* RESPONSIVE */
+@media(max-width:600px){
+  .header{padding:12px 16px}
+  .main{padding:16px 12px}
+  .stats-grid{grid-template-columns:1fr 1fr}
+}
+
+/* ===== DATA SOURCE CARD (Análisis PAI) ===== */
+.ds-card{display:grid;grid-template-columns:1fr auto 1fr;gap:0;
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;margin-bottom:24px}
+.ds-panel{padding:24px;display:flex;flex-direction:column;align-items:center;
+  text-align:center;gap:10px;transition:background .2s}
+.ds-panel.primary{background:rgba(74,111,165,.07);border-right:1px solid var(--border)}
+.ds-panel.secondary{background:rgba(255,255,255,.02)}
+.ds-icon{font-size:32px}
+.ds-title{font-size:14px;font-weight:700}
+.ds-sub{font-size:12px;color:var(--muted);line-height:1.5}
+.ds-divider{display:flex;align-items:center;justify-content:center;
+  padding:0 12px;font-size:11px;color:var(--border);font-weight:700;
+  border-left:1px solid var(--border);border-right:1px solid var(--border)}
+.btn-load-sheets{background:var(--blue);color:white;padding:9px 20px;border-radius:8px;
+  font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;gap:6px}
+.btn-load-sheets:hover{background:#3a5a8a;transform:translateY(-1px)}
+.btn-load-sheets:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.upload-inline{position:relative;display:inline-block}
+.upload-inline input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-inline-btn{background:var(--card2);color:var(--text);padding:9px 18px;
+  border-radius:8px;font-size:13px;font-weight:600;border:1px solid var(--border);
+  cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.upload-inline-btn:hover{border-color:var(--muted)}
+.ds-status{font-size:12px;min-height:18px;margin-top:2px}
+.ds-status.ok{color:var(--green)}
+.ds-status.err{color:var(--red)}
+.ds-status.loading{color:var(--muted)}
+@media(max-width:700px){.ds-card{grid-template-columns:1fr}
+  .ds-panel.primary{border-right:none;border-bottom:1px solid var(--border)}
+  .ds-divider{border-left:none;border-right:none;border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);padding:8px;flex-direction:row}}
+
+/* ===== MAIN TAB SWITCHER ===== */
+.main-nav{display:flex;gap:4px;background:var(--card);border-bottom:1px solid var(--border);
+  padding:0 24px;overflow-x:auto}
+.main-nav-btn{padding:12px 20px;font-size:13px;font-weight:600;color:var(--muted);background:none;
+  border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all .2s;white-space:nowrap}
+.main-nav-btn:hover{color:var(--text)}
+.main-nav-btn.active{color:var(--text);border-bottom-color:var(--blue)}
+
+/* ===== CARGA MENSUAL ===== */
+.carga-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:900px){.carga-grid{grid-template-columns:1fr}}
+.config-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+.config-card h3{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.url-row{display:flex;gap:8px}
+.url-input{flex:1;background:var(--card2);border:1px solid var(--border);color:var(--text);
+  padding:8px 12px;border-radius:8px;font-size:12px;font-family:monospace}
+.url-input:focus{outline:none;border-color:var(--blue)}
+.btn-sm{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
+  transition:all .2s;border:none}
+.btn-green{background:var(--green);color:#0d1117}
+.btn-green:hover{background:#2fa87d}
+.btn-blue{background:var(--blue);color:white}
+.btn-blue:hover{background:#3a5a8a}
+.btn-gray{background:var(--card2);color:var(--muted);border:1px solid var(--border)}
+.btn-gray:hover{color:var(--text);border-color:var(--muted)}
+.status-url{font-size:11px;margin-top:6px}
+.status-url.ok{color:var(--green)}
+.status-url.err{color:var(--red)}
+
+/* Upload plantilla */
+.upload-zone-sm{border:2px dashed var(--border);border-radius:10px;background:var(--card2);
+  padding:24px;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.upload-zone-sm:hover,.upload-zone-sm.drag-over{border-color:var(--blue);background:rgba(74,111,165,.08)}
+.upload-zone-sm.loaded{border-color:var(--green);border-style:solid}
+.upload-zone-sm input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.upload-zone-sm h4{font-size:14px;margin-bottom:4px}
+.upload-zone-sm p{font-size:12px;color:var(--muted)}
+
+/* Metadata bar */
+.meta-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end}
+.meta-group{display:flex;flex-direction:column;gap:4px}
+.meta-group label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.meta-group select,.meta-group input{background:var(--card2);border:1px solid var(--border);
+  color:var(--text);padding:7px 10px;border-radius:8px;font-size:13px}
+.meta-group select:focus,.meta-group input:focus{outline:none;border-color:var(--blue)}
+
+/* STATUS GRID */
+.status-section{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px;margin-bottom:24px}
+.status-section h3{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;
+  align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.grid-wrap{overflow-x:auto}
+.sgrid{border-collapse:collapse;font-size:12px;width:100%}
+.sgrid th{background:var(--card2);padding:6px 8px;text-align:center;color:var(--muted);
+  font-weight:600;border:1px solid var(--border);white-space:nowrap;position:sticky;top:0}
+.sgrid th.mun-th{text-align:left;position:sticky;left:0;z-index:2;background:var(--card2)}
+.sgrid td{padding:4px 6px;border:1px solid var(--border);text-align:center;vertical-align:middle}
+.sgrid td.mun-td{text-align:left;font-weight:600;font-size:12px;position:sticky;left:0;
+  background:var(--card);z-index:1;white-space:nowrap;padding:6px 10px}
+.sgrid .year-hdr{background:rgba(74,111,165,.15);color:var(--blue);font-weight:700;font-size:11px}
+.cell-ok{background:rgba(56,199,147,.15);color:var(--green);font-weight:700;border-radius:4px;
+  padding:3px 6px;display:inline-block;font-size:11px;cursor:default}
+.cell-empty{background:var(--card2);color:var(--border);border-radius:4px;
+  padding:3px 6px;display:inline-block;font-size:11px}
+
+/* PREVIEW */
+.preview-section{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px;margin-bottom:24px}
+.preview-header{display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.preview-header h3{font-size:14px;font-weight:700}
+.preview-meta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.pmeta{background:var(--card2);border:1px solid var(--border);border-radius:8px;
+  padding:8px 14px;font-size:12px}
+.pmeta strong{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
+
+/* APPS SCRIPT CODE */
+.code-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px;margin-bottom:24px}
+.code-panel summary{font-size:14px;font-weight:700;cursor:pointer;padding:2px 0;
+  display:flex;align-items:center;gap:8px;user-select:none}
+.code-panel summary:hover{color:var(--blue)}
+.code-block{background:#010409;border:1px solid var(--border);border-radius:8px;
+  padding:16px;margin-top:14px;font-family:monospace;font-size:12px;color:#79c0ff;
+  white-space:pre;overflow-x:auto;line-height:1.6}
+.send-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.send-progress{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-brand">
+    <div class="header-logo">&#128137;</div>
+    <div class="header-title">
+      <h1>Analizador PAI &mdash; Ni&#241;os y Ni&#241;as</h1>
+      <p>ESE Hospital Regional Noroccidental &bull; Norte de Santander</p>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span class="header-badge">2025 &ndash; 2026</span>
+    <span id="lastFile" style="font-size:12px;color:var(--muted)"></span>
+  </div>
+</header>
+
+<nav class="main-nav">
+  <button class="main-nav-btn active" id="tabBtnAnalisis" onclick="switchMainTab('analisis')">&#128202; An&aacute;lisis PAI</button>
+  <button class="main-nav-btn" id="tabBtnCarga" onclick="switchMainTab('carga')">&#128229; Carga Mensual por Municipio</button>
+</nav>
+
+<main class="main">
+
+  <!-- FUENTE DE DATOS -->
+  <div class="ds-card" id="dataSourceCard">
+    <div class="ds-panel primary">
+      <div class="ds-icon">&#9729;</div>
+      <div class="ds-title">Cargar desde Google Sheets</div>
+      <div class="ds-sub">Lee directamente la base de datos PAI consolidada &mdash; sin subir ning&uacute;n archivo</div>
+      <button class="btn-load-sheets" id="btnLoadSheets" onclick="loadFromSheets()">
+        &#8595; Cargar datos
+      </button>
+      <div class="ds-status" id="sheetsStatus"></div>
+    </div>
+    <div class="ds-divider">o</div>
+    <div class="ds-panel secondary">
+      <div class="ds-icon">&#128196;</div>
+      <div class="ds-title">Cargar desde archivo local</div>
+      <div class="ds-sub">Sube un consolidado <strong>.xlsx</strong> / <strong>.xls</strong> directamente desde tu computador</div>
+      <div class="upload-inline">
+        <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFileInput(this)">
+        <span class="upload-inline-btn">&#128193; Seleccionar archivo</span>
+      </div>
+      <div class="ds-status" id="fileInfo"></div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filter-bar" id="filterBar" style="display:none">
+    <div class="filter-group">
+      <label>Municipio</label>
+      <select id="fMunicipio">
+        <option value="">Todos los municipios</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>A&#241;o</label>
+      <select id="fAnio">
+        <option value="">Todos los a&#241;os</option>
+        <option value="2025">2025</option>
+        <option value="2026">2026</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Grupo de Edad</label>
+      <select id="fEdad">
+        <option value="">Todos los grupos</option>
+        <option value="2M">2 meses</option>
+        <option value="4M">4 meses</option>
+        <option value="6M">6 meses</option>
+        <option value="7M">7 meses</option>
+        <option value="1A">1 a&#241;o (12 meses)</option>
+        <option value="18M">18 meses</option>
+        <option value="5A">5 a&#241;os</option>
+      </select>
+    </div>
+    <button class="btn-filter" onclick="applyFilters()">&#128269; Aplicar filtros</button>
+    <button class="btn-reset" onclick="resetFilters()">&#x21BA; Limpiar</button>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-grid" id="statsGrid" style="display:none">
+    <div class="stat-card blue">
+      <div class="stat-icon">&#128100;</div>
+      <div class="stat-value" id="sTotal">0</div>
+      <div class="stat-label">Total registros</div>
+      <div class="stat-sub" id="sTotalSub"></div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-icon">&#9989;</div>
+      <div class="stat-value" id="sVacunados">0</div>
+      <div class="stat-label">Con esquema completo</div>
+      <div class="prog-bar"><div class="prog-fill" id="pVacunados" style="background:var(--green);width:0%"></div></div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-icon">&#9888;</div>
+      <div class="stat-value" id="sSusc">0</div>
+      <div class="stat-label">Susceptibles</div>
+      <div class="prog-bar"><div class="prog-fill" id="pSusc" style="background:var(--red);width:0%"></div></div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-icon">&#128200;</div>
+      <div class="stat-value" id="sCob">0%</div>
+      <div class="stat-label">Cobertura</div>
+      <div class="stat-sub" id="sCobSub"></div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-icon">&#127970;</div>
+      <div class="stat-value" id="sMunis">0</div>
+      <div class="stat-label">Municipios</div>
+      <div class="stat-sub" id="sMunisSub"></div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-grid" id="chartsGrid" style="display:none">
+    <div class="chart-card">
+      <h3>&#128202; Vacunaciones por Municipio</h3>
+      <div class="chart-wrap"><canvas id="chartMunicipio"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>&#129263; Distribuci&oacute;n por Grupo de Edad</h3>
+      <div class="chart-wrap"><canvas id="chartEdad"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>&#128197; Tendencia Mensual</h3>
+      <div class="chart-wrap"><canvas id="chartTendencia"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SUSCEPTIBLES -->
+  <div class="suscept-section" id="susceptSection" style="display:none">
+    <div class="suscept-header">
+      <div>
+        <h3>&#9888; Ni&#241;os Susceptibles por Vacunar</h3>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px" id="susceptDesc">
+          Niños que según el grupo de edad seleccionado tienen vacunas pendientes
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="suscept-count" id="susceptCount">0</div>
+        <div class="suscept-detail" id="susceptPct"></div>
+      </div>
+    </div>
+    <div class="section-actions" style="margin-bottom:16px">
+      <button class="btn-download" onclick="downloadSusceptibles()">
+        &#11123; Descargar Susceptibles (.xlsx)
+      </button>
+      <button class="btn-secondary" onclick="downloadFiltered()">
+        &#128196; Descargar Listado Filtrado
+      </button>
+    </div>
+    <div id="susceptTable"></div>
+  </div>
+
+  <!-- DATA TABLE -->
+  <div class="table-section" id="tableSection" style="display:none">
+    <div class="section-header">
+      <h2>&#128203; Registros de Vacunaci&oacute;n</h2>
+      <div class="section-actions">
+        <div class="tab-bar">
+          <button class="tab active" onclick="setTab('all',this)">Todos</button>
+          <button class="tab" onclick="setTab('suscept',this)">Solo susceptibles</button>
+        </div>
+      </div>
+    </div>
+    <div class="search-row">
+      <input type="text" class="search-input" id="searchInput" placeholder="Buscar por nombre, documento, municipio..." oninput="onSearch()">
+      <span class="table-count" id="tableCount"></span>
+    </div>
+    <div class="table-wrap" id="tableWrap"></div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <!-- ===== CARGA MENSUAL TAB ===== -->
+  <div id="tabCarga" style="display:none">
+
+    <div class="carga-grid">
+      <!-- Config Google Sheets -->
+      <div class="config-card">
+        <h3>&#128279; Conexi&oacute;n Google Sheets</h3>
+        <div class="url-row">
+          <input class="url-input" id="gsScriptUrl" placeholder="https://script.google.com/macros/s/.../exec" oninput="saveScriptUrl()">
+          <button class="btn-sm btn-blue" onclick="fetchStatus()">&#8635; Estado</button>
+        </div>
+        <div class="status-url" id="urlStatus"></div>
+        <div style="margin-top:12px;font-size:12px;color:var(--muted)">
+          Pega aqu&iacute; la URL del Apps Script desplegado como Web App.
+          Expande el panel inferior para ver el c&oacute;digo que debes agregar.
+        </div>
+      </div>
+
+      <!-- Upload plantilla -->
+      <div class="config-card">
+        <h3>&#128196; Cargar Plantilla Mensual (.xls / .xlsx)</h3>
+        <div class="upload-zone-sm" id="uploadZonePlantilla">
+          <input type="file" id="fileInputPlantilla" accept=".xls,.xlsx" onchange="handlePlantillaInput(this)">
+          <div style="font-size:28px;margin-bottom:8px">&#128229;</div>
+          <h4>Arrastra la plantilla o haz clic</h4>
+          <p>Formato: Registro Diario Vacunaci&oacute;n (por municipio y mes)</p>
+        </div>
+        <div id="plantillaInfo" style="display:none;margin-top:10px;font-size:12px;color:var(--green);font-weight:600"></div>
+      </div>
+    </div>
+
+    <!-- Metadata confirmación -->
+    <div id="metaSection" style="display:none;margin-bottom:16px" class="config-card">
+      <h3>&#128197; Datos detectados — confirma antes de enviar</h3>
+      <div class="meta-bar">
+        <div class="meta-group">
+          <label>Municipio</label>
+          <select id="metaMunicipio">
+            <option value="Ábrego">Ábrego</option>
+            <option value="Convención">Convención</option>
+            <option value="El Carmen">El Carmen</option>
+            <option value="Teorama">Teorama</option>
+          </select>
+        </div>
+        <div class="meta-group">
+          <label>Mes</label>
+          <select id="metaMes">
+            <option value="01">Enero</option><option value="02">Febrero</option>
+            <option value="03">Marzo</option><option value="04">Abril</option>
+            <option value="05">Mayo</option><option value="06">Junio</option>
+            <option value="07">Julio</option><option value="08">Agosto</option>
+            <option value="09">Septiembre</option><option value="10">Octubre</option>
+            <option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+        </div>
+        <div class="meta-group">
+          <label>A&ntilde;o</label>
+          <select id="metaAnio">
+            <option value="2025">2025</option>
+            <option value="2026" selected>2026</option>
+          </select>
+        </div>
+        <div class="meta-group">
+          <label>Hoja destino (Google Sheet)</label>
+          <input type="text" id="metaHoja" value="NIÑOS Y NIÑAS" style="width:180px">
+        </div>
+        <button class="btn-sm btn-blue" onclick="reparse()" style="align-self:flex-end">&#8635; Reprocesar</button>
+      </div>
+    </div>
+
+    <!-- Vista previa + envío -->
+    <div id="previewSection" style="display:none" class="preview-section">
+      <div class="preview-header">
+        <h3>&#128203; Vista previa — Filas a registrar en Google Sheets</h3>
+        <div class="send-bar">
+          <button class="btn-sm btn-green" id="btnSend" onclick="sendToSheets()">&#9654; Enviar a Google Sheets</button>
+          <span class="send-progress" id="sendProgress"></span>
+        </div>
+      </div>
+      <div class="preview-meta" id="previewMeta"></div>
+      <div class="table-wrap" id="previewTable"></div>
+    </div>
+
+    <!-- Status grid -->
+    <div class="status-section">
+      <h3>
+        <span>&#9989; Estado de Carga por Municipio y Mes</span>
+        <button class="btn-sm btn-gray" onclick="fetchStatus()">&#8635; Actualizar desde Google Sheets</button>
+      </h3>
+      <div class="grid-wrap" id="statusGrid"></div>
+    </div>
+
+    <!-- Apps Script code -->
+    <details class="code-panel">
+      <summary>&#128187; C&oacute;digo Apps Script — pegar en Extensiones &gt; Apps Script &gt; Code.gs</summary>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted);line-height:1.6">
+        1. En el Google Sheet: <strong>Extensiones &gt; Apps Script</strong><br>
+        2. Reemplaza todo el contenido de <code>Code.gs</code> con el c&oacute;digo de abajo<br>
+        3. Haz clic en <strong>Implementar &gt; Nueva implementaci&oacute;n</strong><br>
+        4. Tipo: <strong>Aplicaci&oacute;n web</strong> &bull; Ejecutar como: <strong>Yo</strong> &bull; Acceso: <strong>Cualquiera</strong><br>
+        5. Copia la URL generada y p&eacute;gala arriba en "Conexi&oacute;n Google Sheets"
+      </div>
+      <pre class="code-block">/**
+ * ============================================================
+ *  Apps Script — Analizador PAI HRNO
+ *  ESE Hospital Regional Noroccidental · Norte de Santander
+ * ============================================================
+ *  INSTRUCCIONES DE DESPLIEGUE:
+ *  1. Abre el Google Sheet → Extensiones → Apps Script
+ *  2. Reemplaza todo el contenido de Code.gs con este código
+ *  3. Implementar → Nueva implementación
+ *     • Tipo: Aplicación web
+ *     • Ejecutar como: Yo (tu cuenta Google)
+ *     • Acceso: Cualquiera
+ *  4. Copia la URL y pégala en el campo "Conexión Google Sheets"
+ * ============================================================
+ */
+
+// ── Nombre de la hoja destino
+const HOJA = 'NIÑOS Y NIÑAS';
+
+// ── Columnas del encabezado consolidado (deben coincidir con el
+//    orden en que el app transforma las filas de la plantilla)
+const ENCABEZADO = [
+  'MUNICIPIO', 'FECHA_VACUNACION', 'CONSECUTIVO', 'DIA',
+  'TIPO ID MADRE', 'NUM ID MADRE',
+  'PRIMER NOMBRE MADRE', 'SEGUNDO NOMBRE MADRE',
+  'PRIMER APELLIDO MADRE', 'SEGUNDO APELLIDO MADRE',
+  'TIPO ID NIÑO', 'NUM ID NIÑO', 'FECHA NACIMIENTO',
+  'TIPO EDAD', 'EDAD A LA FECHA DE VACUNACION', 'EDAD ACTUAL',
+  'SEXO',
+  'PRIMER APELLIDO NIÑO', 'SEGUNDO APELLIDO NIÑO',
+  'PRIMER NOMBRE NIÑO', 'SEGUNDO NOMBRE NIÑO',
+  'REGIMEN', 'ASEGURADORA', 'DEPTO RESIDENCIA',
+  'MUNICIPIO RESIDENCIA', 'AREA RESIDENCIA',
+  'BARRIO / VEREDA', 'DIRECCION', 'TELEFONO',
+  'GRUPO ETNICO', 'CONDICION DESPLAZAMIENTO',
+  'CONDICION DISCAPACIDAD', 'CORREO'
+];
+
+// ════════════════════════════════════════════════════════════
+//  doPost — recibe filas desde el aplicativo HTML
+// ════════════════════════════════════════════════════════════
+function doPost(e) {
+  // Lock de escritura: evita corrupción si llegan dos lotes a la vez
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    const body = JSON.parse(e.postData.contents);
+    const ss   = SpreadsheetApp.getActiveSpreadsheet();
+
+    const nombreHoja = (body.hoja || HOJA).toString().trim();
+    let sheet = ss.getSheetByName(nombreHoja);
+
+    // Crear la hoja si no existe
+    if (!sheet) {
+      sheet = ss.insertSheet(nombreHoja);
+    }
+
+    const filas = body.rows || [];
+    if (filas.length === 0) {
+      return ok({ agregados: 0, reemplazados: 0 });
+    }
+
+    // ── Crear encabezado si la hoja está vacía
+    if (sheet.getLastRow() === 0) {
+      const hdrs = (body.headers && body.headers.length > 0)
+        ? body.headers
+        : ENCABEZADO;
+      sheet.appendRow(hdrs);
+      sheet.getRange(1, 1, 1, hdrs.length)
+        .setFontWeight('bold')
+        .setBackground('#1c4966')
+        .setFontColor('#ffffff');
+      sheet.setFrozenRows(1);
+    }
+
+    // ── Deduplicación: si ya existen filas para este municipio+mes,
+    //    borrarlas antes de insertar (evita duplicados al reenviar)
+    const municipio = body.municipio || '';
+    const yearMon   = body.yearMon   || '';   // formato "2026-04"
+
+    if (municipio && yearMon) {
+      eliminarFilasExistentes(sheet, municipio, yearMon);
+    }
+
+    // ── Inserción en lote con setValues (1 llamada a la API, no N)
+    const ultimaFila = sheet.getLastRow();
+    const ncols      = filas[0].length;
+    sheet
+      .getRange(ultimaFila + 1, 1, filas.length, ncols)
+      .setValues(filas);
+
+    SpreadsheetApp.flush();
+    return ok({ agregados: filas.length });
+
+  } catch (err) {
+    return error(err.toString());
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  doGet — devuelve el estado de carga o info de la hoja
+// ════════════════════════════════════════════════════════════
+function doGet(e) {
+  try {
+    const accion = (e.parameter && e.parameter.action) || 'status';
+
+    if (accion === 'status') return getStatus();
+    if (accion === 'datos')  return getDatos();
+    if (accion === 'info')   return getInfo();
+
+    return error('Accion no reconocida: ' + accion);
+  } catch (err) {
+    return error(err.toString());
+  }
+}
+
+// ── Retorna {municipio||YYYY-MM: cantidad} para el grid de estado
+function getStatus() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(HOJA);
+
+  if (!sheet || sheet.getLastRow() < 2) return ok({});
+
+  const datos   = sheet.getDataRange().getValues();
+  const hdrs    = datos[0].map(h => norm(h));
+  const colMun  = hdrs.findIndex(h => h.includes('municipio') && !h.includes('resid'));
+  const colFech = hdrs.findIndex(h => h.includes('fecha_vac') || h.startsWith('fecha vac'));
+
+  const status = {};
+  datos.slice(1).forEach(row => {
+    const mun = colMun >= 0 ? row[colMun] : row[0];
+    const f   = colFech >= 0 ? row[colFech] : row[1];
+    if (!mun || !f) return;
+
+    const yearMon = (f instanceof Date)
+      ? Utilities.formatDate(f, 'America/Bogota', 'yyyy-MM')
+      : f.toString().substring(0, 7);
+
+    if (yearMon && yearMon.length === 7) {
+      const key = mun.toString().trim() + '||' + yearMon;
+      status[key] = (status[key] || 0) + 1;
+    }
+  });
+
+  return ok(status);
+}
+
+// ── Retorna todos los datos para el módulo Análisis PAI
+function getDatos() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(HOJA);
+
+  if (!sheet || sheet.getLastRow() < 2) {
+    return ok({ headers: [], rows: [] });
+  }
+
+  const all = sheet.getDataRange().getValues();
+
+  // Convertir fechas Date a string "yyyy-mm-dd" para que el JSON sea serializable
+  const tz = 'America/Bogota';
+  const serialized = all.map(row =>
+    row.map(cell => {
+      if (cell instanceof Date) {
+        return Utilities.formatDate(cell, tz, 'yyyy-MM-dd');
+      }
+      return cell;
+    })
+  );
+
+  return ok({
+    headers: serialized[0],
+    rows:    serialized.slice(1)
+  });
+}
+
+// ── Retorna metadatos básicos de la hoja (columnas, filas)
+function getInfo() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(HOJA);
+  if (!sheet) return ok({ existe: false });
+  return ok({
+    existe:   true,
+    filas:    sheet.getLastRow() - 1,
+    columnas: sheet.getLastColumn(),
+    nombre:   sheet.getName()
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+//  UTILIDADES INTERNAS
+// ════════════════════════════════════════════════════════════
+
+// Borra todas las filas de un municipio+mes (para reenvío limpio)
+function eliminarFilasExistentes(sheet, municipio, yearMon) {
+  if (sheet.getLastRow() < 2) return;
+
+  const datos   = sheet.getDataRange().getValues();
+  const hdrs    = datos[0].map(h => norm(h));
+  const colMun  = hdrs.findIndex(h => h.includes('municipio') && !h.includes('resid'));
+  const colFech = hdrs.findIndex(h => h.includes('fecha_vac') || h.startsWith('fecha vac'));
+
+  // Recorrer de atrás hacia adelante para no desplazar índices al borrar
+  for (let i = datos.length - 1; i >= 1; i--) {
+    const row  = datos[i];
+    const mun  = colMun >= 0 ? row[colMun] : row[0];
+    const f    = colFech >= 0 ? row[colFech] : row[1];
+    const ym   = (f instanceof Date)
+      ? Utilities.formatDate(f, 'America/Bogota', 'yyyy-MM')
+      : (f || '').toString().substring(0, 7);
+
+    if (mun && mun.toString().trim() === municipio && ym === yearMon) {
+      sheet.deleteRow(i + 1); // +1 porque getValues es 0-based, Sheet es 1-based
+    }
+  }
+}
+
+// Normaliza texto para comparaciones (minúscula, sin tildes, sin símbolos)
+function norm(s) {
+  return (s || '').toString().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s_]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Helpers de respuesta JSON
+function ok(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function error(msg) {
+  return ContentService
+    .createTextOutput(JSON.stringify({ error: msg }))
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+    </details>
+
+  </div><!-- /tabCarga -->
+
+</main>
+
+<script>
+// ==================== STATE ====================
+let rawData = [];
+let headers = [];
+let COL = {};
+let filteredData = [];
+let tableData = [];
+let currentPage = 1;
+const PAGE_SIZE = 25;
+let sortCol = -1, sortDir = 1;
+let tableTab = 'all';
+let chartMunic = null, chartEdad = null, chartTend = null;
+
+// ==================== ESQUEMA PAI COLOMBIA ====================
+// Rangos en meses totales (TIPO='A' se convierte a meses × 12)
+// 2M  : 2m → 3m 21d  → [2, 3]
+// 4M  : 4m → 5m 30d  → [4, 5]
+// 6M  : 6m → 11m 21d → [6, 11]
+// 7M  : 7m → 11m 29d → [7, 11]
+// 1A  : 12m → 23m 29d→ [12, 23]
+// 18M : 18m → 23m 29d→ [18, 23]
+// 5A  : 60m → 71m 29d→ [60, 71]
+const ESQUEMA_PAI = {
+  '2M': {
+    label: '2 meses',
+    minMeses: 2, maxMeses: 3,
+    vacunas: [
+      {key:'vpi',          nombre:'VPI 1ra dosis'},
+      {key:'pentavalente', nombre:'Pentavalente 1ra'},
+      {key:'rotavirus',    nombre:'Rotavirus 1ra'},
+      {key:'neumococo',    nombre:'Neumococo 1ra'}
+    ]
+  },
+  '4M': {
+    label: '4 meses',
+    minMeses: 4, maxMeses: 5,
+    vacunas: [
+      {key:'vpi',          nombre:'VPI 2da dosis'},
+      {key:'pentavalente', nombre:'Pentavalente 2da'},
+      {key:'rotavirus',    nombre:'Rotavirus 2da'},
+      {key:'neumococo',    nombre:'Neumococo 2da'}
+    ]
+  },
+  '6M': {
+    label: '6 meses',
+    minMeses: 6, maxMeses: 11,
+    vacunas: [
+      {key:'vpob',         nombre:'VPOb 1ra dosis'},
+      {key:'pentavalente', nombre:'Pentavalente 3ra'}
+    ]
+  },
+  '7M': {
+    label: '7 meses',
+    minMeses: 7, maxMeses: 11,
+    vacunas: [
+      {key:'influenza', nombre:'Influenza 1ra dosis'}
+    ]
+  },
+  '1A': {
+    label: '1 año',
+    minMeses: 12, maxMeses: 23,
+    vacunas: [
+      {key:'tripleViral',    nombre:'Triple Viral 1ra'},
+      {key:'varicela',       nombre:'Varicela 1ra'},
+      {key:'hepA',           nombre:'Hepatitis A 1ra'},
+      {key:'fiebreAmarilla', nombre:'Fiebre Amarilla 1ra'}
+    ]
+  },
+  '18M': {
+    label: '18 meses',
+    minMeses: 18, maxMeses: 23,
+    vacunas: [
+      {key:'dpt',        nombre:'DPT 1er Refuerzo'},
+      {key:'tripleViral', nombre:'Triple Viral 2da'},
+      {key:'varicela',    nombre:'Varicela 2da'},
+      {key:'hepA',        nombre:'Hepatitis A 2da'}
+    ]
+  },
+  '5A': {
+    label: '5 años',
+    minMeses: 60, maxMeses: 71,
+    vacunas: [
+      {key:'dpt',  nombre:'DPT 2do Refuerzo'},
+      {key:'vpob', nombre:'VPOb 2do Refuerzo'}
+    ]
+  }
+};
+
+// ==================== NORMALIZE ====================
+function norm(s) {
+  return (s||'').toString().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9\s|.]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+// ==================== COLUMN MAPPING ====================
+function mapColumns(hdrs) {
+  const n = hdrs.map(h => norm(h));
+  const find = kw => n.findIndex(h => h.includes(norm(kw)));
+  const findNth = (kw, nth) => {
+    let c = 0;
+    for(let i=0;i<n.length;i++){
+      if(n[i].includes(norm(kw))) { if(++c===nth) return i; }
+    }
+    return -1;
+  };
+  const C = {};
+  C.municipio       = find('municipio');
+  C.fechaVac        = n.findIndex(h=>h.includes('fecha_vacunacion')||h.includes('fecha vacunacion'));
+  C.tipoEdad        = find('tipo edad');
+  C.edadVac         = find('edad a la fecha');
+  C.edadActual      = find('edad actual');
+  C.sexo            = find('sexo');
+  // Fecha nacimiento: nombre completo ("fecha de nacimiento") o abreviado ("fecha nacimiento")
+  C.fechaNac        = n.findIndex(h=>h.includes('fecha') && h.includes('nacimiento'));
+  C.telefono        = find('telefono');
+  C.barrio          = find('barrio');
+  C.direccion       = find('direcci');
+  C.regimen         = find('regimen');
+  C.municipioRes    = findNth('municipio',2);
+  C.esquemaCompleto = find('esquema completo');
+  C.vacunador       = find('nombre del vacunador');
+  // Doc niño: nombre completo ("numero de identificaci…") o abreviado ("num id ni")
+  C.docNino = n.findIndex(h=>h.includes('numero de identificaci') && (h.includes('ni') || h.includes('menor') || h.includes('paciente')));
+  if(C.docNino<0) C.docNino = n.findIndex(h=>h.includes('num id ni'));
+  if(C.docNino<0) C.docNino = findNth('numero de identificaci',2);
+  // Nombres/apellidos niño: acepta "del niño" o solo "niño"
+  C.primerAp  = n.findIndex(h=>h.includes('primer apellido') && (h.includes('del ni')||h.includes('ni')||h.includes('menor')) && !h.includes('madre'));
+  C.segundoAp = n.findIndex(h=>h.includes('segundo apellido') && (h.includes('del ni')||h.includes('ni')||h.includes('menor')) && !h.includes('madre'));
+  C.primerNom = n.findIndex(h=>h.includes('primer nombre') && (h.includes('del ni')||h.includes('ni')||h.includes('menor')) && !h.includes('madre'));
+  C.segundoNom= n.findIndex(h=>h.includes('segundo nombre') && (h.includes('del ni')||h.includes('ni')||h.includes('menor')) && !h.includes('madre'));
+  // Madre: acepta "de la madre" o solo "madre"
+  C.primerNomMadre  = n.findIndex(h=>h.includes('primer nombre') && h.includes('madre'));
+  C.primerApMadre   = n.findIndex(h=>h.includes('primer apellido') && h.includes('madre'));
+  // Vaccines
+  C.bcg           = find('bcg');
+  C.hepB          = n.findIndex(h=>h.includes('hepatitis b')&&h.includes('dosis')&&!h.includes('no pai'));
+  C.vpob          = n.findIndex(h=>(h.includes('vpob')||h.includes('oralmonovalente'))&&h.includes('dosis'));
+  C.vpi           = n.findIndex(h=>(h.includes('vpi')||h.includes('inactivado'))&&h.includes('dosis')&&!h.endsWith('1'));
+  C.pentavalente  = n.findIndex(h=>h.includes('pentavalente')&&h.includes('dosis'));
+  C.dpt           = n.findIndex(h=>h.startsWith('dpt')&&h.includes('dosis')&&!h.includes('pediatri')&&!h.includes('acelular')&&!h.includes('hib'));
+  C.rotavirus     = n.findIndex(h=>h.includes('rotavirus')&&h.includes('dosis')&&!h.includes('.1'));
+  C.neumococo     = n.findIndex(h=>h.includes('neumococo')&&h.includes('dosis')&&!h.includes('23')&&!h.includes('.1'));
+  C.tripleViral   = n.findIndex(h=>h.includes('triple viral')&&h.includes('dosis')&&!h.includes('.1'));
+  C.hepA          = n.findIndex(h=>h.includes('hepatitis a')&&h.includes('pai')&&h.includes('dosis'));
+  C.varicela      = n.findIndex(h=>h.includes('varicela')&&h.includes('dosis')&&!h.includes('.1'));
+  C.fiebreAmarilla= n.findIndex(h=>h.includes('fiebre amarilla')&&h.includes('dosis')&&!h.includes('.1'));
+  C.influenza     = n.findIndex(h=>h.includes('influenza')&&h.includes('dosis')&&!h.includes('.1'));
+  return C;
+}
+
+// ==================== EDAD ACTUAL PARSER ====================
+// Parsea texto como "2 años, 10 meses y 14 días" → meses totales
+function parseEdadActualMeses(str){
+  if(!str) return null;
+  const s = str.toString();
+  const mA = s.match(/(\d+)\s*a[ñn]/i);
+  const mM = s.match(/(\d+)\s*mes/i);
+  if(!mA && !mM) return null;
+  const anios = mA ? parseInt(mA[1]) : 0;
+  const meses = mM ? parseInt(mM[1]) : 0;
+  return anios * 12 + meses;
+}
+
+// ==================== DATE UTILS ====================
+function toDate(val){
+  if(!val) return null;
+  if(val instanceof Date) return val;
+  if(typeof val==='number'){
+    const d = new Date(Math.round((val-25569)*86400000));
+    return isNaN(d.getTime())?null:d;
+  }
+  if(typeof val==='string'){
+    const d=new Date(val);
+    return isNaN(d.getTime())?null:d;
+  }
+  return null;
+}
+function fmtDate(val){
+  const d=toDate(val);
+  if(!d) return '';
+  return d.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function getYear(val){
+  const d=toDate(val);
+  return d?d.getFullYear():null;
+}
+function getMonthKey(val){
+  const d=toDate(val);
+  if(!d) return null;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+// ==================== ENCABEZADO BASE (orden del consolidado enviado a Sheets) ====================
+const ENCABEZADO_BASE = [
+  'MUNICIPIO','FECHA_VACUNACION','CONSECUTIVO','DIA',
+  'TIPO ID MADRE','NUM ID MADRE',
+  'PRIMER NOMBRE MADRE','SEGUNDO NOMBRE MADRE',
+  'PRIMER APELLIDO MADRE','SEGUNDO APELLIDO MADRE',
+  'TIPO ID NIÑO','NUM ID NIÑO','FECHA NACIMIENTO',
+  'TIPO EDAD','EDAD A LA FECHA DE VACUNACION','EDAD ACTUAL',
+  'SEXO',
+  'PRIMER APELLIDO NIÑO','SEGUNDO APELLIDO NIÑO',
+  'PRIMER NOMBRE NIÑO','SEGUNDO NOMBRE NIÑO',
+  'REGIMEN','ASEGURADORA','DEPTO RESIDENCIA',
+  'MUNICIPIO RESIDENCIA','AREA RESIDENCIA',
+  'BARRIO / VEREDA','DIRECCION','TELEFONO',
+  'GRUPO ETNICO','CONDICION DESPLAZAMIENTO',
+  'CONDICION DISCAPACIDAD','CORREO'
+];
+let plantillaHeaders = []; // encabezados completos (base + vacunas) del último XLS procesado
+
+// ==================== DATOS COMPARTIDOS: desde archivo o desde Sheets ====================
+function processData(hdrs, allRows, fuente) {
+  headers = hdrs.map(h=>(h||'').toString().trim());
+  COL = mapColumns(headers);
+
+  const filas = allRows.filter(r=>r && r[COL.municipio] != null && r[COL.municipio] !== '');
+
+  // Deduplicar por documento del niño (más reciente gana)
+  const byDoc = new Map();
+  const sinDoc = [];
+  filas.forEach(row => {
+    const doc = (row[COL.docNino]||'').toString().trim();
+    if(!doc){ sinDoc.push(row); return; }
+    if(!byDoc.has(doc)){
+      byDoc.set(doc, row);
+    } else {
+      const prev = byDoc.get(doc);
+      const prevDate = toDate(prev[COL.fechaVac]);
+      const currDate = toDate(row[COL.fechaVac]);
+      if(currDate && (!prevDate || currDate > prevDate)) byDoc.set(doc, row);
+    }
+  });
+  rawData = [...byDoc.values(), ...sinDoc];
+
+  const duplicados = filas.length - rawData.length;
+  const fi = document.getElementById('fileInfo');
+  const ss = document.getElementById('sheetsStatus');
+  const msg = `${rawData.length.toLocaleString('es-CO')} niños únicos` +
+    (duplicados>0 ? ` · ${duplicados.toLocaleString('es-CO')} duplicados eliminados` : '');
+
+  if(fuente==='sheets'){
+    ss.textContent = '✅ ' + msg;
+    ss.className = 'ds-status ok';
+  } else {
+    fi.textContent = '✅ ' + msg;
+    fi.className = 'ds-status ok';
+  }
+  document.getElementById('lastFile').textContent = fuente==='sheets' ? '☁ Google Sheets' : fuente;
+
+  populateMunicipios();
+  applyFilters();
+  showUI();
+}
+
+// ==================== CARGA DESDE GOOGLE SHEETS ====================
+async function loadFromSheets() {
+  const url = getScriptUrl() || DEFAULT_SCRIPT_URL;
+  if(!url){ alert('Configura primero la URL del Apps Script en la pestaña Carga Mensual.'); return; }
+
+  const btn = document.getElementById('btnLoadSheets');
+  const ss  = document.getElementById('sheetsStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ Cargando...';
+  ss.textContent = 'Consultando Google Sheets...';
+  ss.className = 'ds-status loading';
+
+  try {
+    const resp = await fetch(url + '?action=datos', { mode: 'cors' });
+    const data = await resp.json();
+    if(data.error) throw new Error(data.error);
+    if(!data.headers || !data.rows || data.rows.length === 0)
+      throw new Error('No hay datos en Google Sheets todavía.');
+
+    processData(data.headers, data.rows, 'sheets');
+    btn.textContent = '↻ Actualizar';
+    btn.disabled = false;
+  } catch(err){
+    ss.textContent = '❌ ' + err.message;
+    ss.className = 'ds-status err';
+    btn.textContent = '↓ Cargar datos';
+    btn.disabled = false;
+    console.error(err);
+  }
+}
+
+// ==================== FILE LOADING ====================
+function handleFileInput(inp){
+  if(inp.files[0]) processFile(inp.files[0]);
+}
+
+function processFile(file){
+  if(!/\.(xlsx|xls)$/i.test(file.name)){
+    alert('Por favor selecciona un archivo .xlsx o .xls'); return;
+  }
+  const fi = document.getElementById('fileInfo');
+  fi.textContent = '⏳ Cargando...';
+  fi.className = 'ds-status loading';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:false, dateNF:'yyyy-mm-dd'});
+      if(!json || json.length < 2){ alert('El archivo no tiene datos suficientes.'); return; }
+      processData(json[0], json.slice(1), file.name);
+    } catch(err){
+      fi.textContent = '❌ ' + err.message;
+      fi.className = 'ds-status err';
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function populateMunicipios(){
+  const sel = document.getElementById('fMunicipio');
+  const munis = [...new Set(rawData.map(r=>r[COL.municipio]).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos los municipios</option>';
+  munis.forEach(m => {
+    const o = document.createElement('option');
+    o.value = o.textContent = m;
+    sel.appendChild(o);
+  });
+}
+
+function showUI(){
+  ['filterBar','statsGrid','chartsGrid','susceptSection','tableSection'].forEach(id=>{
+    document.getElementById(id).style.display='';
+  });
+}
+
+// ==================== FILTERS ====================
+function applyFilters(){
+  const mun  = document.getElementById('fMunicipio').value;
+  const anio = document.getElementById('fAnio').value;
+  const edad = document.getElementById('fEdad').value;
+
+  let data = rawData;
+
+  if(mun)  data = data.filter(r=>r[COL.municipio]===mun);
+  if(anio) data = data.filter(r=>getYear(r[COL.fechaVac])===parseInt(anio));
+
+  if(edad && ESQUEMA_PAI[edad]){
+    const {minMeses, maxMeses} = ESQUEMA_PAI[edad];
+    data = data.filter(r=>{
+      // Filtrar por EDAD ACTUAL del niño (no la edad al momento de vacunación)
+      const totalMeses = parseEdadActualMeses(r[COL.edadActual]);
+      if(totalMeses === null) return false;
+      return totalMeses >= minMeses && totalMeses <= maxMeses;
+    });
+  }
+
+  filteredData = data;
+  currentPage = 1;
+  updateStats();
+  renderCharts();
+  renderSusceptibles();
+  renderTableData();
+}
+
+function resetFilters(){
+  document.getElementById('fMunicipio').value='';
+  document.getElementById('fAnio').value='';
+  document.getElementById('fEdad').value='';
+  applyFilters();
+}
+
+// ==================== STATS ====================
+function updateStats(){
+  const total = filteredData.length;
+  const susceptibles = computeSusceptibles();
+  const vacunados = total - susceptibles.length;
+  const pct = total>0 ? Math.round(vacunados/total*100) : 0;
+  const munis = new Set(filteredData.map(r=>r[COL.municipio]).filter(Boolean)).size;
+
+  document.getElementById('sTotal').textContent = total.toLocaleString('es-CO');
+  document.getElementById('sTotalSub').textContent = 'Registros en selección actual';
+  document.getElementById('sVacunados').textContent = vacunados.toLocaleString('es-CO');
+  document.getElementById('sSusc').textContent = susceptibles.length.toLocaleString('es-CO');
+  document.getElementById('sCob').textContent = pct+'%';
+  document.getElementById('sCobSub').textContent = `${vacunados} de ${total} registros completos`;
+  document.getElementById('sMunis').textContent = munis;
+  document.getElementById('sMunisSub').textContent = [...new Set(filteredData.map(r=>r[COL.municipio]).filter(Boolean))].join(', ');
+
+  document.getElementById('pVacunados').style.width = pct+'%';
+  document.getElementById('pSusc').style.width = (100-pct)+'%';
+}
+
+// ==================== SUSCEPTIBLES ====================
+function hasVaccine(row, key){
+  const idx = COL[key];
+  if(idx==null||idx<0) return true; // column not found → assume ok
+  const val = row[idx];
+  return val!=null && val.toString().trim()!=='' && val.toString().trim().toLowerCase()!=='nan';
+}
+
+function getMissingVaccines(row, ageKey){
+  if(!ageKey || !ESQUEMA_PAI[ageKey]) {
+    // Sin grupo de edad seleccionado: solo susceptible si la columna dice explícitamente "No"
+    if(COL.esquemaCompleto>=0){
+      const v = (row[COL.esquemaCompleto]||'').toString().trim().toLowerCase();
+      return (v==='no') ? ['Esquema incompleto'] : [];
+    }
+    return [];
+  }
+  return ESQUEMA_PAI[ageKey].vacunas
+    .filter(v=>!hasVaccine(row,v.key))
+    .map(v=>v.nombre);
+}
+
+function computeSusceptibles(){
+  const edad = document.getElementById('fEdad').value;
+  return filteredData
+    .map(row => ({ row, missing: getMissingVaccines(row, edad) }))
+    .filter(x => x.missing.length > 0);
+}
+
+function renderSusceptibles(){
+  const susc = computeSusceptibles();
+  const total = filteredData.length;
+  const pct = total>0 ? Math.round(susc.length/total*100) : 0;
+  const edad = document.getElementById('fEdad').value;
+  const scheme = ESQUEMA_PAI[edad];
+
+  document.getElementById('susceptCount').textContent = susc.length.toLocaleString('es-CO');
+  document.getElementById('susceptPct').textContent = `${pct}% del total filtrado`;
+  document.getElementById('susceptDesc').textContent = scheme
+    ? `Niños de ${scheme.label} con vacunas pendientes: ${scheme.vacunas.map(v=>v.nombre).join(', ')}`
+    : 'Niños con esquema de vacunación incompleto para su edad';
+
+  // Preview table (first 10)
+  const preview = susc.slice(0,10);
+  if(preview.length===0){
+    document.getElementById('susceptTable').innerHTML =
+      '<div style="text-align:center;padding:24px;color:var(--green)">✅ ¡No se encontraron susceptibles con los filtros actuales!</div>';
+    return;
+  }
+
+  let html = '<div class="table-wrap"><table><thead><tr>' +
+    '<th>Nombre Niño/a</th><th>Documento</th><th>Municipio</th>' +
+    '<th>Edad Actual</th><th>Teléfono</th><th>Vacunas Pendientes</th></tr></thead><tbody>';
+
+  preview.forEach(({row, missing}) => {
+    const nombre = [row[COL.primerNom],row[COL.segundoNom],row[COL.primerAp],row[COL.segundoAp]]
+      .filter(Boolean).join(' ') || 'Sin nombre';
+    const doc   = row[COL.docNino] || '—';
+    const mun   = row[COL.municipio] || '—';
+    const edadA = row[COL.edadActual] || '—';
+    const tel   = row[COL.telefono] || '—';
+    const vacsHtml = missing.map(v=>`<span class="vacp">${v}</span>`).join(' ');
+    html += `<tr><td><strong>${nombre}</strong></td><td style="font-variant-numeric:tabular-nums">${doc}</td>
+      <td>${mun}</td><td>${edadA}</td><td>${tel}</td>
+      <td><div class="vacp-list">${vacsHtml}</div></td></tr>`;
+  });
+
+  if(susc.length > 10){
+    html += `<tr><td colspan="6" style="text-align:center;padding:12px;color:var(--muted);font-style:italic">
+      ... y ${(susc.length-10).toLocaleString('es-CO')} más. Descarga el Excel para ver el listado completo.</td></tr>`;
+  }
+  html += '</tbody></table></div>';
+  document.getElementById('susceptTable').innerHTML = html;
+}
+
+// ==================== DOWNLOAD SUSCEPTIBLES ====================
+function downloadSusceptibles(){
+  const susc = computeSusceptibles();
+  if(susc.length===0){ alert('No hay susceptibles con los filtros actuales.'); return; }
+
+  const edad = document.getElementById('fEdad').value;
+  const scheme = ESQUEMA_PAI[edad];
+  const fechaHoy = new Date().toLocaleDateString('es-CO');
+
+  const wsData = [
+    ['REPORTE SUSCEPTIBLES PAI - ESE HRNO'],
+    [`Generado: ${fechaHoy}  |  Grupo edad: ${scheme?scheme.label:'Todos'}  |  Total susceptibles: ${susc.length}`],
+    [],
+    ['MUNICIPIO','NOMBRE COMPLETO NIÑO/A','DOC NIÑO/A','FECHA NACIMIENTO',
+     'EDAD ACTUAL','SEXO','TELÉFONO','NOMBRE MADRE','DIRECCIÓN DE RESIDENCIA',
+     'BARRIO / VEREDA','RÉGIMEN','MUNICIPIO RESIDENCIA','VACUNAS PENDIENTES']
+  ];
+
+  susc.forEach(({row, missing}) => {
+    const nombre = [row[COL.primerNom],row[COL.segundoNom],row[COL.primerAp],row[COL.segundoAp]]
+      .filter(Boolean).join(' ');
+    const madre = [row[COL.primerNomMadre],row[COL.primerApMadre]].filter(Boolean).join(' ');
+    wsData.push([
+      row[COL.municipio]||'',
+      nombre||'',
+      row[COL.docNino]||'',
+      fmtDate(row[COL.fechaNac]),
+      row[COL.edadActual]||'',
+      row[COL.sexo]||'',
+      row[COL.telefono]||'',
+      madre||'',
+      row[COL.direccion]||'',
+      row[COL.barrio]||'',
+      row[COL.regimen]||'',
+      row[COL.municipioRes]||row[COL.municipio]||'',
+      missing.join(', ')
+    ]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths (13 columnas)
+  ws['!cols'] = [12,30,14,16,22,10,14,25,35,25,18,18,45].map(w=>({wch:w}));
+
+  // Style header rows (merge title)
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:12}},{s:{r:1,c:0},e:{r:1,c:12}}];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Susceptibles');
+
+  // Summary sheet
+  const muniCount = {};
+  susc.forEach(({row})=>{
+    const m = row[COL.municipio]||'Sin municipio';
+    muniCount[m] = (muniCount[m]||0)+1;
+  });
+  const wsRes = XLSX.utils.aoa_to_sheet([
+    ['RESUMEN POR MUNICIPIO'],
+    ['Municipio','Susceptibles'],
+    ...Object.entries(muniCount).sort((a,b)=>b[1]-a[1])
+  ]);
+  XLSX.utils.book_append_sheet(wb, wsRes, 'Resumen');
+
+  const fn = `Susceptibles_PAI_${edad||'Todos'}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, fn);
+}
+
+function downloadFiltered(){
+  if(filteredData.length===0){ alert('No hay datos con los filtros actuales.'); return; }
+
+  const edad = document.getElementById('fEdad').value;
+  const mun  = document.getElementById('fMunicipio').value;
+  const anio = document.getElementById('fAnio').value;
+  const fechaHoy = new Date().toLocaleDateString('es-CO');
+
+  const wsData = [
+    ['LISTADO FILTRADO PAI - ESE HRNO'],
+    [`Generado: ${fechaHoy}  |  Municipio: ${mun||'Todos'}  |  Año: ${anio||'Todos'}  |  Grupo edad: ${ESQUEMA_PAI[edad]?ESQUEMA_PAI[edad].label:'Todos'}  |  Total: ${filteredData.length}`],
+    [],
+    ['MUNICIPIO','NOMBRE COMPLETO NIÑO/A','DOC NIÑO/A','FECHA NACIMIENTO',
+     'EDAD ACTUAL','SEXO','TELÉFONO','NOMBRE MADRE','DIRECCIÓN DE RESIDENCIA',
+     'BARRIO / VEREDA','RÉGIMEN','MUNICIPIO RESIDENCIA','F. VACUNACIÓN','VACUNADOR']
+  ];
+
+  filteredData.forEach(row => {
+    const nombre = [row[COL.primerNom],row[COL.segundoNom],row[COL.primerAp],row[COL.segundoAp]]
+      .filter(Boolean).join(' ');
+    const madre = [row[COL.primerNomMadre],row[COL.primerApMadre]].filter(Boolean).join(' ');
+    wsData.push([
+      row[COL.municipio]||'',
+      nombre||'',
+      row[COL.docNino]||'',
+      fmtDate(row[COL.fechaNac]),
+      row[COL.edadActual]||'',
+      row[COL.sexo]||'',
+      row[COL.telefono]||'',
+      madre||'',
+      row[COL.direccion]||'',
+      row[COL.barrio]||'',
+      row[COL.regimen]||'',
+      row[COL.municipioRes]||row[COL.municipio]||'',
+      fmtDate(row[COL.fechaVac]),
+      row[COL.vacunador]||''
+    ]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [12,30,14,16,22,10,14,25,35,25,18,18,16,25].map(w=>({wch:w}));
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:13}},{s:{r:1,c:0},e:{r:1,c:13}}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Listado');
+  XLSX.writeFile(wb, `PAI_Filtrado_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ==================== CHARTS ====================
+const chartDefaults = {
+  color: '#e6edf3',
+  borderColor: '#30363d',
+  font: {family:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', size:11}
+};
+Chart.defaults.color = chartDefaults.color;
+Chart.defaults.borderColor = chartDefaults.borderColor;
+Chart.defaults.font = chartDefaults.font;
+
+function renderCharts(){
+  renderMunicipioChart();
+  renderEdadChart();
+  renderTendenciaChart();
+}
+
+function renderMunicipioChart(){
+  const counts = {};
+  filteredData.forEach(r=>{
+    const m = r[COL.municipio]||'Sin municipio';
+    counts[m]=(counts[m]||0)+1;
+  });
+  const labels = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  const values = labels.map(l=>counts[l]);
+
+  if(chartMunic) chartMunic.destroy();
+  const ctx = document.getElementById('chartMunicipio').getContext('2d');
+  chartMunic = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'Registros',
+        data:values,
+        backgroundColor:['rgba(74,111,165,.7)','rgba(124,29,111,.7)','rgba(56,199,147,.7)','rgba(233,69,96,.7)'],
+        borderRadius:6,
+        borderSkipped:false
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y} registros`}}},
+      scales:{
+        x:{grid:{display:false}},
+        y:{grid:{color:'rgba(48,54,61,.6)'},beginAtZero:true,ticks:{precision:0}}
+      }
+    }
+  });
+}
+
+function renderEdadChart(){
+  const labels = Object.values(ESQUEMA_PAI).map(s=>s.label);
+  const keys   = Object.keys(ESQUEMA_PAI);
+  const values = keys.map(k=>{
+    const s=ESQUEMA_PAI[k];
+    return filteredData.filter(r=>{
+      const tipo=(r[COL.tipoEdad]||'').toString().toUpperCase().trim();
+      const e=parseInt(r[COL.edadVac])||0;
+      return tipo===s.tipo && e===s.edad;
+    }).length;
+  });
+
+  if(chartEdad) chartEdad.destroy();
+  const ctx = document.getElementById('chartEdad').getContext('2d');
+  chartEdad = new Chart(ctx,{
+    type:'doughnut',
+    data:{
+      labels,
+      datasets:[{
+        data:values,
+        backgroundColor:[
+          'rgba(74,111,165,.8)','rgba(124,29,111,.8)','rgba(56,199,147,.8)',
+          'rgba(233,69,96,.8)','rgba(255,180,50,.8)','rgba(240,136,62,.8)','rgba(126,168,216,.8)'
+        ],
+        borderWidth:2,borderColor:'#161b22'
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      cutout:'60%',
+      plugins:{
+        legend:{position:'right',labels:{boxWidth:12,padding:8,font:{size:10}}},
+        tooltip:{callbacks:{label:c=>`${c.label}: ${c.parsed} registros`}}
+      }
+    }
+  });
+}
+
+function renderTendenciaChart(){
+  const counts = {};
+  filteredData.forEach(r=>{
+    const k=getMonthKey(r[COL.fechaVac]);
+    if(k) counts[k]=(counts[k]||0)+1;
+  });
+  const labels = Object.keys(counts).sort();
+  const values = labels.map(l=>counts[l]);
+  const labelsFmt = labels.map(l=>{
+    const [y,m]=l.split('-');
+    const date=new Date(parseInt(y),parseInt(m)-1,1);
+    return date.toLocaleDateString('es-CO',{month:'short',year:'2-digit'});
+  });
+
+  if(chartTend) chartTend.destroy();
+  const ctx = document.getElementById('chartTendencia').getContext('2d');
+  chartTend = new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:labelsFmt,
+      datasets:[{
+        label:'Vacunaciones',
+        data:values,
+        borderColor:'#38c793',
+        backgroundColor:'rgba(56,199,147,.1)',
+        fill:true,tension:.4,
+        pointRadius:4,pointHoverRadius:6,
+        pointBackgroundColor:'#38c793',borderWidth:2
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false}},
+        y:{grid:{color:'rgba(48,54,61,.6)'},beginAtZero:true,ticks:{precision:0}}
+      }
+    }
+  });
+}
+
+// ==================== TABLE ====================
+let searchTerm = '';
+
+function setTab(tab, btn){
+  tableTab = tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  currentPage = 1;
+  renderTableData();
+}
+
+function onSearch(){
+  searchTerm = document.getElementById('searchInput').value.toLowerCase();
+  currentPage = 1;
+  renderTableData();
+}
+
+function renderTableData(){
+  const edad = document.getElementById('fEdad').value;
+  let data = filteredData;
+
+  if(tableTab === 'suscept'){
+    data = computeSusceptibles().map(x=>x.row);
+  }
+
+  if(searchTerm){
+    data = data.filter(row=>{
+      const nombre = [row[COL.primerNom],row[COL.segundoNom],row[COL.primerAp],row[COL.segundoAp]]
+        .filter(Boolean).join(' ').toLowerCase();
+      const doc  = (row[COL.docNino]||'').toString().toLowerCase();
+      const mun  = (row[COL.municipio]||'').toLowerCase();
+      return nombre.includes(searchTerm)||doc.includes(searchTerm)||mun.includes(searchTerm);
+    });
+  }
+
+  tableData = data;
+  const total = tableData.length;
+  const pages = Math.ceil(total/PAGE_SIZE);
+  if(currentPage>pages) currentPage=1;
+
+  const pageData = tableData.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE);
+
+  document.getElementById('tableCount').textContent =
+    `${total.toLocaleString('es-CO')} registros${searchTerm?' (filtrados)':''}`;
+
+  // Build table HTML
+  let html = '<table><thead><tr>' +
+    '<th onclick="sortTable(0)">Nombre Niño/a <span class="sort-icon">&#8597;</span></th>' +
+    '<th onclick="sortTable(1)">Documento <span class="sort-icon">&#8597;</span></th>' +
+    '<th onclick="sortTable(2)">Municipio <span class="sort-icon">&#8597;</span></th>' +
+    '<th onclick="sortTable(3)">F. Vacunación <span class="sort-icon">&#8597;</span></th>' +
+    '<th onclick="sortTable(4)">Edad Vac. <span class="sort-icon">&#8597;</span></th>' +
+    '<th onclick="sortTable(5)">Edad Actual <span class="sort-icon">&#8597;</span></th>' +
+    '<th>Sexo</th>' +
+    '<th>Susceptible</th>' +
+    '</tr></thead><tbody>';
+
+  if(pageData.length===0){
+    html += '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🔍</div>' +
+      '<h3>Sin resultados</h3><p>Ningún registro coincide con los filtros aplicados.</p></div></td></tr>';
+  }
+
+  pageData.forEach(row => {
+    const nombre = [row[COL.primerNom],row[COL.segundoNom],row[COL.primerAp],row[COL.segundoAp]]
+      .filter(Boolean).join(' ') || 'Sin nombre';
+    const doc    = row[COL.docNino] || '—';
+    const mun    = row[COL.municipio] || '—';
+    const fvac   = fmtDate(row[COL.fechaVac]);
+    const tipo   = (row[COL.tipoEdad]||'').trim();
+    const e      = row[COL.edadVac];
+    const edadVacStr = (e!=null&&e!='') ? `${e} ${tipo==='M'?'mes(es)':tipo==='A'?'año(s)':''}` : '—';
+    const edadA  = row[COL.edadActual] || '—';
+    const sexo   = row[COL.sexo] || '—';
+    const missing = getMissingVaccines(row, edad);
+    const badge  = missing.length===0
+      ? '<span class="badge badge-green">✓ Completo</span>'
+      : '<span class="badge badge-red">⚠ Susceptible</span>';
+
+    html += `<tr>
+      <td><strong>${nombre}</strong></td>
+      <td style="font-variant-numeric:tabular-nums;color:var(--muted)">${doc}</td>
+      <td>${mun}</td>
+      <td>${fvac}</td>
+      <td>${edadVacStr}</td>
+      <td style="font-size:12px">${edadA}</td>
+      <td><span class="badge ${sexo.toLowerCase().startsWith('f')?'badge-blue':'badge-yellow'}">${sexo}</span></td>
+      <td>${badge}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('tableWrap').innerHTML = html;
+
+  // Pagination
+  renderPagination(total, pages);
+}
+
+function sortTable(colIdx){
+  // Map display col index to COL key
+  const map = [COL.primerNom, COL.docNino, COL.municipio, COL.fechaVac, COL.edadVac, COL.edadActual];
+  const idx = map[colIdx];
+  if(idx==null) return;
+  if(sortCol===colIdx) sortDir*=-1;
+  else { sortCol=colIdx; sortDir=1; }
+  tableData.sort((a,b)=>{
+    const av=(a[idx]||'').toString(), bv=(b[idx]||'').toString();
+    return av.localeCompare(bv,'es',{numeric:true})*sortDir;
+  });
+  renderTableData();
+}
+
+function renderPagination(total, pages){
+  if(pages<=1){ document.getElementById('pagination').innerHTML=''; return; }
+  const start=(currentPage-1)*PAGE_SIZE+1;
+  const end=Math.min(currentPage*PAGE_SIZE,total);
+  let html = `<span class="page-info">Mostrando ${start}–${end} de ${total.toLocaleString('es-CO')}</span>`;
+  html += '<div class="page-btns">';
+  html += `<button class="page-btn" onclick="gotoPage(${currentPage-1})" ${currentPage===1?'disabled':''}>&#8592;</button>`;
+
+  const range = [];
+  if(pages<=7){
+    for(let i=1;i<=pages;i++) range.push(i);
+  } else {
+    range.push(1);
+    if(currentPage>3) range.push('...');
+    for(let i=Math.max(2,currentPage-1);i<=Math.min(pages-1,currentPage+1);i++) range.push(i);
+    if(currentPage<pages-2) range.push('...');
+    range.push(pages);
+  }
+
+  range.forEach(r=>{
+    if(r==='...') html+=`<span class="page-btn" style="border:none;cursor:default">…</span>`;
+    else html+=`<button class="page-btn ${r===currentPage?'active':''}" onclick="gotoPage(${r})">${r}</button>`;
+  });
+
+  html += `<button class="page-btn" onclick="gotoPage(${currentPage+1})" ${currentPage===pages?'disabled':''}>&#8594;</button>`;
+  html += '</div>';
+  document.getElementById('pagination').innerHTML = html;
+}
+
+function gotoPage(p){
+  const pages = Math.ceil(tableData.length/PAGE_SIZE);
+  if(p<1||p>pages) return;
+  currentPage=p;
+  renderTableData();
+}
+
+// ==================== TAB SWITCHER ====================
+const ANALISIS_IDS = ['dataSourceCard','filterBar','statsGrid','chartsGrid','susceptSection','tableSection'];
+
+function switchMainTab(tab) {
+  const toAnalisis = tab === 'analisis';
+  ANALISIS_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (toAnalisis) {
+      if (el.dataset.tabHidden === '1') {
+        el.style.display = el.dataset.origDisplay || '';
+        el.dataset.tabHidden = '0';
+      }
+    } else {
+      el.dataset.origDisplay = el.style.display;
+      el.dataset.tabHidden = '1';
+      el.style.display = 'none';
+    }
+  });
+  document.getElementById('tabCarga').style.display = toAnalisis ? 'none' : '';
+  document.getElementById('tabBtnAnalisis').classList.toggle('active', toAnalisis);
+  document.getElementById('tabBtnCarga').classList.toggle('active', !toAnalisis);
+  if (!toAnalisis) { renderStatusGrid(); loadScriptUrl(); }
+}
+
+// ==================== CARGA MENSUAL — CONFIG ====================
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwRiSf8pAVWi3_Y9b3Il3nUhlohd5sRIPDvhIvW9QlC0NYeTy48hpE2CrWtsIz0f6r2YQ/exec';
+
+function loadScriptUrl() {
+  const saved = localStorage.getItem('pai_script_url') || DEFAULT_SCRIPT_URL;
+  document.getElementById('gsScriptUrl').value = saved;
+}
+
+function saveScriptUrl() {
+  const url = document.getElementById('gsScriptUrl').value.trim();
+  if (url) localStorage.setItem('pai_script_url', url);
+}
+
+function getScriptUrl() {
+  return document.getElementById('gsScriptUrl').value.trim() || DEFAULT_SCRIPT_URL;
+}
+
+// ==================== PLANTILLA XLS UPLOAD ====================
+let plantillaRaw = null;   // raw parsed data
+let plantillaRows = null;  // transformed rows ready to send
+let plantillaFile = null;  // file reference
+
+const dropZonePl = document.getElementById('uploadZonePlantilla');
+dropZonePl.addEventListener('dragover', e => { e.preventDefault(); dropZonePl.classList.add('drag-over'); });
+dropZonePl.addEventListener('dragleave', () => dropZonePl.classList.remove('drag-over'));
+dropZonePl.addEventListener('drop', e => {
+  e.preventDefault(); dropZonePl.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) processPlantilla(e.dataTransfer.files[0]);
+});
+
+function handlePlantillaInput(inp) {
+  if (inp.files[0]) processPlantilla(inp.files[0]);
+}
+
+function processPlantilla(file) {
+  plantillaFile = file;
+  const info = document.getElementById('plantillaInfo');
+  info.style.display = 'block';
+  info.textContent = '⏳ Leyendo archivo...';
+  info.style.color = 'var(--muted)';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array', cellDates: true });
+
+      // Detectar metadata desde el nombre del archivo
+      const det = detectMetaFromFilename(file.name);
+
+      // Poblar selects de metadata
+      if (det.municipio) document.getElementById('metaMunicipio').value = det.municipio;
+      if (det.mes)       document.getElementById('metaMes').value = det.mes;
+      if (det.anio)      document.getElementById('metaAnio').value = det.anio;
+
+      plantillaRaw = wb;
+      const result = parsePlantillaWb(wb, det);
+
+      // Guardar headers completos (base + vacunas) para enviar a Google Sheets
+      plantillaHeaders = [...ENCABEZADO_BASE, ...result.vaccineHdrs];
+
+      info.style.color = 'var(--green)';
+      info.textContent = `✅ ${file.name} — ${result.rows.length} registros detectados`;
+      dropZonePl.classList.add('loaded');
+
+      showMeta(det);
+      showPreview(result);
+      plantillaRows = result.rows;
+    } catch (err) {
+      info.style.color = 'var(--red)';
+      info.textContent = '❌ Error: ' + err.message;
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function reparse() {
+  if (!plantillaRaw) return;
+  const det = {
+    municipio: document.getElementById('metaMunicipio').value,
+    mes:       document.getElementById('metaMes').value,
+    anio:      document.getElementById('metaAnio').value
+  };
+  const result = parsePlantillaWb(plantillaRaw, det);
+  plantillaRows = result.rows;
+  showPreview(result);
+  document.getElementById('plantillaInfo').textContent =
+    `✅ ${plantillaFile ? plantillaFile.name : 'archivo'} — ${result.rows.length} registros`;
+}
+
+// ==================== DETECT METADATA FROM FILENAME ====================
+function detectMetaFromFilename(filename) {
+  const fn = filename.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const MUNI_MAP = {
+    'ABREGO':'Ábrego','CONVENCION':'Convención','EL CARMEN':'El Carmen','TEORAMA':'Teorama'
+  };
+  const MES_MAP = {
+    'ENERO':'01','FEBRERO':'02','MARZO':'03','ABRIL':'04','MAYO':'05','JUNIO':'06',
+    'JULIO':'07','AGOSTO':'08','SEPTIEMBRE':'09','OCTUBRE':'10','NOVIEMBRE':'11','DICIEMBRE':'12'
+  };
+  let municipio = '', mes = '', anio = '';
+  for (const [k, v] of Object.entries(MUNI_MAP)) { if (fn.includes(k)) { municipio = v; break; } }
+  for (const [k, v] of Object.entries(MES_MAP))  { if (fn.includes(k)) { mes = v; break; } }
+  const mA = fn.match(/\b(20\d\d)\b/);
+  if (mA) anio = mA[1];
+  return { municipio, mes, anio };
+}
+
+// ==================== PARSE PLANTILLA ====================
+function parsePlantillaWb(wb, meta) {
+  // Buscar hoja NIÑOS Y NIÑAS
+  const sheetName = wb.SheetNames.find(n =>
+    n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').includes('ni') &&
+    n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').includes('as')
+  ) || wb.SheetNames[1] || wb.SheetNames[0];
+
+  const ws = wb.Sheets[sheetName];
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: false, dateNF: 'yyyy-mm-dd' });
+
+  const municipio = meta.municipio || 'Sin municipio';
+  const mes  = meta.mes  || '01';
+  const anio = meta.anio || '2026';
+
+  // Extraer headers de vacunas: recorrer filas 5-8 y quedarse con la que más celdas llenas tenga
+  let vaccineHdrs = [];
+  for (let ri = 8; ri >= 5; ri--) {
+    const hRow = raw[ri] || [];
+    const vcols = hRow.slice(30).map(h => (h || '').toString().trim());
+    if (vcols.filter(Boolean).length > vaccineHdrs.filter(Boolean).length) {
+      vaccineHdrs = vcols;
+    }
+  }
+
+  const rows = [];
+  // Datos reales empiezan en fila 10 (índice 9 o 10); saltar filas sin consecutivo numérico
+  for (let i = 9; i < raw.length; i++) {
+    const row = raw[i];
+    if (!row) continue;
+    const cons = row[0];
+    if (!cons) continue;
+    const n = parseInt(cons);
+    if (isNaN(n) || n < 1 || n > 999) continue;
+    // Saltar si no hay documento de niño
+    if (!row[9] && !row[3]) continue;
+
+    const diaRaw = row[1];
+    const dia = diaRaw ? String(parseInt(diaRaw) || 1).padStart(2, '0') : '01';
+    const fechaVac = `${anio}-${mes}-${dia}`;
+
+    // Transformar al formato del consolidado (mismo orden de columnas)
+    const transformed = [
+      municipio,   // A: MUNICIPIO
+      fechaVac,    // B: FECHA_VACUNACION
+      row[0],      // C: CONSECUTIVO
+      row[1],      // D: DÍA
+      row[2],      // E: TIPO ID MADRE
+      row[3],      // F: NUM ID MADRE
+      row[4],      // G: PRIMER NOMBRE MADRE
+      row[5],      // H: SEGUNDO NOMBRE MADRE
+      row[6],      // I: PRIMER APELLIDO MADRE
+      row[7],      // J: SEGUNDO APELLIDO MADRE
+      row[8],      // K: TIPO ID NIÑO
+      row[9],      // L: NUM ID NIÑO
+      row[10],     // M: FECHA NACIMIENTO
+      row[11],     // N: TIPO EDAD
+      row[12],     // O: EDAD A LA FECHA
+      '',          // P: EDAD ACTUAL (calculada, vacía)
+      row[13],     // Q: SEXO
+      row[14],     // R: PRIMER APELLIDO NIÑO
+      row[15],     // S: SEGUNDO APELLIDO NIÑO
+      row[16],     // T: PRIMER NOMBRE NIÑO
+      row[17],     // U: SEGUNDO NOMBRE NIÑO
+      row[18],     // V: RÉGIMEN
+      row[19],     // W: ASEGURADORA
+      row[20],     // X: DEPTO RESIDENCIA
+      row[21],     // Y: MUNICIPIO RESIDENCIA
+      row[22],     // Z: AREA RESIDENCIA
+      row[23],     // AA: BARRIO/VEREDA
+      row[24],     // AB: DIRECCIÓN
+      row[25],     // AC: TELÉFONO
+      row[26],     // AD: GRUPO ÉTNICO
+      row[27],     // AE: CONDICIÓN DESPLAZAMIENTO
+      row[28],     // AF: CONDICIÓN DISCAPACIDAD
+      row[29],     // AG: CORREO
+      ...row.slice(30) // AH+: todas las columnas de vacunas
+    ];
+    rows.push(transformed);
+  }
+  return { municipio, mes, anio, rows, sheetName, vaccineHdrs };
+}
+
+// ==================== SHOW META & PREVIEW ====================
+function showMeta(det) {
+  document.getElementById('metaSection').style.display = '';
+}
+
+function showPreview(result) {
+  const { municipio, mes, anio, rows } = result;
+  document.getElementById('previewSection').style.display = '';
+
+  const MESES_ES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  document.getElementById('previewMeta').innerHTML = `
+    <div class="pmeta"><strong>Municipio</strong>${municipio}</div>
+    <div class="pmeta"><strong>Mes</strong>${MESES_ES[parseInt(mes)] || mes}</div>
+    <div class="pmeta"><strong>Año</strong>${anio}</div>
+    <div class="pmeta"><strong>Registros a enviar</strong>${rows.length}</div>
+  `;
+
+  if (rows.length === 0) {
+    document.getElementById('previewTable').innerHTML =
+      '<div class="empty-state"><div class="empty-icon">📋</div><h3>Sin registros</h3>' +
+      '<p>No se encontraron filas con datos válidos en la plantilla.</p></div>';
+    return;
+  }
+
+  const preview = rows.slice(0, 8);
+  let html = '<table><thead><tr>' +
+    '<th>Cons.</th><th>Día</th><th>Nombre Niño/a</th><th>Doc. Niño/a</th>' +
+    '<th>Municipio</th><th>F. Vacunación</th><th>Régimen</th></tr></thead><tbody>';
+  preview.forEach(r => {
+    const nombre = [r[19], r[20], r[17], r[18]].filter(Boolean).join(' ') || '—';
+    html += `<tr><td>${r[2]||''}</td><td>${r[3]||''}</td><td><strong>${nombre}</strong></td>
+      <td style="font-variant-numeric:tabular-nums">${r[11]||'—'}</td>
+      <td>${r[0]||''}</td><td>${r[1]||''}</td><td>${r[21]||'—'}</td></tr>`;
+  });
+  if (rows.length > 8) {
+    html += `<tr><td colspan="7" style="text-align:center;padding:10px;color:var(--muted);font-style:italic">
+      ... y ${rows.length - 8} registros más</td></tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('previewTable').innerHTML = html;
+  document.getElementById('sendProgress').textContent = '';
+}
+
+// ==================== SEND TO GOOGLE SHEETS ====================
+async function sendToSheets() {
+  if (!plantillaRows || plantillaRows.length === 0) {
+    alert('No hay datos para enviar. Carga primero una plantilla.'); return;
+  }
+  const url = getScriptUrl();
+  if (!url) { alert('Configura primero la URL del Apps Script.'); return; }
+
+  const btn = document.getElementById('btnSend');
+  const prog = document.getElementById('sendProgress');
+  btn.disabled = true;
+  btn.textContent = '⏳ Enviando...';
+  prog.style.color = 'var(--muted)';
+
+  const hoja       = document.getElementById('metaHoja').value.trim() || 'NIÑOS Y NIÑAS';
+  const municipio  = document.getElementById('metaMunicipio').value.trim();
+  const mes        = document.getElementById('metaMes').value.trim();
+  const anio       = document.getElementById('metaAnio').value.trim();
+  const yearMon    = `${anio}-${mes}`;
+
+  const BATCH = 150;
+  const total = plantillaRows.length;
+
+  try {
+    for (let i = 0; i < plantillaRows.length; i += BATCH) {
+      const chunk = plantillaRows.slice(i, i + BATCH);
+      prog.textContent = `Enviando ${Math.min(i + BATCH, total)} de ${total}...`;
+
+      // Primer lote: lleva municipio+yearMon (para deduplicar en Sheets) y los headers
+      // completos (base + vacunas) para que la hoja quede bien encabezada si está vacía.
+      // Lotes siguientes: solo insertan, sin borrar ni reenviar headers.
+      const payload = {
+        hoja,
+        rows: chunk,
+        ...(i === 0 ? {
+          municipio,
+          yearMon,
+          headers: plantillaHeaders.length > 0 ? plantillaHeaders : undefined
+        } : {})
+      };
+
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',   // Apps Script requiere no-cors desde file://
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    // Guardar en localStorage para el grid de estado
+    const municipio = document.getElementById('metaMunicipio').value;
+    const mes  = document.getElementById('metaMes').value;
+    const anio = document.getElementById('metaAnio').value;
+    markLocalStatus(municipio, `${anio}-${mes}`, total);
+
+    prog.style.color = 'var(--green)';
+    prog.textContent = `✅ ${total} registros enviados correctamente`;
+    btn.textContent = '✓ Enviado';
+    renderStatusGrid();
+
+  } catch(err) {
+    prog.style.color = 'var(--red)';
+    prog.textContent = '❌ Error: ' + err.message;
+    btn.disabled = false;
+    btn.textContent = '▶ Enviar a Google Sheets';
+  }
+}
+
+// ==================== STATUS GRID ====================
+const MUNICIPIOS_HRNO = ['Ábrego','Convención','El Carmen','Teorama'];
+const MESES_ABREV = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+// Estado combinado: Google Sheets + local
+let gsStatus  = {};   // {municipio||YYYY-MM: count} desde Apps Script
+let localStatus = {}; // {municipio||YYYY-MM: count} guardado en localStorage
+
+function loadLocalStatus() {
+  try { localStatus = JSON.parse(localStorage.getItem('pai_local_status') || '{}'); }
+  catch(e) { localStatus = {}; }
+}
+
+function markLocalStatus(municipio, yearMon, count) {
+  loadLocalStatus();
+  const key = `${municipio}||${yearMon}`;
+  localStatus[key] = (localStatus[key] || 0) + count;
+  localStorage.setItem('pai_local_status', JSON.stringify(localStatus));
+}
+
+async function fetchStatus() {
+  const url = getScriptUrl();
+  const el = document.getElementById('urlStatus');
+  if (!url) { el.textContent = '⚠ Ingresa la URL del Apps Script'; el.className = 'status-url err'; return; }
+
+  el.textContent = '⏳ Consultando Google Sheets...';
+  el.className = 'status-url';
+  try {
+    const resp = await fetch(url + '?action=status', { mode: 'cors' });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    gsStatus = data;
+    el.textContent = '✅ Conectado — estado actualizado';
+    el.className = 'status-url ok';
+  } catch(err) {
+    el.textContent = '⚠ No se pudo conectar: ' + err.message + ' (el grid usa estado local)';
+    el.className = 'status-url err';
+  }
+  renderStatusGrid();
+}
+
+function mergedStatus() {
+  loadLocalStatus();
+  const merged = Object.assign({}, gsStatus);
+  for (const [k, v] of Object.entries(localStatus)) {
+    merged[k] = Math.max(merged[k] || 0, v);
+  }
+  return merged;
+}
+
+function renderStatusGrid() {
+  loadLocalStatus();
+  const status = mergedStatus();
+
+  // Columnas: Ene 2025 … hasta mes actual + 2
+  const cols = [];
+  const now = new Date();
+  const start = new Date(2025, 0, 1);
+  const end   = new Date(now.getFullYear(), now.getMonth() + 2, 1);
+  for (let d = new Date(start); d < end; d.setMonth(d.getMonth() + 1)) {
+    cols.push({ year: d.getFullYear(), mon: d.getMonth() + 1 });
+  }
+
+  // Agrupar cols por año para el encabezado
+  const years = [...new Set(cols.map(c => c.year))];
+
+  let html = '<table class="sgrid"><thead>';
+
+  // Fila de años
+  html += '<tr><th class="mun-th" rowspan="2">Municipio</th>';
+  years.forEach(y => {
+    const count = cols.filter(c => c.year === y).length;
+    html += `<th colspan="${count}" class="year-hdr">${y}</th>`;
+  });
+  html += '</tr>';
+
+  // Fila de meses
+  html += '<tr>';
+  cols.forEach(c => {
+    html += `<th>${MESES_ABREV[c.mon - 1]}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  // Filas de municipios
+  MUNICIPIOS_HRNO.forEach(mun => {
+    html += `<tr><td class="mun-td">${mun}</td>`;
+    cols.forEach(c => {
+      const key   = `${mun}||${c.year}-${String(c.mon).padStart(2,'0')}`;
+      const count = status[key] || 0;
+      const isFut = c.year > now.getFullYear() || (c.year === now.getFullYear() && c.mon > now.getMonth() + 1);
+      if (count > 0) {
+        html += `<td><span class="cell-ok" title="${count} registros">▶ ${count}</span></td>`;
+      } else if (isFut) {
+        html += `<td><span class="cell-empty" style="opacity:.3">—</span></td>`;
+      } else {
+        html += `<td><span class="cell-empty">○</span></td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('statusGrid').innerHTML = html;
+}
+
+// Inicializar al cargar la página
+window.addEventListener('load', () => {
+  loadScriptUrl();
+  renderStatusGrid();
+});
+
+</script>
+</body>
+</html>

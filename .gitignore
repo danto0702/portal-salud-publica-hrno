@@ -1,0 +1,16 @@
+# Archivos temporales de Excel (lock files)
+~$*.xlsx
+~$*.xls
+~$*.docx
+
+# Archivos de datos sensibles / grandes
+*.pdf
+Consolidado_NinosNinas_PAI*.xlsx
+ANÁLISIS PAI*.xlsx
+METAS*.xlsx
+REGISTROS DIARIOS DE VACUNACIÓN/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
