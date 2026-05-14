@@ -1195,14 +1195,15 @@ function hideLoad(){$('lo').classList.remove('show')}
 (function(){
   try {
     const params = new URLSearchParams(window.location.search);
-    const apiParam = params.get('api');
-    if(apiParam && apiParam.startsWith('https://')){
+    const apiParam = (params.get('api') || '').trim();
+    if(apiParam){
       localStorage.setItem('certivac_api_url', apiParam);
       // Limpiar el parámetro de la barra de dirección (sin recargar)
-      const clean = window.location.pathname + window.location.hash;
-      history.replaceState(null, '', clean);
+      history.replaceState(null, '', window.location.pathname + window.location.hash);
+      // Mostrar toast de bienvenida al cargar la página
+      window.__apiAutoConfig = true;
     }
-  } catch(e){}
+  } catch(e){ console.error('[AutoConfig]', e); }
 })();
 
 // Lee la URL guardada en localStorage si no está hardcodeada
@@ -3835,6 +3836,10 @@ window.onload=async ()=>{
   const urlGuardada = getApiUrl();
   const inp = $('cfg-url-input');
   if(inp && urlGuardada) inp.value = urlGuardada;
+  // Toast de bienvenida si se configuró automáticamente por ?api=
+  if(window.__apiAutoConfig){
+    toast('✅ Portal configurado automáticamente — conectando…');
+  }
   // Verificar conexión y cargar datos
   const ok = await verificarConexion();
   if(ok){
