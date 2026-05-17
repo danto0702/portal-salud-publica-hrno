@@ -3,307 +3,682 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Portal de Salud Pública · ESE HRNO</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-<script>
-// ── Auto-configuración por parámetro ?api= en la URL ──────────────
-(function(){
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const apiParam = (params.get('api') || '').trim();
-    const debug    = params.get('debug') === '1';
-    if(apiParam){
-      localStorage.setItem('certivac_api_url', apiParam);
-      window.__apiAutoConfig = true;
-      if(debug) alert('[AutoConfig] URL guardada:\n' + apiParam);
-    } else if(debug){
-      const stored = localStorage.getItem('certivac_api_url') || '(vacío)';
-      alert('[Debug] Parámetro ?api= no detectado.\nLocalStorage actual:\n' + stored);
-    }
-    if(apiParam || debug)
-      history.replaceState(null, '', window.location.pathname + window.location.hash);
-  } catch(e){ console.error('[AutoConfig]', e); }
-})();
-</script>
-
+<title>Portal Salud Pública · ESE HRNO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{
-  --ink:#0C1B33;--cobalt:#1B4FD8;--cobalt-l:#2D6EF5;
-  --teal:#00B4A0;--teal-d:#008A7A;--amber:#F59E0B;--crimson:#DC2626;
-  --snow:#F7F9FD;--s1:#EDF0F7;--s2:#D4D9E8;--s4:#7D8AA3;--s6:#3D4B63;
-  --r:14px;--sh:0 2px 16px rgba(12,27,51,.08);--shM:0 8px 32px rgba(12,27,51,.14);
+/* ── RESET & BASE ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:       #eef4fb;
+  --surface:  #ffffff;
+  --surface2: #f4f8fd;
+  --border:   rgba(15,76,129,0.12);
+  --border2:  rgba(15,76,129,0.28);
+  --text:     #0c1b33;
+  --text2:    #4a6a8a;
+  --text3:    #1e3a5f;
+  --primary:  #0f4c81;
+  --primary2: #1565c0;
+  --teal:     #0891B2;
+  --green:    #059669;
+  --yellow:   #b45309;
+  --orange:   #c2410c;
+  --r:        12px;
 }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Syne',sans-serif;background:var(--s1);color:var(--ink);min-height:100vh}
-
-/* ── TOP BAR ── */
-.topbar{
-  background:#0f4c81;height:44px;display:flex;align-items:center;
-  justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100;
-  box-shadow:0 2px 12px rgba(0,0,0,.25)
-}
-.tb-brand{display:flex;align-items:center;gap:10px}
-.tb-gem{
-  width:26px;height:26px;background:linear-gradient(135deg,var(--teal),var(--cobalt));
-  border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px
-}
-.tb-name{font-size:13px;font-weight:700;color:#fff;letter-spacing:-.2px}
-.tb-sep{width:1px;height:16px;background:rgba(255,255,255,.2);margin:0 4px}
-.tb-tag{font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.6px;text-transform:uppercase;font-weight:700}
-.tb-ver{font-size:10px;color:rgba(255,255,255,.35);font-weight:600}
-
-/* ── HERO BANNER ── */
-.hero{
-  background:var(--ink) url('https://res.cloudinary.com/dj7qylkqh/image/upload/v1778261091/A%C3%B1adir_un_t%C3%ADtulo_12_meekeo.png')
-    center/cover no-repeat;
-  padding:52px 32px 44px;color:#fff;position:relative;overflow:hidden;
-  min-height:180px;display:flex;flex-direction:column;justify-content:flex-end
-}
-.hero::after{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(to top, rgba(12,27,51,.72) 0%, rgba(12,27,51,.1) 100%)
-}
-.hero-content{position:relative;z-index:1}
-.hero-label{
-  display:inline-flex;align-items:center;gap:6px;
-  background:rgba(0,180,160,.22);border:1px solid rgba(0,180,160,.35);
-  color:var(--teal);font-size:10px;font-weight:700;letter-spacing:1.2px;
-  text-transform:uppercase;padding:4px 12px;border-radius:20px;margin-bottom:14px
-}
-.hero-title{font-size:28px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1.15;margin-bottom:8px}
-.hero-sub{font-size:14px;color:rgba(255,255,255,.65);font-weight:500;max-width:560px}
-
-/* ── NOTIFICATION ── */
-.notif{
-  display:none;align-items:center;gap:10px;
-  margin:18px 28px 0;padding:11px 16px;border-radius:10px;
-  background:rgba(0,180,160,.1);border:1px solid rgba(0,180,160,.25);
-  font-size:13px;color:var(--teal);font-weight:600
-}
-.notif.show{display:flex}
-.notif svg{flex-shrink:0}
-
-/* ── MAIN CONTENT ── */
-.main{padding:28px 28px 48px}
-.section-title{
-  font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;
-  color:var(--s4);margin-bottom:16px;padding-bottom:10px;
-  border-bottom:1px solid var(--s2)
+html { font-size: 14px; scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  min-height: 100vh;
 }
 
-/* ── APP GRID ── */
-.app-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-bottom:40px}
-
-.app-card{
-  background:#fff;border-radius:var(--r);box-shadow:var(--sh);
-  border:1px solid rgba(212,217,232,.6);
-  display:flex;flex-direction:column;overflow:hidden;
-  transition:box-shadow .2s, transform .2s;cursor:pointer;text-decoration:none;color:inherit
+/* ── HEADER ── */
+.header {
+  background: var(--surface);
+  border-bottom: 3px solid var(--primary);
+  padding: 0 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 64px; position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 12px rgba(15,76,129,0.10);
 }
-.app-card:hover{box-shadow:var(--shM);transform:translateY(-3px)}
-
-.ac-stripe{height:4px;width:100%}
-.stripe-cobalt{background:linear-gradient(90deg,var(--cobalt),var(--teal))}
-.stripe-teal  {background:linear-gradient(90deg,var(--teal),#00d4c0)}
-.stripe-amber {background:linear-gradient(90deg,var(--amber),#f97316)}
-
-.ac-body{padding:22px 22px 18px;flex:1}
-.ac-icon{
-  width:44px;height:44px;border-radius:11px;display:flex;align-items:center;
-  justify-content:center;font-size:22px;margin-bottom:14px
+.logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.logo-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, var(--primary), var(--primary2));
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  font-size: 20px; box-shadow: 0 4px 12px rgba(15,76,129,0.30);
+  flex-shrink: 0;
 }
-.icon-cobalt{background:rgba(27,79,216,.1)}
-.icon-teal  {background:rgba(0,180,160,.1)}
-.icon-amber {background:rgba(245,158,11,.1)}
+.logo-text h1 {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 15px; font-weight: 700; color: var(--primary);
+  letter-spacing: -.2px;
+}
+.logo-text p  { font-size: 9.5px; color: var(--text2); margin-top: 2px; letter-spacing: .6px; text-transform: uppercase; font-weight: 600; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+#clock { font-size: 13px; font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
+.date-badge {
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 6px; padding: 5px 10px; font-size: 11px; color: var(--text2);
+}
+.dash-link {
+  background: rgba(15,76,129,.08); border: 1px solid rgba(15,76,129,.25);
+  color: var(--primary); border-radius: 8px; padding: 6px 14px;
+  font-size: 11px; font-weight: 700; text-decoration: none; letter-spacing: .3px;
+  transition: all .2s; display: flex; align-items: center; gap: 5px;
+}
+.dash-link:hover { background: rgba(15,76,129,.16); color: var(--primary2); }
 
-.ac-badge{
-  display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.9px;
-  text-transform:uppercase;padding:3px 9px;border-radius:20px;margin-bottom:10px
+/* ── HERO ── */
+.hero {
+  background: linear-gradient(135deg, #0f4c81 0%, #1565c0 55%, #1976d2 100%);
+  padding: 44px 24px 40px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
 }
-.badge-cobalt{background:rgba(27,79,216,.1);color:var(--cobalt)}
-.badge-teal  {background:rgba(0,180,160,.1);color:var(--teal-d)}
-.badge-amber {background:rgba(245,158,11,.12);color:#b45309}
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.30);
+  border-radius: 20px; padding: 4px 14px; font-size: 10px; font-weight: 700;
+  color: rgba(255,255,255,0.95); letter-spacing: 1px; text-transform: uppercase;
+  margin-bottom: 16px; position: relative;
+}
+.hero h2 {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 28px; font-weight: 700; color: #fff;
+  margin-bottom: 10px; line-height: 1.2; position: relative;
+}
+.hero h2 span { color: #7dd3fc; }
+.hero p { font-size: 13px; color: rgba(255,255,255,0.82); max-width: 520px; margin: 0 auto; line-height: 1.7; position: relative; }
+.hero-stats { display: flex; align-items: center; justify-content: center; gap: 28px; margin-top: 26px; position: relative; }
+.hero-stat { text-align: center; }
+.hero-stat .val { font-size: 22px; font-weight: 800; color: #fff; line-height: 1; }
+.hero-stat .lbl { font-size: 10px; color: rgba(255,255,255,0.70); margin-top: 4px; text-transform: uppercase; letter-spacing: .6px; }
+.hero-divider { width: 1px; height: 36px; background: rgba(255,255,255,0.25); }
 
-.ac-name{font-size:17px;font-weight:800;color:var(--ink);letter-spacing:-.3px;margin-bottom:6px}
-.ac-desc{font-size:13px;color:var(--s4);line-height:1.55;font-weight:500}
+/* ── MAIN LAYOUT ── */
+.main { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+.section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.section-header h3 {
+  font-size: 11px; font-weight: 700; color: var(--primary);
+  text-transform: uppercase; letter-spacing: 1.4px; white-space: nowrap;
+}
+.section-line { flex: 1; height: 1px; background: var(--border2); }
 
-.ac-footer{
-  padding:13px 22px;border-top:1px solid var(--s2);
-  display:flex;align-items:center;justify-content:space-between
+/* ── PROGRAM GRID ── */
+.programs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-bottom: 32px; }
+
+.prog-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); overflow: hidden;
+  transition: all .25s; position: relative;
+  display: flex; flex-direction: column;
+  box-shadow: 0 1px 4px rgba(15,76,129,0.06);
 }
-.ac-link{
-  font-size:12px;font-weight:700;color:var(--cobalt);display:flex;align-items:center;gap:5px
+.prog-card:hover { border-color: var(--border2); transform: translateY(-2px); box-shadow: 0 8px 28px rgba(15,76,129,0.14); }
+.prog-card.coming-soon { opacity: .60; }
+.prog-card.coming-soon:hover { transform: none; box-shadow: 0 1px 4px rgba(15,76,129,0.06); }
+
+.prog-accent { height: 4px; width: 100%; }
+.prog-body { padding: 18px; flex: 1; display: flex; flex-direction: column; }
+.prog-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+.prog-icon {
+  width: 42px; height: 42px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+  flex-shrink: 0;
 }
-.ac-link svg{transition:transform .18s}
-.app-card:hover .ac-link svg{transform:translateX(4px)}
-.ac-status{
-  display:flex;align-items:center;gap:5px;
-  font-size:10.5px;font-weight:600;color:var(--s4)
+.prog-badge { font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 20px; letter-spacing: .5px; }
+.prog-badge.live  { background: rgba(5,150,105,.10); color: #047857; border: 1px solid rgba(5,150,105,.30); }
+.prog-badge.build { background: rgba(180,83,9,.10);  color: #92400e; border: 1px solid rgba(180,83,9,.30); }
+.prog-badge.soon  { background: rgba(74,106,138,.10); color: var(--text2); border: 1px solid var(--border2); }
+
+.prog-name { font-family: 'Lora', Georgia, serif; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+.prog-desc { font-size: 11.5px; color: var(--text2); line-height: 1.6; margin-bottom: 14px; flex: 1; }
+
+.prog-modules { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.prog-module-link {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; border-radius: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  text-decoration: none; transition: all .2s; gap: 8px;
 }
-.ac-dot{width:7px;height:7px;border-radius:50%;background:var(--s2)}
-.ac-dot.live{background:#22c55e}
+.prog-module-link:hover { background: rgba(15,76,129,0.06); border-color: var(--border2); }
+.prog-module-link.disabled { pointer-events: none; opacity: .45; cursor: default; }
+.pml-left { display: flex; align-items: center; gap: 8px; }
+.pml-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.pml-name { font-size: 11px; font-weight: 600; color: var(--text3); }
+.pml-tag  { font-size: 9px; color: var(--text2); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+.pml-arrow { color: var(--text2); flex-shrink: 0; transition: transform .2s; }
+.prog-module-link:hover .pml-arrow { transform: translateX(3px); color: var(--primary); }
+
+.prog-footer { border-top: 1px solid var(--border); padding-top: 12px; display: flex; align-items: center; justify-content: space-between; }
+.prog-resp { font-size: 10px; color: var(--text2); }
+.prog-resp span { color: var(--primary); font-weight: 600; }
+
+/* ── QUICK ACCESS ROW ── */
+.quick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-bottom: 32px; }
+.quick-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; text-decoration: none; display: flex; align-items: center; gap: 12px;
+  transition: all .2s; box-shadow: 0 1px 3px rgba(15,76,129,0.05);
+}
+.quick-card:hover { border-color: var(--border2); background: rgba(15,76,129,0.04); box-shadow: 0 4px 14px rgba(15,76,129,0.10); transform: translateY(-1px); }
+.quick-icon { font-size: 20px; flex-shrink: 0; }
+.quick-name { font-size: 12px; font-weight: 600; color: var(--text3); }
+.quick-sub  { font-size: 10px; color: var(--text2); margin-top: 2px; }
 
 /* ── FOOTER ── */
-.portal-footer{
-  margin-top:auto;padding:18px 28px;border-top:1px solid var(--s2);
-  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px
+.footer {
+  background: var(--primary);
+  padding: 28px 24px;
+  text-align: center;
+  margin-top: 8px;
 }
-.pf-txt{font-size:11px;color:var(--s4);font-weight:500}
-.pf-link{font-size:11px;color:var(--cobalt);font-weight:700;text-decoration:none}
-.pf-link:hover{text-decoration:underline}
+.footer p { font-size: 11px; color: rgba(255,255,255,0.80); line-height: 2.0; }
+.footer strong { color: #fff; font-weight: 700; }
 
-/* ── CONFIG SECTION ── */
-.cfg-panel{
-  background:#fff;border-radius:var(--r);box-shadow:var(--sh);
-  border:1px solid rgba(212,217,232,.6);padding:22px;margin-bottom:28px
+/* ── RESPONSIVE ── */
+@media (max-width: 640px) {
+  .header { padding: 0 14px; height: 58px; }
+  .hero { padding: 32px 16px 28px; }
+  .hero h2 { font-size: 22px; }
+  .main { padding: 22px 14px; }
+  .programs-grid { grid-template-columns: 1fr; }
+  .hero-stats { gap: 16px; }
+  .dash-link span { display: none; }
+  .logo-text p { display: none; }
 }
-.cfg-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.cfg-lbl{font-size:12px;font-weight:700;color:var(--s6);min-width:130px}
-.cfg-inp{
-  flex:1;min-width:260px;padding:9px 14px;border:1.5px solid var(--s2);border-radius:9px;
-  font-family:'Syne',sans-serif;font-size:12px;color:var(--ink);outline:none;
-  transition:border-color .15s
-}
-.cfg-inp:focus{border-color:var(--cobalt)}
-.cfg-btn{
-  padding:9px 18px;border:none;border-radius:9px;cursor:pointer;
-  font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
-  background:var(--cobalt);color:#fff;transition:background .15s;white-space:nowrap
-}
-.cfg-btn:hover{background:var(--cobalt-l)}
-.cfg-note{font-size:11px;color:var(--s4);margin-top:8px;line-height:1.5}
-.cfg-saved{font-size:11px;color:var(--teal);font-weight:700;margin-top:6px;display:none}
-.cfg-saved.show{display:block}
 </style>
 </head>
 <body>
 
-<!-- TOP BAR -->
-<div class="topbar">
-  <div class="tb-brand">
-    <div class="tb-gem">🏥</div>
-    <span class="tb-name">Portal de Salud Pública</span>
-    <div class="tb-sep"></div>
-    <span class="tb-tag">ESE HRNO</span>
+<!-- HEADER -->
+<header class="header">
+  <a class="logo" href="./">
+    <div class="logo-icon">🏥</div>
+    <div class="logo-text">
+      <h1>ESE HRNO · Salud Pública</h1>
+      <p>Portal de Aplicativos · 2026</p>
+    </div>
+  </a>
+  <div class="header-right">
+    <div class="date-badge" id="clock">--:--:--</div>
+    <a class="dash-link" href="Dashboard_SaludPublica_HRNO.html">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span>Dashboard</span>
+    </a>
   </div>
-  <span class="tb-ver">v2026.1</span>
-</div>
+</header>
 
 <!-- HERO -->
-<div class="hero">
-  <div class="hero-content">
-    <div class="hero-label">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-      Sistema de Información
-    </div>
-    <div class="hero-title">Herramientas de Salud Pública</div>
-    <div class="hero-sub">Plataforma integrada de aplicaciones para la gestión del PAI y vigilancia epidemiológica · ESE Hospital Regional Noroccidental</div>
+<section class="hero">
+  <div class="hero-badge">
+    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+    Ecosistema Digital · Norte de Santander
   </div>
-</div>
+  <h2>Portal de <span>Salud Pública</span></h2>
+  <p>Acceso centralizado a todos los módulos y aplicativos de la Coordinación de Salud Pública del Hospital Regional Noroccidental.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="val">7</div><div class="lbl">Programas</div></div>
+    <div class="hero-divider"></div>
+    <div class="hero-stat"><div class="val" id="modulos-live">2</div><div class="lbl">Módulos activos</div></div>
+    <div class="hero-divider"></div>
+    <div class="hero-stat"><div class="val">+15</div><div class="lbl">Personas en equipo</div></div>
+  </div>
+</section>
 
-<!-- NOTIFICACIÓN AUTO-CONFIG -->
-<div class="notif" id="notif-autoconfig">
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-  Portal configurado automáticamente. Ya puedes acceder a las aplicaciones.
-</div>
+<main class="main">
 
-<!-- MAIN -->
-<div class="main">
-
-  <!-- CONFIG PANEL -->
-  <div class="section-title">Configuración del portal</div>
-  <div class="cfg-panel">
-    <div class="cfg-row">
-      <span class="cfg-lbl">URL del Apps Script</span>
-      <input id="cfg-api-input" class="cfg-inp" type="url"
-             placeholder="https://script.google.com/macros/s/…/exec">
-      <button class="cfg-btn" onclick="guardarAPI()">Guardar</button>
-    </div>
-    <div class="cfg-note">
-      Esta URL conecta todas las aplicaciones del portal con el backend de datos.
-      Solo debes configurarla una vez por navegador.
-    </div>
-    <div class="cfg-saved" id="cfg-saved-msg">✅ URL guardada correctamente.</div>
+  <!-- PROGRAMAS -->
+  <div class="section-header">
+    <h3>Programas y módulos</h3>
+    <div class="section-line"></div>
   </div>
 
-  <!-- APPS -->
-  <div class="section-title">Aplicaciones disponibles</div>
-  <div class="app-grid">
+  <div class="programs-grid">
 
-    <!-- CertiVac -->
-    <a class="app-card" href="CertiVac.html">
-      <div class="ac-stripe stripe-cobalt"></div>
-      <div class="ac-body">
-        <div class="ac-icon icon-cobalt">💉</div>
-        <span class="ac-badge badge-cobalt">PAI · Liquidación</span>
-        <div class="ac-name">CertiVac</div>
-        <div class="ac-desc">Gestión de dosis administradas por ciclo y municipio, informes de cumplimiento de metas y generación de constancias de liquidación de vacunación.</div>
+    <!-- ── MISIÓN MÉDICA ── -->
+    <div class="prog-card">
+      <div class="prog-accent" style="background: linear-gradient(90deg, #1d4ed8, #3b82f6);"></div>
+      <div class="prog-body">
+        <div class="prog-top">
+          <div class="prog-icon" style="background: rgba(59,130,246,0.12);">🛡️</div>
+          <span class="prog-badge live">Activo</span>
+        </div>
+        <div class="prog-name">Misión Médica</div>
+        <div class="prog-desc">Protección del personal de salud, identificación institucional, reporte de infracciones e incidentes conforme al DIH.</div>
+        <div class="prog-modules">
+          <a href="MISIÓN MÉDICA/Modulo_Identificacion_Mision_Medica.html" class="prog-module-link">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#3b82f6;"></div>
+              <span class="pml-name">Identificación e Emblemas</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pml-tag">QR · Carné</span>
+              <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+          </a>
+          <a href="MISIÓN MÉDICA/Formulario de Reporte de Infracciones MM.html" class="prog-module-link">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#3b82f6;"></div>
+              <span class="pml-name">Reporte de Infracciones</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pml-tag">Formulario</span>
+              <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+          </a>
+        </div>
+        <div class="prog-footer">
+          <span class="prog-resp">Referente: <span>Danilo Torrado</span></span>
+          <span style="font-size:10px;color:var(--text2);">DIH · Protección</span>
+        </div>
       </div>
-      <div class="ac-footer">
-        <span class="ac-link">
-          Abrir aplicación
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-        </span>
-        <span class="ac-status">
-          <span class="ac-dot live"></span>Activo
-        </span>
+    </div>
+
+    <!-- ── EBS ── -->
+    <div class="prog-card coming-soon">
+      <div class="prog-accent" style="background: linear-gradient(90deg, #7e22ce, #a855f7);"></div>
+      <div class="prog-body">
+        <div class="prog-top">
+          <div class="prog-icon" style="background: rgba(168,85,247,0.12);">🏘️</div>
+          <span class="prog-badge soon">Próximamente</span>
+        </div>
+        <div class="prog-name">Equipos Básicos de Salud (EBS)</div>
+        <div class="prog-desc">Coordinación de equipos rurales e interdisciplinarios. Territorialización, metas, monitoreo de actividades y PISIS.</div>
+        <div class="prog-modules">
+          <div class="prog-module-link disabled">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#a855f7;"></div>
+              <span class="pml-name">Monitoreo de Actividades</span>
+            </div>
+            <span class="pml-tag">En desarrollo</span>
+          </div>
+          <div class="prog-module-link disabled">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#a855f7;"></div>
+              <span class="pml-name">Control de Metas</span>
+            </div>
+            <span class="pml-tag">En desarrollo</span>
+          </div>
+        </div>
+        <div class="prog-footer">
+          <span class="prog-resp">Referente: <span>Danilo Torrado</span></span>
+          <span style="font-size:10px;color:var(--text2);">Rurales · Interdisciplinario</span>
+        </div>
       </div>
+    </div>
+
+    <!-- ── PAI ── -->
+    <div class="prog-card">
+      <div class="prog-accent" style="background: linear-gradient(90deg, #059669, #10b981);"></div>
+      <div class="prog-body">
+        <div class="prog-top">
+          <div class="prog-icon" style="background: rgba(5,150,105,0.12);">💉</div>
+          <span class="prog-badge live">Activo</span>
+        </div>
+        <div class="prog-name">PAI — Plan Ampliado de Inmunizaciones</div>
+        <div class="prog-desc">Carga de archivos XLS, liquidaciones por vacunadora, trazadores, analytics y certificados. Sistema CertiVac v5.2.</div>
+        <div class="prog-modules">
+          <a href="CertiVac.html" class="prog-module-link">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#059669;"></div>
+              <span class="pml-name">CertiVac — Dashboard & Liquidaciones</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pml-tag">Completo</span>
+              <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+          </a>
+          <a href="CertiVac.html" class="prog-module-link" onclick="localStorage.setItem('certivac-nav','trazadores')">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#059669;"></div>
+              <span class="pml-name">Trazadores PAI</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pml-tag">BCG · Penta · SRP</span>
+              <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+          </a>
+          <a href="CertiVac.html" class="prog-module-link">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#059669;"></div>
+              <span class="pml-name">Gráficas & Análisis</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pml-tag">Chart.js · 7 vistas</span>
+              <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+          </a>
+          <a href="Analizador_PAI_HRNO.html" class="prog-module-link">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#059669;"></div>
+              <span class="pml-name">Verificador de Población Susceptible</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pml-tag">Cobertura · Brechas</span>
+              <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+          </a>
+        </div>
+        <div class="prog-footer">
+          <span class="prog-resp">Sistema: <span>CertiVac v5.2</span></span>
+          <span style="font-size:10px;color:var(--text2);">Vacunadoras · Municipios</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PIC ── -->
+    <div class="prog-card coming-soon">
+      <div class="prog-accent" style="background: linear-gradient(90deg, #d97706, #f59e0b);"></div>
+      <div class="prog-body">
+        <div class="prog-top">
+          <div class="prog-icon" style="background: rgba(217,119,6,0.12);">📋</div>
+          <span class="prog-badge soon">Próximamente</span>
+        </div>
+        <div class="prog-name">PIC — Plan de Intervenciones Colectivas</div>
+        <div class="prog-desc">Planificación, seguimiento y consolidación de informes del Plan de Intervenciones Colectivas para la Secretaría de Salud.</div>
+        <div class="prog-modules">
+          <div class="prog-module-link disabled">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#d97706;"></div>
+              <span class="pml-name">Seguimiento de Actividades</span>
+            </div>
+            <span class="pml-tag">En desarrollo</span>
+          </div>
+        </div>
+        <div class="prog-footer">
+          <span class="prog-resp">Referente: <span>Coordinación PIC</span></span>
+          <span style="font-size:10px;color:var(--text2);">Ábrego · Secretaría Salud</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── JÓVENES EN PAZ ── -->
+    <div class="prog-card coming-soon">
+      <div class="prog-accent" style="background: linear-gradient(90deg, #dc2626, #ef4444);"></div>
+      <div class="prog-body">
+        <div class="prog-top">
+          <div class="prog-icon" style="background: rgba(220,38,38,0.10);">☮️</div>
+          <span class="prog-badge soon">Próximamente</span>
+        </div>
+        <div class="prog-name">Jóvenes en Paz (JEP)</div>
+        <div class="prog-desc">Programa de salud para jóvenes en proceso de reincorporación. Municipios: Ábrego, Convención y El Carmen.</div>
+        <div class="prog-modules">
+          <div class="prog-module-link disabled">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#dc2626;"></div>
+              <span class="pml-name">Registro de Actividades</span>
+            </div>
+            <span class="pml-tag">En desarrollo</span>
+          </div>
+        </div>
+        <div class="prog-footer">
+          <span class="prog-resp">Referente: <span>Danilo Torrado</span></span>
+          <span style="font-size:10px;color:var(--text2);">Confidencial · 3 municipios</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── HOPE ── -->
+    <div class="prog-card coming-soon">
+      <div class="prog-accent" style="background: linear-gradient(90deg, #0f4c81, #0891B2);"></div>
+      <div class="prog-body">
+        <div class="prog-top">
+          <div class="prog-icon" style="background: rgba(15,76,129,0.10);">✨</div>
+          <span class="prog-badge soon">Próximamente</span>
+        </div>
+        <div class="prog-name">Programa HOPE</div>
+        <div class="prog-desc">Módulo especial del programa HOPE. Registro y seguimiento de actividades institucionales.</div>
+        <div class="prog-modules">
+          <div class="prog-module-link disabled">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#0f4c81;"></div>
+              <span class="pml-name">Actividades HOPE</span>
+            </div>
+            <span class="pml-tag">En desarrollo</span>
+          </div>
+        </div>
+        <div class="prog-footer">
+          <span class="prog-resp">Referente: <span>Equipo HOPE</span></span>
+          <span style="font-size:10px;color:var(--text2);">Programa especial</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /programs-grid -->
+
+  <!-- HERRAMIENTAS INTEROPERABLES -->
+  <div class="section-header" style="margin-top:8px;">
+    <h3>Herramientas interoperables</h3>
+    <div class="section-line"></div>
+    <span style="font-size:10px;color:var(--text2);white-space:nowrap;">Transversales a varios programas</span>
+  </div>
+
+  <div class="programs-grid" style="margin-bottom:32px;">
+
+    <!-- ── PCI APP ── -->
+    <div class="prog-card">
+      <div class="prog-accent" style="background: linear-gradient(90deg, #0f4c81, #1976d2);"></div>
+      <div class="prog-body">
+        <div class="prog-top">
+          <div class="prog-icon" style="background: rgba(15,76,129,0.10);">📋</div>
+          <span class="prog-badge live">Activo</span>
+        </div>
+        <div class="prog-name">PCI App — Plan de Cuidado Individual</div>
+        <div class="prog-desc">Registro de intervenciones por Ciclo Vital según Resolución 3280/2018. Funciona offline con sincronización automática a Google Sheets.</div>
+        <div class="prog-modules">
+          <a href="HERRAMIENTAS INTEROPERABLES/PCI-App/index.html" class="prog-module-link">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#0f4c81;"></div>
+              <span class="pml-name">Formulario PCI por Ciclo Vital</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pml-tag">Offline · PWA</span>
+              <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+          </a>
+          <div class="prog-module-link disabled">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#0f4c81;"></div>
+              <span class="pml-name">Historial & Análisis PCI</span>
+            </div>
+            <span class="pml-tag">En desarrollo</span>
+          </div>
+        </div>
+        <div class="prog-footer">
+          <span class="prog-resp">Ciclos: <span>7 rutas · Res. 3280/2018</span></span>
+          <span style="font-size:10px;color:var(--text2);">EBS · Transversal</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DIAGRAMFLOW ── -->
+    <div class="prog-card">
+      <div class="prog-accent" style="background: linear-gradient(90deg, #7e22ce, #0891B2);"></div>
+      <div class="prog-body">
+        <div class="prog-top">
+          <div class="prog-icon" style="background: rgba(126,34,206,0.10);">⬡</div>
+          <span class="prog-badge live">Activo</span>
+        </div>
+        <div class="prog-name">DiagramFlow</div>
+        <div class="prog-desc">Editor de diagramas de flujo y mapas mentales. Canvas interactivo con exportación a PNG, SVG y XLSX. Proyectos guardados localmente.</div>
+        <div class="prog-modules">
+          <a href="HERRAMIENTAS INTEROPERABLES/DiagramFlow.html" class="prog-module-link">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#7e22ce;"></div>
+              <span class="pml-name">Editor de Diagramas de Flujo</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pml-tag">Canvas · SVG</span>
+              <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+          </a>
+          <a href="HERRAMIENTAS INTEROPERABLES/DiagramFlow.html" class="prog-module-link">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#0891B2;"></div>
+              <span class="pml-name">Mapas Mentales</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pml-tag">Mental · Radial</span>
+              <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+          </a>
+        </div>
+        <div class="prog-footer">
+          <span class="prog-resp">Export: <span>PNG · SVG · XLSX · .dfp</span></span>
+          <span style="font-size:10px;color:var(--text2);">Sin servidor · Local</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BUSCADOR CUPS ── -->
+    <div class="prog-card">
+      <div class="prog-accent" style="background: linear-gradient(90deg, #0891B2, #059669);"></div>
+      <div class="prog-body">
+        <div class="prog-top">
+          <div class="prog-icon" style="background: rgba(8,145,178,0.12);">🔍</div>
+          <span class="prog-badge live">Activo</span>
+        </div>
+        <div class="prog-name">Buscador de Códigos CUPS</div>
+        <div class="prog-desc">Consulta rápida de la Clasificación Única de Procedimientos en Salud. Base de datos completa con filtro por especialidad y grupo. Sin conexión.</div>
+        <div class="prog-modules">
+          <a href="HERRAMIENTAS INTEROPERABLES/Buscador_CUPS.html" class="prog-module-link">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#0891B2;"></div>
+              <span class="pml-name">Buscador CUPS</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pml-tag">BD completa · Local</span>
+              <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+          </a>
+        </div>
+        <div class="prog-footer">
+          <span class="prog-resp">Filtros: <span>Especialidad · Grupo · Código</span></span>
+          <span style="font-size:10px;color:var(--text2);">Sin servidor · Offline</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /herramientas-grid -->
+
+  <!-- ACCESO RÁPIDO -->
+  <div class="section-header">
+    <h3>Acceso rápido</h3>
+    <div class="section-line"></div>
+  </div>
+  <div class="quick-grid">
+    <a href="Dashboard_SaludPublica_HRNO.html" class="quick-card">
+      <span class="quick-icon">📊</span>
+      <div><div class="quick-name">Dashboard Central</div><div class="quick-sub">Gestión interna · Tareas · Contratos</div></div>
     </a>
-
-    <!-- Verificador PAI -->
-    <a class="app-card" href="Analizador_PAI_HRNO.html">
-      <div class="ac-stripe stripe-teal"></div>
-      <div class="ac-body">
-        <div class="ac-icon icon-teal">🧒</div>
-        <span class="ac-badge badge-teal">PAI · Análisis</span>
-        <div class="ac-name">Verificador de Población Susceptible</div>
-        <div class="ac-desc">Análisis de población susceptible por biológico y municipio. Identifica brechas de cobertura y apoya la planificación de jornadas de vacunación.</div>
-      </div>
-      <div class="ac-footer">
-        <span class="ac-link">
-          Abrir aplicación
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-        </span>
-        <span class="ac-status">
-          <span class="ac-dot live"></span>Activo
-        </span>
-      </div>
+    <a href="MISIÓN MÉDICA/Modulo_Identificacion_Mision_Medica.html" class="quick-card">
+      <span class="quick-icon">🛡️</span>
+      <div><div class="quick-name">Identificación MM</div><div class="quick-sub">QR · Carné · Emblemas</div></div>
     </a>
-
+    <a href="MISIÓN MÉDICA/Formulario de Reporte de Infracciones MM.html" class="quick-card">
+      <span class="quick-icon">📝</span>
+      <div><div class="quick-name">Reporte Infracciones</div><div class="quick-sub">Canal seguro · Misión Médica</div></div>
+    </a>
+    <a href="CertiVac.html" class="quick-card">
+      <span class="quick-icon">💉</span>
+      <div><div class="quick-name">CertiVac PAI</div><div class="quick-sub">Liquidaciones · Trazadores · Analytics</div></div>
+    </a>
+    <a href="Analizador_PAI_HRNO.html" class="quick-card">
+      <span class="quick-icon">🧒</span>
+      <div><div class="quick-name">Verificador PAI</div><div class="quick-sub">Población Susceptible · Coberturas</div></div>
+    </a>
+    <a href="HERRAMIENTAS INTEROPERABLES/PCI-App/index.html" class="quick-card">
+      <span class="quick-icon">📋</span>
+      <div><div class="quick-name">PCI App</div><div class="quick-sub">Ciclos Vitales · Offline · Res. 3280</div></div>
+    </a>
+    <a href="HERRAMIENTAS INTEROPERABLES/DiagramFlow.html" class="quick-card">
+      <span class="quick-icon">⬡</span>
+      <div><div class="quick-name">DiagramFlow</div><div class="quick-sub">Flujos · Mapas Mentales · Export PNG/SVG</div></div>
+    </a>
+    <a href="HERRAMIENTAS INTEROPERABLES/Buscador_CUPS.html" class="quick-card">
+      <span class="quick-icon">🔍</span>
+      <div><div class="quick-name">Buscador CUPS</div><div class="quick-sub">Códigos de procedimientos · BD completa</div></div>
+    </a>
+    <a href="https://saludpublicaesehrno.odoo.com" target="_blank" class="quick-card">
+      <span class="quick-icon">🌐</span>
+      <div><div class="quick-name">Portal Odoo HRNO</div><div class="quick-sub">Sistema institucional externo</div></div>
+    </a>
+    <a href="https://www.sivigila.gov.co" target="_blank" class="quick-card">
+      <span class="quick-icon">🔬</span>
+      <div><div class="quick-name">SIVIGILA</div><div class="quick-sub">Notificaciones EISP</div></div>
+    </a>
+    <a href="https://pisis.minsalud.gov.co" target="_blank" class="quick-card">
+      <span class="quick-icon">🏗️</span>
+      <div><div class="quick-name">PISIS / SIAPS</div><div class="quick-sub">Reportes EBS</div></div>
+    </a>
   </div>
 
-  <!-- FOOTER -->
-  <div class="portal-footer">
-    <span class="pf-txt">© 2026 · ESE Hospital Regional Noroccidental · Portal de Salud Pública</span>
-    <a class="pf-link" href="https://github.com/danto0702/portal-salud-publica-hrno" target="_blank" rel="noopener">GitHub ↗</a>
-  </div>
+</main>
 
-</div><!-- /main -->
+<footer class="footer">
+  <p>
+    <strong>Portal de Salud Pública · ESE Hospital Regional Noroccidental</strong><br>
+    Coordinación de Salud Pública · Norte de Santander, Colombia · 2026<br>
+    Aplicativo local — no requiere conexión a internet para funcionar
+  </p>
+</footer>
 
 <script>
-// ── Mostrar notificación si fue auto-configurado por ?api= ──────────
-window.addEventListener('DOMContentLoaded', function(){
-  // Pre-cargar URL guardada en el input
-  const stored = localStorage.getItem('certivac_api_url') || '';
-  const inp = document.getElementById('cfg-api-input');
-  if(inp && stored) inp.value = stored;
+  // ── Auto-configuración por parámetro ?api= en la URL ──────────────
+  (function(){
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const apiParam = (params.get('api') || '').trim();
+      const debug    = params.get('debug') === '1';
+      if(apiParam){
+        localStorage.setItem('certivac_api_url', apiParam);
+        window.__apiAutoConfig = true;
+        if(debug) alert('[AutoConfig] URL guardada:\n' + apiParam);
+      } else if(debug){
+        const stored = localStorage.getItem('certivac_api_url') || '(vacío)';
+        alert('[Debug] Parámetro ?api= no detectado.\nLocalStorage actual:\n' + stored);
+      }
+      if(apiParam || debug)
+        history.replaceState(null, '', window.location.pathname + window.location.hash);
+    } catch(e){ console.error('[AutoConfig]', e); }
+  })();
 
-  // Toast auto-config
-  if(window.__apiAutoConfig){
-    const n = document.getElementById('notif-autoconfig');
-    if(n) n.classList.add('show');
+  // Reloj en tiempo real
+  function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    document.getElementById('clock').textContent = `${h}:${m}:${s}`;
   }
-});
+  updateClock();
+  setInterval(updateClock, 1000);
 
-function guardarAPI(){
-  const inp = document.getElementById('cfg-api-input');
-  const url = (inp?.value || '').trim();
-  if(!url){ inp.focus(); return; }
-  localStorage.setItem('certivac_api_url', url);
-  const msg = document.getElementById('cfg-saved-msg');
-  if(msg){ msg.classList.add('show'); setTimeout(()=>msg.classList.remove('show'), 3500); }
-}
+  // Notificación auto-config
+  if(window.__apiAutoConfig){
+    const bar = document.createElement('div');
+    bar.style.cssText = 'background:#059669;color:#fff;text-align:center;padding:8px 16px;font-size:12px;font-weight:700;position:sticky;top:64px;z-index:99;';
+    bar.textContent = '✅ Portal configurado automáticamente — la URL del API quedó guardada para todas las aplicaciones.';
+    document.querySelector('.hero').insertAdjacentElement('beforebegin', bar);
+    setTimeout(()=>bar.remove(), 5000);
+  }
+
+  // Contar módulos activos dinámicamente
+  const liveCards = document.querySelectorAll('.prog-card:not(.coming-soon)').length;
+  const liveLinks = document.querySelectorAll('.prog-module-link:not(.disabled)').length;
+  document.getElementById('modulos-live').textContent = liveLinks;
 </script>
+
 </body>
 </html>
