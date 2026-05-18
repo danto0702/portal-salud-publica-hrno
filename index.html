@@ -203,7 +203,7 @@ body {
 
 <!-- HEADER -->
 <header class="header">
-  <a class="logo" href="./">
+  <a class="logo" href="index.html">
     <div class="logo-icon">🏥</div>
     <div class="logo-text">
       <h1>ESE HRNO · Salud Pública</h1>
@@ -285,6 +285,35 @@ body {
       </div>
     </div>
 
+    <!-- ── VIGILANCIA EPIDEMIOLÓGICA ── -->
+    <div class="prog-card">
+      <div class="prog-accent" style="background: linear-gradient(90deg, #b91c1c, #e94560);"></div>
+      <div class="prog-body">
+        <div class="prog-top">
+          <div class="prog-icon" style="background: rgba(233,69,96,0.10);">🔬</div>
+          <span class="prog-badge live">Activo</span>
+        </div>
+        <div class="prog-name">Vigilancia Epidemiológica</div>
+        <div class="prog-desc">Monitor SIVIGILA con KPIs de eventos de interés en salud pública, eventos críticos, gráficas por semana epidemiológica y análisis por municipio.</div>
+        <div class="prog-modules">
+          <a href="VIGILANCIA SP/SIVIGILA_Monitor_v2.html" class="prog-module-link">
+            <div class="pml-left">
+              <div class="pml-dot" style="background:#e94560;"></div>
+              <span class="pml-name">SIVIGILA Monitor v2</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="pml-tag">KPIs · Gráficas · EISP</span>
+              <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+          </a>
+        </div>
+        <div class="prog-footer">
+          <span class="prog-resp">Referente: <span>Danilo Torrado</span></span>
+          <span style="font-size:10px;color:var(--text2);">SIVIGILA · EISP · Semanal</span>
+        </div>
+      </div>
+    </div>
+
     <!-- ── EBS ── -->
     <div class="prog-card coming-soon">
       <div class="prog-accent" style="background: linear-gradient(90deg, #7e22ce, #a855f7);"></div>
@@ -329,7 +358,7 @@ body {
         <div class="prog-name">PAI — Plan Ampliado de Inmunizaciones</div>
         <div class="prog-desc">Carga de archivos XLS, liquidaciones por vacunadora, trazadores, analytics y certificados. Sistema CertiVac v5.2.</div>
         <div class="prog-modules">
-          <a href="CertiVac.html" class="prog-module-link">
+          <a href="PAI/CertiVac.html" class="prog-module-link">
             <div class="pml-left">
               <div class="pml-dot" style="background:#059669;"></div>
               <span class="pml-name">CertiVac — Dashboard & Liquidaciones</span>
@@ -339,7 +368,7 @@ body {
               <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
             </div>
           </a>
-          <a href="CertiVac.html" class="prog-module-link" onclick="localStorage.setItem('certivac-nav','trazadores')">
+          <a href="PAI/CertiVac.html" class="prog-module-link" onclick="localStorage.setItem('certivac-nav','trazadores')">
             <div class="pml-left">
               <div class="pml-dot" style="background:#059669;"></div>
               <span class="pml-name">Trazadores PAI</span>
@@ -349,7 +378,7 @@ body {
               <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
             </div>
           </a>
-          <a href="CertiVac.html" class="prog-module-link">
+          <a href="PAI/CertiVac.html" class="prog-module-link">
             <div class="pml-left">
               <div class="pml-dot" style="background:#059669;"></div>
               <span class="pml-name">Gráficas & Análisis</span>
@@ -359,7 +388,7 @@ body {
               <svg class="pml-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
             </div>
           </a>
-          <a href="Analizador_PAI_HRNO.html" class="prog-module-link">
+          <a href="PAI/Analizador_PAI_HRNO.html" class="prog-module-link">
             <div class="pml-left">
               <div class="pml-dot" style="background:#059669;"></div>
               <span class="pml-name">Verificador de Población Susceptible</span>
@@ -590,11 +619,11 @@ body {
       <span class="quick-icon">📝</span>
       <div><div class="quick-name">Reporte Infracciones</div><div class="quick-sub">Canal seguro · Misión Médica</div></div>
     </a>
-    <a href="CertiVac.html" class="quick-card">
+    <a href="PAI/CertiVac.html" class="quick-card">
       <span class="quick-icon">💉</span>
       <div><div class="quick-name">CertiVac PAI</div><div class="quick-sub">Liquidaciones · Trazadores · Analytics</div></div>
     </a>
-    <a href="Analizador_PAI_HRNO.html" class="quick-card">
+    <a href="PAI/Analizador_PAI_HRNO.html" class="quick-card">
       <span class="quick-icon">🧒</span>
       <div><div class="quick-name">Verificador PAI</div><div class="quick-sub">Población Susceptible · Coberturas</div></div>
     </a>
@@ -614,9 +643,9 @@ body {
       <span class="quick-icon">🌐</span>
       <div><div class="quick-name">Portal Odoo HRNO</div><div class="quick-sub">Sistema institucional externo</div></div>
     </a>
-    <a href="https://www.sivigila.gov.co" target="_blank" class="quick-card">
+    <a href="VIGILANCIA SP/SIVIGILA_Monitor_v2.html" class="quick-card">
       <span class="quick-icon">🔬</span>
-      <div><div class="quick-name">SIVIGILA</div><div class="quick-sub">Notificaciones EISP</div></div>
+      <div><div class="quick-name">SIVIGILA Monitor</div><div class="quick-sub">KPIs · Eventos críticos · EISP</div></div>
     </a>
     <a href="https://pisis.minsalud.gov.co" target="_blank" class="quick-card">
       <span class="quick-icon">🏗️</span>
