@@ -659,13 +659,66 @@ pre.gas{background:var(--bg3);border:1px solid var(--border);border-radius:6px;p
 
 <!-- MODAL ADMIN LOGIN -->
 <div class="mbg" id="m-login">
-  <div class="modal" style="width:340px">
+  <div class="modal" style="width:360px">
     <div class="modal-ttl">Modo administrador</div>
     <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Ingresa la contraseña para habilitar funciones de carga y configuración.</p>
     <div class="fg2"><label>Contraseña</label><input type="password" id="login-pass" onkeydown="if(event.key==='Enter')checkLogin()"></div>
+    <div class="mfoot" style="flex-direction:column;gap:8px;align-items:stretch">
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn bg" onclick="closeModal('m-login')">Cancelar</button>
+        <button class="btn bp" onclick="checkLogin()">Ingresar</button>
+      </div>
+      <button class="btn bg" style="font-size:11px;color:var(--text2);width:100%;justify-content:center"
+              onclick="abrirRecuperacion()">¿Olvidaste la contraseña? Recuperar acceso</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RECUPERAR ACCESO -->
+<div class="mbg" id="m-recovery">
+  <div class="modal" style="width:400px">
+    <div class="modal-ttl">Recuperar acceso de administrador</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">
+      Ingresa tu clave de recuperación de 20 caracteres. Si no la tienes guardada, contacta al coordinador de Salud Pública.
+    </p>
+    <div class="fg2">
+      <label>Clave de recuperación</label>
+      <input type="text" id="rec-key" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
+             style="text-transform:uppercase;letter-spacing:1px;font-family:monospace;width:100%"
+             oninput="this.value=this.value.toUpperCase()"
+             onkeydown="if(event.key==='Enter')checkRecovery()">
+    </div>
+    <div id="rec-new-wrap" style="display:none">
+      <div class="fg2"><label>Nueva contraseña</label><input type="password" id="rec-new"></div>
+      <div class="fg2"><label>Confirmar contraseña</label><input type="password" id="rec-con"></div>
+    </div>
     <div class="mfoot">
-      <button class="btn bg" onclick="closeModal('m-login')">Cancelar</button>
-      <button class="btn bp" onclick="checkLogin()">Ingresar</button>
+      <button class="btn bg" onclick="closeModal('m-recovery')">Cancelar</button>
+      <button class="btn ba" id="rec-btn" onclick="checkRecovery()">Verificar clave</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MOSTRAR CLAVE DE RECUPERACIÓN -->
+<div class="mbg" id="m-showkey">
+  <div class="modal" style="width:420px">
+    <div class="modal-ttl" style="color:var(--warn)">⚠ Guarda tu clave de recuperación</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">
+      Esta clave te permite recuperar el acceso si olvidas la contraseña.
+      <strong style="color:var(--red)">Solo se muestra una vez</strong> — guárdala en papel o en un lugar seguro.
+    </p>
+    <div style="background:var(--bg3);border:2px dashed var(--warn);border-radius:8px;padding:18px;text-align:center;margin-bottom:16px">
+      <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Clave de recuperación</div>
+      <div id="show-rk" style="font-family:monospace;font-size:17px;font-weight:700;color:var(--warn);letter-spacing:3px;word-break:break-all">—</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:16px;padding:10px;background:rgba(255,180,50,.08);border-radius:6px">
+      <input type="checkbox" id="rk-ack" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer"
+             onchange="document.getElementById('rk-ok').disabled=!this.checked">
+      <label for="rk-ack" style="font-size:12px;cursor:pointer;line-height:1.5">Confirmo que he guardado esta clave en un lugar seguro</label>
+    </div>
+    <div class="mfoot">
+      <button class="btn bg" onclick="copiarClaveRec()">📋 Copiar</button>
+      <button class="btn bs" id="rk-ok" disabled onclick="closeModal('m-showkey')">Entendido — cerrar</button>
     </div>
   </div>
 </div>
@@ -891,6 +944,97 @@ function J(d) {
 }`;
 
 // ============================================================
+// SEGURIDAD — Hash SHA-256 + Clave de Recuperación
+// ============================================================
+async function hashPW(pw){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(pw)));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function genClaveRec(){
+  // Caracteres sin ambigüedad visual (sin 0,O,1,I,L)
+  const C='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const b=crypto.getRandomValues(new Uint8Array(20));
+  const raw=Array.from(b).map(v=>C[v%C.length]).join('');
+  return raw.match(/.{4}/g).join('-'); // formato XXXX-XXXX-XXXX-XXXX-XXXX
+}
+
+async function guardarClaveRec(clave){
+  const h=await hashPW(clave.replace(/-/g,''));
+  localStorage.setItem('siv_rk_hash',h);
+}
+
+async function mostrarClaveRec(){
+  const clave=genClaveRec();
+  await guardarClaveRec(clave);
+  document.getElementById('show-rk').textContent=clave;
+  document.getElementById('rk-ack').checked=false;
+  document.getElementById('rk-ok').disabled=true;
+  openModal('m-showkey');
+}
+
+function copiarClaveRec(){
+  const t=document.getElementById('show-rk').textContent;
+  navigator.clipboard.writeText(t).then(()=>toast('Clave copiada al portapapeles','success'));
+}
+
+function abrirRecuperacion(){
+  closeModal('m-login');
+  document.getElementById('rec-key').value='';
+  document.getElementById('rec-new-wrap').style.display='none';
+  document.getElementById('rec-btn').textContent='Verificar clave';
+  document.getElementById('rec-new').value='';
+  document.getElementById('rec-con').value='';
+  openModal('m-recovery');
+}
+
+async function checkRecovery(){
+  const raw=(document.getElementById('rec-key').value||'').trim().toUpperCase().replace(/-/g,'');
+  if(!raw){toast('Ingresa la clave de recuperación','error');return;}
+  const storedHash=ls('siv_rk_hash');
+  if(!storedHash){
+    toast('No hay clave de recuperación configurada. Inicia sesión con la contraseña actual primero.','error');
+    return;
+  }
+  const keyHash=await hashPW(raw);
+  if(keyHash!==storedHash){toast('Clave de recuperación incorrecta','error');return;}
+
+  const wrap=document.getElementById('rec-new-wrap');
+  const btn=document.getElementById('rec-btn');
+  if(wrap.style.display==='none'){
+    wrap.style.display='block';
+    btn.textContent='Establecer contraseña';
+    toast('Clave correcta. Ahora establece tu nueva contraseña.','success');
+    return;
+  }
+  // Segunda fase: guardar nueva contraseña
+  const nw=document.getElementById('rec-new').value;
+  const cn=document.getElementById('rec-con').value;
+  if(!nw||nw.length<4){toast('La contraseña debe tener al menos 4 caracteres','error');return;}
+  if(nw!==cn){toast('Las contraseñas no coinciden','error');return;}
+  const newHash=await hashPW(nw);
+  localStorage.setItem('siv_pw_hash',newHash);
+  localStorage.removeItem('siv_pw'); // eliminar formato legacy
+  closeModal('m-recovery');
+  ADMIN=true; updAdminUI();
+  toast('Contraseña restablecida. Modo administrador activo.','success');
+  setTimeout(()=>mostrarClaveRec(),400); // nueva clave de recuperación
+}
+
+// Wrapper seguro para localStorage.setItem (captura QuotaExceededError)
+function safeLSSet(key,val){
+  try{ localStorage.setItem(key,val); }
+  catch(e){
+    if(e.name==='QuotaExceededError'||e.code===22){
+      toast('⚠ Caché local llena. Los datos se muestran pero no se guardan localmente.','warn');
+    }
+  }
+}
+
+// Escape HTML para prevenir XSS al insertar datos en innerHTML
+function escH(s){ return String(s===null||s===undefined?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ============================================================
 // CONSTANTES
 // ============================================================
 const TIP_CAS = {'1':'Sospechoso','2':'Probable','3':'Conf. Lab','4':'Conf. Clínica'};
@@ -970,10 +1114,27 @@ function toggleAdmin(){
   if(ADMIN){ ADMIN=false; updAdminUI(); toast('Sesión de administrador cerrada','warn'); }
   else      { openModal('m-login'); document.getElementById('login-pass').value=''; setTimeout(()=>document.getElementById('login-pass').focus(),100); }
 }
-function checkLogin(){
+async function checkLogin(){
   const pw=document.getElementById('login-pass').value;
-  const stored=ls('siv_pw')||'HRNO2026';
-  if(pw===stored){ ADMIN=true; closeModal('m-login'); updAdminUI(); toast('Modo administrador activo','success'); }
+  if(!pw){toast('Ingresa la contraseña','error');return;}
+  let match=false;
+  const storedHash=ls('siv_pw_hash');
+  if(storedHash){
+    const pwHash=await hashPW(pw);
+    match=(pwHash===storedHash);
+  } else {
+    // Primer uso o migración desde versión legacy (contraseña en texto plano)
+    const legacy=ls('siv_pw')||'HRNO2026';
+    match=(pw===legacy);
+    if(match){
+      // Migrar a formato hash y generar clave de recuperación
+      const pwHash=await hashPW(pw);
+      localStorage.setItem('siv_pw_hash',pwHash);
+      localStorage.removeItem('siv_pw');
+      setTimeout(()=>mostrarClaveRec(),600);
+    }
+  }
+  if(match){ ADMIN=true; closeModal('m-login'); updAdminUI(); toast('Modo administrador activo','success'); }
   else { toast('Contraseña incorrecta','error'); }
 }
 function updAdminUI(){
@@ -984,17 +1145,29 @@ function updAdminUI(){
   if(!ADMIN && ['carga','config'].includes(currentVista())) setV('dashboard');
 }
 function currentVista(){ return document.querySelector('.view.on')?.id?.replace('view-','') || 'dashboard'; }
-function changePass(){
+async function changePass(){
   const cur=document.getElementById('pass-cur').value;
   const nw=document.getElementById('pass-new').value;
   const cn=document.getElementById('pass-con').value;
-  const stored=ls('siv_pw')||'HRNO2026';
-  if(cur!==stored){ toast('Contraseña actual incorrecta','error'); return; }
   if(!nw||nw.length<4){ toast('La nueva contraseña debe tener al menos 4 caracteres','error'); return; }
   if(nw!==cn){ toast('Las contraseñas no coinciden','error'); return; }
-  localStorage.setItem('siv_pw',nw);
+  let match=false;
+  const storedHash=ls('siv_pw_hash');
+  if(storedHash){
+    const curHash=await hashPW(cur);
+    match=(curHash===storedHash);
+  } else {
+    const legacy=ls('siv_pw')||'HRNO2026';
+    match=(cur===legacy);
+  }
+  if(!match){ toast('Contraseña actual incorrecta','error'); return; }
+  const newHash=await hashPW(nw);
+  localStorage.setItem('siv_pw_hash',newHash);
+  localStorage.removeItem('siv_pw');
   toast('Contraseña cambiada correctamente','success');
   ['pass-cur','pass-new','pass-con'].forEach(id=>document.getElementById(id).value='');
+  // Siempre generar nueva clave de recuperación al cambiar contraseña
+  setTimeout(()=>mostrarClaveRec(),400);
 }
 
 // ============================================================
@@ -1019,12 +1192,12 @@ function setV(v){
 // TABS
 // ============================================================
 function switchTab(group,pane,el){
-  document.querySelectorAll('#carga-'+group+', #carga-regular, #carga-historico, #cfg-conexion,#cfg-criticos,#cfg-acceso,#cfg-codigo,#cfg-datos').forEach(p=>{
-    if(p&&p.id.startsWith(group==='cfg'?'cfg-':'carga-')) p.classList.remove('on');
-  });
+  const prefix=group==='cfg'?'cfg-':'carga-';
+  // Desactivar solo los panes del grupo correcto
   el.closest('.tabs').querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   el.classList.add('on');
-  document.getElementById((group==='cfg'?'cfg-':'carga-')+pane)?.classList.add('on');
+  document.querySelectorAll('[id^="'+prefix+'"]').forEach(p=>p.classList.remove('on'));
+  document.getElementById(prefix+pane)?.classList.add('on');
 }
 
 // ============================================================
@@ -1038,8 +1211,8 @@ async function pullData(){
     const d=await r.json();
     if(!Array.isArray(d)) throw new Error(d.error||'Respuesta inválida');
     D_ALL=d.map(nr);
-    localStorage.setItem('siv_datos',JSON.stringify(D_ALL));
-    localStorage.setItem('siv_ts',new Date().toLocaleString('es-CO'));
+    safeLSSet('siv_datos',JSON.stringify(D_ALL));
+    safeLSSet('siv_ts',new Date().toLocaleString('es-CO'));
     applyFilt(); updConn(true); updCfgInfo();
     toast(D_ALL.length.toLocaleString('es-CO')+' registros cargados','success');
   }catch(e){ updConn(false); toast('Error: '+e.message,'error'); }
@@ -1212,10 +1385,10 @@ function renderCriticos(d){
     const tr=cur>prev?'↑':cur<prev?'↓':'→';
     const nivel=tot.length>20?'':'warn2';
     return `<div class="crit-card ${nivel}">
-      <span class="crit-trend">${tr}</span>
-      <div class="crit-name">${eve}</div>
+      <span class="crit-trend">${escH(tr)}</span>
+      <div class="crit-name">${escH(eve)}</div>
       <div class="crit-num">${tot.length.toLocaleString('es-CO')}</div>
-      <div class="crit-sub">total · ${cur} esta SE${sa}</div>
+      <div class="crit-sub">total · ${cur} esta SE${escH(String(sa))}</div>
     </div>`;
   }).join('');
 }
@@ -1325,19 +1498,20 @@ function renderPag(){
     const tc=TIP_CAS[r.tip_cas_]||r.tip_cas_||'—';
     const tcCls={'Sospechoso':'b1','Probable':'b2','Conf. Lab':'b3','Conf. Clínica':'b4'}[tc]||'';
     const hs=r.pac_hos_==='1'?'<span style="color:var(--warn)">Sí</span>':'No';
-    const cf=r.con_fin_==='2'?'<span style="color:var(--red);font-weight:600">Fallecido</span>':(CON_FIN[r.con_fin_]||r.con_fin_||'—');
+    const cfRaw=CON_FIN[r.con_fin_]||r.con_fin_||'—';
+    const cf=r.con_fin_==='2'?'<span style="color:var(--red);font-weight:600">Fallecido</span>':escH(cfRaw);
     const cg=r.tipo_carga==='SEMANAL'?'<span class="bdg bS">SEM</span>':r.tipo_carga==='MENSUAL'?'<span class="bdg bM">MEN</span>':'<span class="bdg" style="background:rgba(56,199,147,.15);color:var(--green)">HIST</span>';
-    const sx=r.sexo_==='M'?'Masc.':r.sexo_==='F'?'Fem.':r.sexo_||'—';
+    const sx=r.sexo_==='M'?'Masc.':r.sexo_==='F'?'Fem.':escH(r.sexo_||'—');
     const isCrit=CRITICOS.includes(r.nom_eve)?'border-left:3px solid var(--red);':'';
     return `<tr style="${isCrit}">
       <td><strong>SE${r.semana}</strong></td><td>${r.año}</td>
-      <td style="font-size:11px">${r.tip_ide_||'—'}</td><td style="font-family:monospace;font-size:12px">${r.num_ide_||'—'}</td>
-      <td style="font-size:11px">${r._nombre||'—'}</td>
-      <td>${r.fec_not||'—'}</td>
-      <td>${r.nom_eve||'—'}</td><td>${MUN[r.municipio]?.nom||r.municipio||'—'}</td>
-      <td>${AREA_NM[r.area_]||r.area_||'—'}</td><td>${r._lugar||'—'}</td>
+      <td style="font-size:11px">${escH(r.tip_ide_||'—')}</td><td style="font-family:monospace;font-size:12px">${escH(r.num_ide_||'—')}</td>
+      <td style="font-size:11px">${escH(r._nombre||'—')}</td>
+      <td>${escH(r.fec_not||'—')}</td>
+      <td>${escH(r.nom_eve||'—')}</td><td>${escH(MUN[r.municipio]?.nom||r.municipio||'—')}</td>
+      <td>${escH(AREA_NM[r.area_]||r.area_||'—')}</td><td>${escH(r._lugar||'—')}</td>
       <td>${r.edad_}a</td><td>${sx}</td>
-      <td><span class="bdg ${tcCls}">${tc}</span></td><td>${hs}</td><td>${cf}</td><td>${cg}</td>
+      <td><span class="bdg ${tcCls}">${escH(tc)}</span></td><td>${hs}</td><td>${cf}</td><td>${cg}</td>
     </tr>`;
   }).join('');
   const tot=D_F.length, pags=Math.ceil(tot/PPP);
@@ -1373,7 +1547,7 @@ function evalAlertas(){
   const nd=ALERTAS.filter(a=>a.disparada).length;
   document.getElementById('k-al').textContent=nd;
   const bdg=document.getElementById('alr-bdg'); bdg.textContent=nd; bdg.classList.toggle('on',nd>0);
-  localStorage.setItem('siv_alr',JSON.stringify(ALERTAS));
+  safeLSSet('siv_alr',JSON.stringify(ALERTAS));
 }
 
 function renderAlertas(){
@@ -1383,19 +1557,19 @@ function renderAlertas(){
 }
 
 function alrHTML(a){
-  const nm=MUN[a.municipio]?.nom||a.municipio||'Todos';
+  const nm=escH(MUN[a.municipio]?.nom||a.municipio||'Todos');
   const cl=a.disparada?(a.nivel==='danger'?'trig':'warn2'):'';
   const acc=ADMIN?`<div style="display:flex;gap:5px">
-    <button class="btn bg" style="font-size:11px" onclick="toggleAlr(${a.id})">${a.activa?'Pausar':'Activar'}</button>
-    <button class="btn bd" style="font-size:11px" onclick="delAlr(${a.id})">×</button>
+    <button class="btn bg" style="font-size:11px" onclick="toggleAlr(${Number(a.id)})">${a.activa?'Pausar':'Activar'}</button>
+    <button class="btn bd" style="font-size:11px" onclick="delAlr(${Number(a.id)})">×</button>
   </div>`:'';
   return `<div class="al-item ${cl}">
     <div class="al-dot"></div>
     <div style="flex:1">
-      <div style="font-size:13px;font-weight:600">${a.nombre}</div>
+      <div style="font-size:13px;font-weight:600">${escH(a.nombre||'—')}</div>
       <div style="font-size:11px;color:var(--text2);margin-top:2px">
-        ${a.evento||'Cualquier evento'} · ${nm} · Umbral: ${a.umbral} casos/${a.periodo}
-        ${a.disparada?` — <span style="color:var(--red);font-weight:700">ALERTA: ${a.casosAct} casos</span>`:` — ${a.casosAct||0} casos`}
+        ${escH(a.evento||'Cualquier evento')} · ${nm} · Umbral: ${Number(a.umbral)||0} casos/${escH(a.periodo||'')}
+        ${a.disparada?` — <span style="color:var(--red);font-weight:700">ALERTA: ${Number(a.casosAct)||0} casos</span>`:` — ${Number(a.casosAct)||0} casos`}
       </div>
     </div>${acc}
   </div>`;
@@ -1407,14 +1581,14 @@ function saveAlerta(){
   const umb=Number(document.getElementById('alr-umb').value);
   if(!umb||umb<1){toast('Umbral debe ser ≥ 1','error');return;}
   ALERTAS.push({id:Date.now(),nombre:nom,municipio:document.getElementById('alr-mun').value,evento:document.getElementById('alr-eve').value,umbral:umb,periodo:document.getElementById('alr-per').value,nivel:document.getElementById('alr-niv').value,activa:true,creada:new Date().toISOString(),disparada:false,casosAct:0});
-  localStorage.setItem('siv_alr',JSON.stringify(ALERTAS));
+  safeLSSet('siv_alr',JSON.stringify(ALERTAS));
   closeModal('m-alr'); evalAlertas(); renderAlertas();
   toast('Alerta creada','success');
   document.getElementById('alr-nom').value=''; document.getElementById('alr-umb').value=5;
 }
 
-function toggleAlr(id){ const a=ALERTAS.find(a=>a.id===id); if(a){a.activa=!a.activa;localStorage.setItem('siv_alr',JSON.stringify(ALERTAS));evalAlertas();renderAlertas();} }
-function delAlr(id){ ALERTAS=ALERTAS.filter(a=>a.id!==id); localStorage.setItem('siv_alr',JSON.stringify(ALERTAS)); renderAlertas(); evalAlertas(); toast('Alerta eliminada','warn'); }
+function toggleAlr(id){ const a=ALERTAS.find(a=>a.id===id); if(a){a.activa=!a.activa;safeLSSet('siv_alr',JSON.stringify(ALERTAS));evalAlertas();renderAlertas();} }
+function delAlr(id){ ALERTAS=ALERTAS.filter(a=>a.id!==id); safeLSSet('siv_alr',JSON.stringify(ALERTAS)); renderAlertas(); evalAlertas(); toast('Alerta eliminada','warn'); }
 
 // ============================================================
 // CARGA DE ARCHIVOS
@@ -1437,7 +1611,7 @@ function procFile(file,tipo,histAno,histMun){
   const reader=new FileReader();
   reader.onload=e=>{
     try{
-      const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
       const ws=wb.Sheets[wb.SheetNames[0]];
       const json=XLSX.utils.sheet_to_json(ws,{defval:''});
       const munFile=histMun||detectMun(file.name);
@@ -1450,7 +1624,7 @@ function procFile(file,tipo,histAno,histMun){
       toast(`${regs.length} leídos · ${nuevos.length} nuevos · ${dups.length} duplicados`,'success');
     }catch(err){hideLod();toast('Error: '+err.message,'error');}
   };
-  reader.readAsBinaryString(file);
+  reader.readAsArrayBuffer(file);
 }
 
 function detectMun(n){ const u=n.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
@@ -1481,8 +1655,8 @@ async function doLoad(){
     if(url){ const res=await postGAS({accion:'insertar',registros:PEND,tipo_carga:PEND_TIPO,email:ls('gas_email')||''}); gasMsg=res.ok?` · GAS: ${res.insertados} insertados`:` · GAS error: ${res.error}`; }
   }catch(e){ gasMsg=` · (GAS: ${e.message})`; }
   D_ALL=[...D_ALL,...PEND.map(r=>({...r,tipo_carga:PEND_TIPO}))];
-  localStorage.setItem('siv_datos',JSON.stringify(D_ALL));
-  localStorage.setItem('siv_ts',new Date().toLocaleString('es-CO'));
+  safeLSSet('siv_datos',JSON.stringify(D_ALL));
+  safeLSSet('siv_ts',new Date().toLocaleString('es-CO'));
 
   // Marcar en grilla histórico si aplica
   if(PEND_TIPO==='HISTORICO'&&PEND.length>0){
@@ -1490,7 +1664,7 @@ async function doLoad(){
     const hist=JSON.parse(ls('siv_hist')||'{}');
     if(!hist[ano])hist[ano]={};
     hist[ano][mun]=true;
-    localStorage.setItem('siv_hist',JSON.stringify(hist));
+    safeLSSet('siv_hist',JSON.stringify(hist));
     buildHistGrid();
   }
 
@@ -1539,17 +1713,25 @@ function fillCriticosList(){
   const el=document.getElementById('criticos-list'); if(!el)return;
   const evs=[...new Set(D_ALL.map(r=>r.nom_eve).filter(Boolean))].sort();
   if(!evs.length){el.innerHTML='<p style="color:var(--text2);font-size:12px">Carga datos primero para ver los eventos disponibles.</p>';return;}
-  el.innerHTML=evs.map(e=>{
+  el.innerHTML=evs.map((e,idx)=>{
     const checked=CRITICOS.includes(e);
+    const safeId='crit-'+idx; // índice numérico para evitar caracteres inválidos en IDs
     return `<div class="critico-row ${checked?'marked':''}">
-      <input type="checkbox" id="crit-${e.replace(/\s/g,'_')}" ${checked?'checked':''} onchange="toggleCrit('${e}',this)">
-      <label for="crit-${e.replace(/\s/g,'_')}">${e}</label>
+      <input type="checkbox" id="${safeId}" ${checked?'checked':''} onchange="toggleCrit(${idx},this)" data-eve="${escH(e)}">
+      <label for="${safeId}">${escH(e)}</label>
     </div>`;
   }).join('');
 }
 
-function toggleCrit(eve,el){ if(el.checked){if(!CRITICOS.includes(eve))CRITICOS.push(eve);}else{CRITICOS=CRITICOS.filter(e=>e!==eve);} el.closest('.critico-row').classList.toggle('marked',el.checked); }
-function saveCriticos(){ localStorage.setItem('siv_crit',JSON.stringify(CRITICOS)); renderDB(); toast('Eventos críticos guardados','success'); }
+function toggleCrit(idx,el){
+  // Leer el nombre real del evento desde el atributo data (nunca del ID)
+  const eve=el.dataset.eve;
+  if(!eve)return;
+  if(el.checked){if(!CRITICOS.includes(eve))CRITICOS.push(eve);}
+  else{CRITICOS=CRITICOS.filter(e=>e!==eve);}
+  el.closest('.critico-row').classList.toggle('marked',el.checked);
+}
+function saveCriticos(){ safeLSSet('siv_crit',JSON.stringify(CRITICOS)); renderDB(); toast('Eventos críticos guardados','success'); }
 
 // ============================================================
 // CONFIGURACIÓN
@@ -1586,7 +1768,7 @@ function exportJSON(){
 
 function importJSON(){
   const inp=document.createElement('input'); inp.type='file'; inp.accept='.json';
-  inp.onchange=e=>{const reader=new FileReader();reader.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!Array.isArray(d))throw new Error('Formato inválido');D_ALL=d.map(nr);localStorage.setItem('siv_datos',JSON.stringify(D_ALL));applyFilt();updCfgInfo();toast(D_ALL.length.toLocaleString('es-CO')+' registros importados','success');}catch(err){toast('Error: '+err.message,'error');}};reader.readAsText(e.target.files[0]);};
+  inp.onchange=e=>{const reader=new FileReader();reader.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!Array.isArray(d))throw new Error('Formato inválido');D_ALL=d.map(nr);safeLSSet('siv_datos',JSON.stringify(D_ALL));applyFilt();updCfgInfo();toast(D_ALL.length.toLocaleString('es-CO')+' registros importados','success');}catch(err){toast('Error: '+err.message,'error');}};reader.readAsText(e.target.files[0]);};
   inp.click();
 }
 

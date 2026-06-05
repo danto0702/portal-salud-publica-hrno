@@ -4,9 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CertiVac — Sistema PAI Colombia</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Lora:ital,wght@0,400;0,600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- Librerías locales offline (sin CDN) -->
+<script src="libs/xlsx.full.min.js"></script>
+<script src="libs/chart.umd.min.js"></script>
+<style>
+/* Fuentes de sistema como fallback offline — Syne y JetBrains Mono se cargan si hay internet */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Lora:ital,wght@0,400;0,600&display=swap');
+</style>
 
 <script>
 // ╔══════════════════════════════════════════════════════════════╗
@@ -378,7 +382,7 @@ td{padding:10px 13px;color:var(--ink);vertical-align:middle}
         <tbody id="c-tbody"></tbody>
       </table>
       <div class="ctot-wrap">
-        <div class="ctot ctot-main"><div><div class="ct-l">Subtotal a Pagar</div><div style="font-size:10px;opacity:.4;margin-top:1px">MIN(aplicadas,meta)×$8.000</div></div><div class="ct-v" id="c-gran">$0</div></div>
+        <div class="ctot ctot-main"><div><div class="ct-l">Subtotal a Pagar</div><div id="c-formula-txt" style="font-size:10px;opacity:.4;margin-top:1px">MIN(aplicadas,meta)×$8.000</div></div><div class="ct-v" id="c-gran">$0</div></div>
         <div class="ctot ctot-ext"><div><div class="ct-l" style="color:var(--orange)">Fuera de Meta (ref.)</div><div style="font-size:10px;opacity:.6;color:var(--orange);margin-top:1px">No se paga</div></div><div class="ct-v-ext" id="c-ext">$0</div></div>
       </div>
       <div class="cfirmas">
@@ -1374,12 +1378,12 @@ function renderDashboardData(liq){
   if(!liq.vacs.length){tb.innerHTML=`<tr><td colspan="7"><div class="es"><div class="ei">📭</div><p>Sin datos para el período seleccionado</p></div></td></tr>`;return;}
   tb.innerHTML=liq.vacs.slice(0,10).map((v,i)=>`<tr>
     <td style="color:var(--s4);font-size:11px">${i+1}</td>
-    <td class="td-v">${v.vac}</td>
-    <td class="td-m">${v.tAp.toLocaleString('es-CO')}</td>
-    <td class="td-m" style="color:var(--teal-d)">${v.tEnMeta.toLocaleString('es-CO')}</td>
-    <td class="td-m" style="color:var(--orange)">${v.tFuera.toLocaleString('es-CO')}</td>
+    <td class="td-v">${escH(v.vac)}</td>
+    <td class="td-m">${Number(v.tAp).toLocaleString('es-CO')}</td>
+    <td class="td-m" style="color:var(--teal-d)">${Number(v.tEnMeta).toLocaleString('es-CO')}</td>
+    <td class="td-m" style="color:var(--orange)">${Number(v.tFuera).toLocaleString('es-CO')}</td>
     <td class="td-val">${fmt(v.tVal)}</td>
-    <td><button class="bc-btn" onclick="verCert('${escJ(v.vac)}')">📄</button></td>
+    <td><button class="bc-btn" onclick="verCert('${escH(escJ(v.vac))}')">📄</button></td>
   </tr>`).join('');
 }
 
@@ -1399,14 +1403,14 @@ async function cargarHistorial(){
     }
     tb.innerHTML=data.archivos.map((a,i)=>`<tr>
       <td style="color:var(--s4);font-size:11px">${i+1}</td>
-      <td class="td-v" style="font-size:12px">${a.nombre_archivo}</td>
-      <td class="td-m" style="font-size:11px">${String(a.fecha_carga||'').substring(0,16).replace('T',' ')}</td>
-      <td style="font-size:12px">${a.mes_archivo||''} ${a.año_archivo||''}</td>
-      <td style="font-size:12px">${a.municipio||'—'}</td>
-      <td class="td-m">${a.total_registros||0}</td>
-      <td class="td-m" style="color:var(--teal-d)">${a.en_ciclo||0}</td>
-      <td class="td-m" style="color:var(--orange)">${a.fuera_ciclo||0}</td>
-      <td><button class="bc-btn b-da" style="background:var(--crimson);color:#fff" onclick="borrarArchivoHist('${escJ(a.id_archivo)}','${escJ(a.nombre_archivo)}')">🗑️</button></td>
+      <td class="td-v" style="font-size:12px">${escH(a.nombre_archivo)}</td>
+      <td class="td-m" style="font-size:11px">${escH(String(a.fecha_carga||'').substring(0,16).replace('T',' '))}</td>
+      <td style="font-size:12px">${escH(a.mes_archivo||'')} ${escH(String(a.año_archivo||''))}</td>
+      <td style="font-size:12px">${escH(a.municipio||'—')}</td>
+      <td class="td-m">${Number(a.total_registros)||0}</td>
+      <td class="td-m" style="color:var(--teal-d)">${Number(a.en_ciclo)||0}</td>
+      <td class="td-m" style="color:var(--orange)">${Number(a.fuera_ciclo)||0}</td>
+      <td><button class="bc-btn b-da" style="background:var(--crimson);color:#fff" onclick="borrarArchivoHist('${escH(escJ(a.id_archivo))}','${escH(escJ(a.nombre_archivo))}')">🗑️</button></td>
     </tr>`).join('');
   }catch(e){
     tb.innerHTML=`<tr><td colspan="9"><div class="es"><div class="ei">❌</div><p>${e.message}</p></div></td></tr>`;
@@ -1426,7 +1430,12 @@ async function borrarArchivoHist(id, nombre){
 }
 
 async function borrarTodoBD(){
-  if(!confirm('⚠️ ¿Eliminar TODOS los registros de Google Sheets? Esta acción es irreversible.'))return;
+  const confirmacion=prompt('⚠️ Esta acción elimina TODOS los registros de Google Sheets y es IRREVERSIBLE.\n\nEscribe BORRAR TODO para confirmar:');
+  if(confirmacion===null)return; // canceló
+  if(confirmacion.trim().toUpperCase()!=='BORRAR TODO'){
+    toast('Operación cancelada — el texto no coincide','warn');
+    return;
+  }
   showLoad('Eliminando todos los datos…','Por favor espere');
   try{
     const data=await apiPost({accion:'borrar_todo',confirmacion:'BORRAR_TODO'});
@@ -1527,14 +1536,14 @@ async function cargarLiquidacion(){
       const b=pct>=90?`<span class="bdg b-g">${pct}%</span>`:pct>=60?`<span class="bdg b-y">${pct}%</span>`:`<span class="bdg b-r">${pct}%</span>`;
       return`<tr>
         <td style="color:var(--s4);font-size:11px">${i+1}</td>
-        <td class="td-v">${v.vac}</td>
-        <td class="td-m">${v.tAp.toLocaleString('es-CO')}</td>
-        <td class="td-m" style="color:var(--teal-d)">${v.tEnMeta.toLocaleString('es-CO')}</td>
-        <td class="td-m" style="color:var(--orange)">${v.tFuera.toLocaleString('es-CO')}</td>
+        <td class="td-v">${escH(v.vac)}</td>
+        <td class="td-m">${Number(v.tAp).toLocaleString('es-CO')}</td>
+        <td class="td-m" style="color:var(--teal-d)">${Number(v.tEnMeta).toLocaleString('es-CO')}</td>
+        <td class="td-m" style="color:var(--orange)">${Number(v.tFuera).toLocaleString('es-CO')}</td>
         <td>${b}</td>
         <td class="td-val">${fmt(v.tVal)}</td>
         <td class="td-ext">${fmt(v.tValExt||0)}</td>
-        <td><button class="bc-btn" onclick="verCert('${escJ(v.vac)}')">📄 Cert.</button></td>
+        <td><button class="bc-btn" onclick="verCert('${escH(escJ(v.vac))}')">📄 Cert.</button></td>
       </tr>`;
     }).join('');
   }catch(e){
@@ -1544,7 +1553,7 @@ async function cargarLiquidacion(){
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// ETL LOCAL (parse XLS en el navegador, luego enviar al backend)
+// ETL LOCAL (escH disponible desde utilidades) (parse XLS en el navegador, luego enviar al backend)
 // ═══════════════════════════════════════════════════════════════════════
 function onDrag(e,a){e.preventDefault();$('dz').classList.toggle('drag',a)}
 function onDrop(e){e.preventDefault();$('dz').classList.remove('drag');if(e.dataTransfer.files.length)handleFiles(e.dataTransfer.files)}
@@ -1583,26 +1592,8 @@ async function procesarYGuardar(file){
         const meta=extraerMeta(wb,hs);
         const registros=[];
 
-        // Parsear mes y año del metadata para construir fechas completas
-        // El campo meta.mes puede ser "Julio", "7", "JULIO 2025", etc.
-        const MESES_NOMBRES={'enero':1,'febrero':2,'marzo':3,'abril':4,'mayo':5,'junio':6,
-          'julio':7,'agosto':8,'septiembre':9,'octubre':10,'noviembre':11,'diciembre':12};
-        let mesNum=0, anioNum=0;
-        const mesStr=String(meta.mes||'').trim().toLowerCase().replace(/[áéíóú]/g,c=>({á:'a',é:'e',í:'i',ó:'o',ú:'u'}[c]||c));
-        const anioStr=String(meta.año||'').trim();
-        // Intentar parsear mes por nombre
-        for(const[nom,num] of Object.entries(MESES_NOMBRES)){if(mesStr.includes(nom)){mesNum=num;break;}}
-        if(!mesNum) mesNum=parseInt(mesStr)||0;
-        anioNum=parseInt(anioStr)||0;
-        // Si no se encontró en el metadata, intentar extraer del nombre del archivo
-        if(!mesNum||!anioNum){
-          const nombreUp=file.name.toUpperCase();
-          if(!anioNum){const m=nombreUp.match(/20\d{2}/);if(m)anioNum=parseInt(m[0]);}
-          if(!mesNum){for(const[nom,num] of Object.entries(MESES_NOMBRES)){if(nombreUp.includes(nom.toUpperCase())){mesNum=num;break;}}}
-          // Detectar febrero/feb en nombre
-          if(!mesNum&&(nombreUp.includes('FEB')||nombreUp.includes('FEBRERO')))mesNum=2;
-          if(!mesNum&&(nombreUp.includes('JUL')||nombreUp.includes('JULIO')))mesNum=7;
-        }
+        // Parsear mes y año usando la función centralizada
+        const {mesNum, anioNum}=extraerMesAno(meta, file.name);
 
         setFP(id,25,'Procesando Niños y Niñas...');
         const hn=hs.find(h=>h.toUpperCase().includes('NI')&&h.toUpperCase().includes('A'));
@@ -1663,6 +1654,41 @@ async function procesarYGuardar(file){
 }
 
 // ── ETL helpers ──
+
+// Extrae mes (1-12) y año (YYYY) desde metadata + nombre de archivo
+// Centraliza la lógica que antes estaba duplicada en procesarYGuardar y diagnosticarXLS
+function extraerMesAno(meta, fileName){
+  const MESES_NOMBRES={'enero':1,'febrero':2,'marzo':3,'abril':4,'mayo':5,'junio':6,
+    'julio':7,'agosto':8,'septiembre':9,'octubre':10,'noviembre':11,'diciembre':12};
+  let mesNum=0, anioNum=0;
+  const mesStr=String(meta.mes||'').trim().toLowerCase()
+    .replace(/[áéíóú]/g,c=>({á:'a',é:'e',í:'i',ó:'o',ú:'u'}[c]||c));
+  const anioStr=String(meta.año||'').trim();
+  // Parsear mes por nombre
+  for(const[nom,num] of Object.entries(MESES_NOMBRES)){if(mesStr.includes(nom)){mesNum=num;break;}}
+  if(!mesNum) mesNum=parseInt(mesStr)||0;
+  anioNum=parseInt(anioStr)||0;
+  // Fallback desde nombre del archivo
+  if(!mesNum||!anioNum){
+    const nombreUp=String(fileName||'').toUpperCase();
+    if(!anioNum){const m=nombreUp.match(/20\d{2}/);if(m)anioNum=parseInt(m[0]);}
+    if(!mesNum){
+      for(const[nom,num] of Object.entries(MESES_NOMBRES)){
+        if(nombreUp.includes(nom.toUpperCase())){mesNum=num;break;}
+      }
+      // Abreviaturas comunes
+      if(!mesNum&&(nombreUp.includes('FEB')))mesNum=2;
+      if(!mesNum&&(nombreUp.includes('JUL')))mesNum=7;
+      if(!mesNum&&(nombreUp.includes('AGO')))mesNum=8;
+      if(!mesNum&&(nombreUp.includes('SEP')||nombreUp.includes('SEPT')))mesNum=9;
+      if(!mesNum&&(nombreUp.includes('OCT')))mesNum=10;
+      if(!mesNum&&(nombreUp.includes('NOV')))mesNum=11;
+      if(!mesNum&&(nombreUp.includes('DIC')))mesNum=12;
+    }
+  }
+  return {mesNum, anioNum};
+}
+
 function edadEnMeses(tipo,num){
   const n=parseInt(num)||0,t=String(tipo||'').trim().toUpperCase();
   if(t==='M')return n;if(t==='A')return n*12;if(t==='D')return Math.floor(n/30);return 0;
@@ -1696,11 +1722,20 @@ function normN(v){if(!v)return'';const s=v.toString().trim().toUpperCase().repla
 function extraerMeta(wb,hs){
   const m={municipio:'',departamento:'',mes:'',año:'',institucion:''};
   const hn=hs.find(h=>h.toUpperCase().includes('NI')&&h.toUpperCase().includes('A'));
-  if(hn){const d=XLSX.utils.sheet_to_json(wb.Sheets[hn],{header:1,defval:null,raw:false});
-    const f3=d[2]||[],f4=d[3]||[];
-    m.departamento=(f3[6]||'').toString().trim();m.municipio=(f3[7]||'').toString().trim();
-    m.mes=(f3[9]||'').toString().trim();m.año=(f3[10]||'').toString().trim();
-    m.institucion=(f4[18]||'').toString().trim();
+  if(hn){
+    const d=XLSX.utils.sheet_to_json(wb.Sheets[hn],{header:1,defval:null,raw:false});
+    // Fila índice 2 (fila 3 visual): departamento[6], municipio[7], mes[9], año[10], institución[18]
+    const f2=d[2]||[];
+    m.departamento=(f2[6]||'').toString().trim();
+    m.municipio   =(f2[7]||'').toString().trim();
+    m.mes         =(f2[9]||'').toString().trim();
+    m.año         =(f2[10]||'').toString().trim();
+    m.institucion =(f2[18]||'').toString().trim();
+    // Fallback: algunos formatos ponen la institución en la fila siguiente
+    if(!m.institucion){
+      const f3=d[3]||[];
+      m.institucion=(f3[18]||'').toString().trim();
+    }
   }
   return m;
 }
@@ -1730,17 +1765,7 @@ async function diagnosticarXLS(file){
         const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
         const hs=wb.SheetNames;
         const meta=extraerMeta(wb,hs);
-        const MESES_NOMBRES={'enero':1,'febrero':2,'marzo':3,'abril':4,'mayo':5,'junio':6,'julio':7,'agosto':8,'septiembre':9,'octubre':10,'noviembre':11,'diciembre':12};
-        let mesNum=0,anioNum=0;
-        const mesStr=String(meta.mes||'').trim().toLowerCase().replace(/[áéíóú]/g,c=>({á:'a',é:'e',í:'i',ó:'o',ú:'u'}[c]||c));
-        for(const[nom,num] of Object.entries(MESES_NOMBRES)){if(mesStr.includes(nom)){mesNum=num;break;}}
-        if(!mesNum)mesNum=parseInt(mesStr)||0;
-        anioNum=parseInt(String(meta.año||'').trim())||0;
-        if(!mesNum||!anioNum){
-          const nu=file.name.toUpperCase();
-          if(!anioNum){const m=nu.match(/20\d{2}/);if(m)anioNum=parseInt(m[0]);}
-          if(!mesNum){for(const[nom,num] of Object.entries(MESES_NOMBRES)){if(nu.includes(nom.toUpperCase())){mesNum=num;break;}}}
-        }
+        const {mesNum, anioNum}=extraerMesAno(meta, file.name);
         const regs=[];
         const hn=hs.find(h=>h.toUpperCase().includes('NI')&&h.toUpperCase().includes('A'));
         if(hn)parsNinos(wb.Sheets[hn],regs,file.name,mesNum,anioNum);
@@ -1834,8 +1859,13 @@ function parsNinos(ws,regs,fuente,mesNum,anio){
   const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
   if(d.length<8)return;
   const dc=buildDC(d[7]||[],d[8]||[]);
-  const f6=d[5]||[];let cv=146;
+  const f6=d[5]||[];let cv=-1;
   for(let i=f6.length-1;i>=0;i--){if((f6[i]||'').toString().toUpperCase().includes('VACUNADOR')){cv=i;break;}}
+  if(cv<0){
+    console.warn('[CertiVac parsNinos] Columna VACUNADOR no encontrada en:',fuente);
+    toast(`⚠️ Hoja Niños/Niñas: columna VACUNADOR no encontrada en "${fuente.split('/').pop()}" — revisa el formato del XLS`,'warn');
+    return; // sin vacunadora no se puede registrar
+  }
   for(let r=10;r<d.length;r++){
     const row=d[r];if(!row||row[0]==null||row[0]===''||row[0]==='0')continue;
     const vac=normN(row[cv]);if(!vac)continue;
@@ -1852,8 +1882,13 @@ function parsAdultos(ws,regs,fuente,mesNum,anio){
   const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
   if(d.length<10)return;
   const dc=buildDC(d[8]||[],d[9]||[]);
-  const f7=d[6]||[];let cv=107;
+  const f7=d[6]||[];let cv=-1;
   for(let i=f7.length-1;i>=0;i--){if((f7[i]||'').toString().toUpperCase().includes('VACUNADOR')){cv=i;break;}}
+  if(cv<0){
+    console.warn('[CertiVac parsAdultos] Columna VACUNADOR no encontrada en:',fuente);
+    toast(`⚠️ Hoja Adultos: columna VACUNADOR no encontrada en "${fuente.split('/').pop()}" — revisa el formato del XLS`,'warn');
+    return;
+  }
   for(let r=11;r<d.length;r++){
     const row=d[r];if(!row||row[0]==null||row[0]===''||row[0]==='0')continue;
     const vac=normN(row[cv]);if(!vac)continue;
@@ -1869,8 +1904,13 @@ function parsRN(ws,regs,fuente,mesNum,anio){
   const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
   if(d.length<8)return;
   const dc=buildDC(d[6]||[],d[7]||[]);
-  const f6=d[5]||[];let cv=39;
+  const f6=d[5]||[];let cv=-1;
   for(let i=f6.length-1;i>=0;i--){if((f6[i]||'').toString().toUpperCase().includes('VACUNADOR')){cv=i;break;}}
+  if(cv<0){
+    console.warn('[CertiVac parsRN] Columna VACUNADOR no encontrada en:',fuente);
+    toast(`⚠️ Hoja Recién Nacidos: columna VACUNADOR no encontrada en "${fuente.split('/').pop()}"`,'warn');
+    return;
+  }
   for(let r=9;r<d.length;r++){
     const row=d[r];if(!row||row[0]==null||row[0]===''||row[0]==='0')continue;
     const vac=normN(row[cv]);if(!vac)continue;
@@ -2087,6 +2127,9 @@ function recalcCertRow(tr){
 // ── Recalcula todos cuando cambia el precio global ──
 function recalcAllCertRows(){
   const precio=parseInt($('cert-precio-global').value)||8000;
+  // Sincronizar texto de la fórmula en el resumen
+  const ft=$('c-formula-txt');
+  if(ft) ft.textContent=`MIN(aplicadas,meta)×${fmt(precio)}`;
   document.querySelectorAll('#c-tbody .cert-data-row').forEach(tr=>{
     const meta=Math.max(0,parseInt(tr.querySelector('[data-field="meta"]').value)||0);
     const ap=Math.max(0,parseInt(tr.querySelector('[data-field="ap"]').value)||0);
