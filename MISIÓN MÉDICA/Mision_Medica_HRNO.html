@@ -2654,7 +2654,7 @@ async function openTarjetaOverlay(id){
           <div style="font-size:.82rem;font-weight:700;font-family:monospace;color:var(--purple)">${data.numero_carnet}</div>
           <div style="font-size:.62rem;color:rgba(255,255,255,.4);margin-top:.2rem">Válido institucional</div>
         </div>
-        <div id="qr-code-container" style="background:#fff;padding:6px;border-radius:6px;width:72px;height:72px"></div>
+        <div id="qr-code-container" style="background:#fff;padding:5px;border-radius:6px;width:96px;height:96px;flex-shrink:0"></div>
       </div>
     </div>
 
@@ -2682,7 +2682,7 @@ async function openTarjetaOverlay(id){
   // Generate QR
   setTimeout(()=>{
     const qrEl = document.getElementById('qr-code-container');
-    if(qrEl){ try{ new QRCode(qrEl,{text:tarjetaUrl,width:60,height:60,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M}); }catch(e){} }
+    if(qrEl){ try{ new QRCode(qrEl,{text:tarjetaUrl,width:86,height:86,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H}); }catch(e){} }
   },200);
 }
 
@@ -2701,7 +2701,7 @@ async function descargarCarnet(){
   const el = document.getElementById('carnet-render');
   if(!el){ toast('No hay tarjeta para descargar','warn'); return; }
   try{
-    const canvas = await html2canvas(el,{backgroundColor:'#1a0d26',scale:2});
+    const canvas = await html2canvas(el,{backgroundColor:'#1a0d26',scale:4,useCORS:true});
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
     a.download = 'Carnet_Mision_Medica.png';
