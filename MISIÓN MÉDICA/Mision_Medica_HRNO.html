@@ -1,0 +1,2902 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Misión Médica · ESE HRNO</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════
+   DESIGN TOKENS — Misión Médica HRNO
+   Professional dark theme: healthcare government
+═══════════════════════════════════════════════════ */
+:root {
+  /* Core surfaces */
+  --bg:          #080c10;
+  --surface:     #0e1318;
+  --surface-2:   #131920;
+  --surface-3:   #1a2230;
+  --border:      #1e2d3d;
+  --border-soft: #16212e;
+
+  /* Text */
+  --text:        #dde6f0;
+  --text-soft:   #a8bfd4;
+  --muted:       #5a7a96;
+
+  /* Brand colors */
+  --red:         #e94560;
+  --red-dark:    #b8293e;
+  --red-glow:    rgba(233,69,96,.18);
+  --purple:      #9333ea;
+  --purple-dark: #6d1fd1;
+  --purple-glow: rgba(147,51,234,.15);
+  --blue:        #3b82f6;
+  --blue-glow:   rgba(59,130,246,.15);
+  --green:       #10d9a0;
+  --green-dark:  #0aaa7d;
+  --green-glow:  rgba(16,217,160,.15);
+  --yellow:      #f59e0b;
+  --yellow-glow: rgba(245,158,11,.15);
+  --cyan:        #06b6d4;
+
+  /* Elevation shadows */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.4),0 1px 2px rgba(0,0,0,.3);
+  --shadow-md:  0 4px 12px rgba(0,0,0,.5),0 2px 6px rgba(0,0,0,.3);
+  --shadow-lg:  0 10px 30px rgba(0,0,0,.6),0 4px 12px rgba(0,0,0,.4);
+  --shadow-glow-red: 0 0 24px rgba(233,69,96,.2);
+  --shadow-glow-blue: 0 0 24px rgba(59,130,246,.15);
+
+  /* Radius scale */
+  --r-sm:  6px;
+  --r-md:  10px;
+  --r-lg:  14px;
+  --r-xl:  18px;
+  --r-2xl: 24px;
+
+  /* Transitions */
+  --ease: cubic-bezier(.22,.68,0,1.2);
+  --t-fast: 150ms ease;
+  --t-base: 220ms ease;
+}
+
+/* ─── RESET ─── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  font-size:15px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+::-webkit-scrollbar-thumb:hover{background:#2a3f55}
+
+/* ═══════════════════════════════
+   NAVIGATION — glass top bar
+═══════════════════════════════ */
+.nav-bar{
+  background:rgba(8,12,16,.88);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:50;
+}
+.nav-bar::after{
+  content:'';display:block;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(233,69,96,.4),rgba(59,130,246,.3),transparent);
+}
+.nav-inner{
+  max-width:1280px;margin:auto;
+  padding:0 1.25rem;
+  display:flex;align-items:center;
+  justify-content:space-between;
+  height:62px;
+  gap:1rem;
+}
+.nav-brand{
+  display:flex;align-items:center;gap:.625rem;
+  font-weight:700;font-size:1rem;
+  color:var(--text);letter-spacing:-.01em;
+  flex-shrink:0;
+  text-decoration:none;
+}
+.nav-brand .cross{
+  color:var(--red);
+  font-size:1.25rem;
+  filter:drop-shadow(0 0 6px rgba(233,69,96,.5));
+}
+.nav-brand .brand-sub{
+  font-size:.7rem;font-weight:400;
+  color:var(--muted);display:block;
+  line-height:1;letter-spacing:.04em;
+}
+.nav-tabs{
+  display:flex;gap:.125rem;
+  overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;
+  flex:1;
+}
+.nav-tabs::-webkit-scrollbar{display:none}
+.nav-tab{
+  padding:.5rem .875rem;
+  border-radius:var(--r-sm);
+  font-size:.78rem;font-weight:500;
+  color:var(--muted);cursor:pointer;
+  white-space:nowrap;border:none;
+  background:transparent;
+  transition:color var(--t-fast),background var(--t-fast);
+  display:flex;align-items:center;gap:.375rem;
+  font-family:inherit;
+  letter-spacing:.01em;
+}
+.nav-tab svg{opacity:.7;transition:opacity var(--t-fast)}
+.nav-tab:hover{color:var(--text-soft);background:rgba(255,255,255,.04)}
+.nav-tab:hover svg{opacity:1}
+.nav-tab.active{
+  color:#fff;
+  background:linear-gradient(135deg,rgba(233,69,96,.2),rgba(233,69,96,.08));
+  border:1px solid rgba(233,69,96,.2);
+  box-shadow:0 0 12px rgba(233,69,96,.1);
+}
+.nav-tab.active svg{opacity:1;color:var(--red)}
+.nav-tab.admin-btn{color:var(--yellow)}
+.nav-tab.admin-btn:hover{background:rgba(245,158,11,.08);color:var(--yellow)}
+
+/* ═══════════════════════════════
+   PAGE LAYOUT
+═══════════════════════════════ */
+.page-view{
+  display:none;
+  max-width:1280px;
+  margin:0 auto;
+  padding:2rem 1.25rem 5rem;
+}
+.page-view.active{display:block;animation:fadeIn .22s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ─── HERO ─── */
+.section-hero{
+  text-align:center;
+  padding:3rem 1rem 2.5rem;
+  position:relative;
+}
+.section-hero::before{
+  content:'';
+  position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:600px;height:200px;
+  background:radial-gradient(ellipse at center,rgba(233,69,96,.07) 0%,transparent 70%);
+  pointer-events:none;
+}
+.section-hero h1{
+  font-size:clamp(1.6rem,4vw,2.4rem);
+  font-weight:800;
+  letter-spacing:-.03em;
+  margin-bottom:.625rem;
+  background:linear-gradient(135deg,#fff 40%,rgba(233,69,96,.9));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.section-hero p{
+  color:var(--text-soft);
+  font-size:.95rem;
+  max-width:580px;
+  margin:0 auto;
+  line-height:1.7;
+}
+
+/* ─── BADGES ─── */
+.badge{
+  display:inline-flex;align-items:center;gap:.25rem;
+  padding:.2rem .65rem;
+  border-radius:99px;
+  font-size:.68rem;font-weight:600;letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.badge-red{background:rgba(233,69,96,.12);color:var(--red);border:1px solid rgba(233,69,96,.2)}
+.badge-green{background:rgba(16,217,160,.1);color:var(--green);border:1px solid rgba(16,217,160,.2)}
+.badge-yellow{background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.2)}
+.badge-blue{background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.2)}
+.badge-purple{background:rgba(147,51,234,.1);color:#c084fc;border:1px solid rgba(147,51,234,.2)}
+
+/* ═══════════════════════════════
+   CARDS
+═══════════════════════════════ */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r-lg);
+  padding:1.375rem;
+  box-shadow:var(--shadow-sm);
+  transition:border-color var(--t-base);
+  position:relative;
+  overflow:hidden;
+}
+.card::before{
+  content:'';
+  position:absolute;top:0;left:0;right:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent);
+  pointer-events:none;
+}
+.card:hover{border-color:#253547}
+.card-header{
+  font-size:.68rem;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:1.125rem;
+  padding-bottom:.875rem;
+  border-bottom:1px solid var(--border-soft);
+  display:flex;align-items:center;gap:.5rem;
+}
+.card-elevated{
+  background:var(--surface-2);
+  box-shadow:var(--shadow-md);
+}
+.card-glass{
+  background:rgba(14,19,24,.8);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+
+/* ═══════════════════════════════
+   FORM ELEMENTS
+═══════════════════════════════ */
+.form-group{margin-bottom:1.125rem}
+.form-label{
+  display:block;
+  font-size:.72rem;font-weight:600;
+  color:var(--text-soft);
+  margin-bottom:.4rem;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+}
+.form-label span.req{color:var(--red);margin-left:.125rem}
+
+.form-input,.form-select,.form-textarea{
+  width:100%;
+  background:rgba(6,10,14,.6);
+  border:1px solid var(--border);
+  border-radius:var(--r-md);
+  padding:.65rem 1rem;
+  color:var(--text);
+  font-size:.9rem;font-family:inherit;
+  transition:border-color var(--t-fast),box-shadow var(--t-fast),background var(--t-fast);
+  outline:none;
+  line-height:1.5;
+}
+.form-input:hover,.form-select:hover,.form-textarea:hover{
+  border-color:#2a3f55;
+  background:rgba(8,14,20,.8);
+}
+.form-input:focus,.form-select:focus,.form-textarea:focus{
+  border-color:rgba(59,130,246,.6);
+  box-shadow:0 0 0 3px rgba(59,130,246,.12);
+  background:rgba(6,10,14,.9);
+}
+.form-select{
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235a7a96' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right .875rem center;
+  padding-right:2.25rem;cursor:pointer;
+}
+.form-textarea{resize:vertical;min-height:96px}
+.radio-group{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.375rem}
+.radio-item{
+  display:flex;align-items:center;gap:.4rem;
+  padding:.45rem .875rem;
+  border:1px solid var(--border);
+  border-radius:var(--r-sm);
+  cursor:pointer;font-size:.84rem;
+  transition:all var(--t-fast);
+  color:var(--text-soft);
+}
+.radio-item:hover{border-color:#2a3f55;color:var(--text)}
+.radio-item:has(input:checked){
+  border-color:rgba(233,69,96,.5);
+  background:rgba(233,69,96,.08);
+  color:var(--red);
+  box-shadow:0 0 0 1px rgba(233,69,96,.1);
+}
+.radio-item input{accent-color:var(--red);cursor:pointer}
+
+/* ─── Field grouping ─── */
+.form-fieldset{
+  border:1px solid var(--border-soft);
+  border-radius:var(--r-md);
+  padding:1.125rem;
+  margin-bottom:1rem;
+}
+.form-fieldset legend{
+  font-size:.72rem;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);
+  padding:0 .5rem;
+}
+
+/* ═══════════════════════════════
+   BUTTONS
+═══════════════════════════════ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  padding:.575rem 1.125rem;
+  border-radius:var(--r-md);
+  font-size:.84rem;font-weight:600;
+  cursor:pointer;border:none;
+  transition:all var(--t-fast);
+  font-family:inherit;letter-spacing:.01em;
+  position:relative;
+  white-space:nowrap;
+}
+.btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.4)}
+.btn:active:not(:disabled){transform:scale(.97)}
+
+.btn-primary{
+  background:linear-gradient(135deg,#e94560,#c73652);
+  color:#fff;
+  box-shadow:0 2px 8px rgba(233,69,96,.3),0 1px 2px rgba(0,0,0,.3);
+}
+.btn-primary:hover:not(:disabled){
+  background:linear-gradient(135deg,#f0526a,#d4435f);
+  box-shadow:0 4px 16px rgba(233,69,96,.4),0 1px 3px rgba(0,0,0,.3);
+  transform:translateY(-1px);
+}
+
+.btn-secondary{
+  background:var(--surface-2);
+  color:var(--text-soft);
+  border:1px solid var(--border);
+}
+.btn-secondary:hover:not(:disabled){
+  background:var(--surface-3);
+  color:var(--text);
+  border-color:#2a3f55;
+}
+
+.btn-green{
+  background:linear-gradient(135deg,#10d9a0,#0aaa7d);
+  color:#06201a;
+  box-shadow:0 2px 8px rgba(16,217,160,.25);
+}
+.btn-green:hover:not(:disabled){
+  box-shadow:0 4px 16px rgba(16,217,160,.35);
+  transform:translateY(-1px);
+}
+
+.btn-yellow{
+  background:linear-gradient(135deg,#f59e0b,#d97706);
+  color:#1a0e00;
+  box-shadow:0 2px 8px rgba(245,158,11,.25);
+}
+.btn-yellow:hover:not(:disabled){
+  box-shadow:0 4px 16px rgba(245,158,11,.35);
+  transform:translateY(-1px);
+}
+
+.btn-blue{
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  color:#fff;
+  box-shadow:0 2px 8px rgba(59,130,246,.25);
+}
+.btn-blue:hover:not(:disabled){
+  box-shadow:0 4px 16px rgba(59,130,246,.35);
+  transform:translateY(-1px);
+}
+
+.btn-ghost{
+  background:transparent;
+  color:var(--muted);
+  border:1px solid transparent;
+}
+.btn-ghost:hover:not(:disabled){
+  background:rgba(255,255,255,.04);
+  color:var(--text-soft);
+  border-color:var(--border);
+}
+
+.btn-sm{padding:.375rem .75rem;font-size:.76rem;border-radius:var(--r-sm)}
+.btn-lg{padding:.75rem 1.625rem;font-size:.95rem;border-radius:var(--r-lg)}
+.btn-full{width:100%}
+.btn-icon{padding:.45rem;border-radius:var(--r-sm)}
+
+/* ═══════════════════════════════
+   GRID
+═══════════════════════════════ */
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:1rem}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1rem}
+.grid-4{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1rem}
+
+/* ═══════════════════════════════
+   DATA TABLE
+═══════════════════════════════ */
+.data-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.data-table thead{position:sticky;top:0;z-index:1}
+.data-table th{
+  padding:.625rem 1rem;
+  text-align:left;
+  font-size:.67rem;text-transform:uppercase;
+  letter-spacing:.08em;
+  color:var(--muted);font-weight:600;
+  background:var(--surface-2);
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+.data-table th:first-child{border-radius:var(--r-sm) 0 0 0}
+.data-table th:last-child{border-radius:0 var(--r-sm) 0 0}
+.data-table td{
+  padding:.7rem 1rem;
+  border-bottom:1px solid var(--border-soft);
+  vertical-align:middle;
+  color:var(--text-soft);
+}
+.data-table td:first-child{color:var(--text)}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tbody tr{transition:background var(--t-fast)}
+.data-table tbody tr:hover td{
+  background:rgba(59,130,246,.04);
+  color:var(--text);
+}
+.table-wrap{
+  overflow-x:auto;
+  border-radius:var(--r-lg);
+  border:1px solid var(--border);
+  background:var(--surface);
+}
+
+/* ═══════════════════════════════
+   TOAST
+═══════════════════════════════ */
+#toast-container{
+  position:fixed;bottom:1.5rem;right:1.5rem;
+  z-index:9999;
+  display:flex;flex-direction:column;gap:.5rem;
+  pointer-events:none;
+}
+.toast{
+  padding:.75rem 1.125rem;
+  border-radius:var(--r-md);
+  font-size:.84rem;font-weight:500;
+  max-width:340px;
+  animation:slideUp .25s var(--ease);
+  display:flex;align-items:center;gap:.625rem;
+  pointer-events:all;
+  box-shadow:var(--shadow-md);
+  backdrop-filter:blur(12px);
+}
+.toast-success{background:rgba(16,217,160,.08);border:1px solid rgba(16,217,160,.25);color:var(--green)}
+.toast-error{background:rgba(233,69,96,.1);border:1px solid rgba(233,69,96,.3);color:#f87171}
+.toast-info{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);color:#93c5fd}
+.toast-warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);color:var(--yellow)}
+@keyframes slideUp{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+
+/* ═══════════════════════════════
+   MODAL
+═══════════════════════════════ */
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.75);
+  backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);
+  z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  padding:1rem;
+  animation:fadeIn .2s ease;
+}
+.modal-box{
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:var(--r-xl);
+  padding:2rem;
+  max-width:500px;width:100%;
+  box-shadow:var(--shadow-lg);
+  position:relative;
+}
+.modal-box::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);
+  border-radius:var(--r-xl) var(--r-xl) 0 0;
+}
+.modal-box h3{font-size:1.1rem;font-weight:700;margin-bottom:.375rem;letter-spacing:-.01em}
+.modal-box p{color:var(--text-soft);font-size:.88rem;line-height:1.6;margin-bottom:1.375rem}
+.modal-actions{display:flex;gap:.5rem;justify-content:flex-end}
+
+/* ═══════════════════════════════
+   SPINNER
+═══════════════════════════════ */
+.spinner{
+  width:20px;height:20px;
+  border:2px solid rgba(255,255,255,.15);
+  border-top-color:currentColor;
+  border-radius:50%;
+  animation:spin .65s linear infinite;
+  flex-shrink:0;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ═══════════════════════════════
+   SECTION HEADER
+═══════════════════════════════ */
+.section-title{
+  font-size:1rem;font-weight:700;
+  display:flex;align-items:center;gap:.625rem;
+  margin-bottom:1.125rem;
+  color:var(--text);
+  letter-spacing:-.01em;
+}
+.section-title::after{
+  content:'';flex:1;
+  height:1px;
+  background:linear-gradient(90deg,var(--border),transparent);
+}
+
+/* ═══════════════════════════════
+   ADMIN AUTH LOCK
+═══════════════════════════════ */
+#admin-lock{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;min-height:65vh;gap:1.375rem;
+  text-align:center;
+}
+#admin-lock .lock-icon{
+  font-size:3rem;color:var(--yellow);
+  filter:drop-shadow(0 0 16px rgba(245,158,11,.3));
+}
+#admin-lock h2{font-size:1.35rem;font-weight:800;letter-spacing:-.02em}
+#admin-lock p{color:var(--muted);font-size:.88rem;max-width:300px}
+#admin-panel{display:none}
+
+/* ═══════════════════════════════
+   ADMIN TABS
+═══════════════════════════════ */
+.admin-tabs{
+  display:flex;gap:0;
+  border-bottom:1px solid var(--border);
+  margin-bottom:1.5rem;
+  overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;
+}
+.admin-tabs::-webkit-scrollbar{display:none}
+.admin-tab{
+  padding:.6rem 1.125rem;
+  font-size:.8rem;font-weight:500;
+  color:var(--muted);cursor:pointer;
+  border:none;background:transparent;
+  border-bottom:2px solid transparent;
+  transition:all var(--t-fast);
+  white-space:nowrap;
+  font-family:inherit;
+  letter-spacing:.01em;
+}
+.admin-tab:hover{color:var(--text-soft)}
+.admin-tab.active{color:var(--red);border-bottom-color:var(--red)}
+.admin-pane{display:none}
+.admin-pane.active{display:block;animation:fadeIn .2s ease}
+
+/* ═══════════════════════════════
+   STAT CARDS
+═══════════════════════════════ */
+.stat-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r-lg);
+  padding:1.25rem 1.375rem;
+  position:relative;overflow:hidden;
+  transition:border-color var(--t-base),box-shadow var(--t-base);
+}
+.stat-card::before{
+  content:'';
+  position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--stat-accent,var(--blue)),transparent);
+}
+.stat-card:hover{
+  border-color:#253547;
+  box-shadow:0 4px 20px rgba(0,0,0,.4);
+}
+.stat-card .stat-value{
+  font-size:2.25rem;font-weight:800;
+  line-height:1;letter-spacing:-.03em;
+  background:linear-gradient(135deg,#fff,rgba(255,255,255,.7));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.stat-card .stat-label{
+  font-size:.7rem;
+  color:var(--muted);
+  margin-top:.375rem;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  font-weight:500;
+}
+.stat-card .stat-icon{
+  position:absolute;top:1rem;right:1rem;
+  opacity:.12;
+  font-size:2.5rem;
+}
+/* Accent variants */
+.stat-card.red-accent{--stat-accent:var(--red)}
+.stat-card.green-accent{--stat-accent:var(--green)}
+.stat-card.yellow-accent{--stat-accent:var(--yellow)}
+.stat-card.blue-accent{--stat-accent:var(--blue)}
+
+/* ═══════════════════════════════
+   FILTER BAR
+═══════════════════════════════ */
+.filter-bar{
+  display:flex;flex-wrap:wrap;gap:.625rem;
+  margin-bottom:1.125rem;
+  padding:.875rem 1rem;
+  background:var(--surface);
+  border-radius:var(--r-md);
+  border:1px solid var(--border);
+  align-items:flex-end;
+}
+.filter-bar label{
+  font-size:.68rem;font-weight:600;
+  color:var(--muted);display:block;
+  margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.05em;
+}
+.filter-bar select,.filter-bar input{
+  background:rgba(6,10,14,.7);
+  border:1px solid var(--border);
+  border-radius:var(--r-sm);
+  padding:.4rem .75rem;
+  color:var(--text-soft);
+  font-size:.8rem;font-family:inherit;
+  outline:none;
+  transition:border-color var(--t-fast);
+}
+.filter-bar select:focus,.filter-bar input:focus{border-color:rgba(59,130,246,.5);color:var(--text)}
+
+/* ═══════════════════════════════
+   CARNET VIRTUAL
+═══════════════════════════════ */
+.carnet-card{
+  background:linear-gradient(135deg,#0d0820 0%,#170826 50%,#1e0b16 100%);
+  border:1px solid rgba(147,51,234,.35);
+  border-radius:var(--r-xl);
+  padding:1.625rem;
+  max-width:380px;
+  position:relative;overflow:hidden;
+  box-shadow:0 8px 32px rgba(0,0,0,.6),0 0 40px rgba(147,51,234,.1);
+}
+.carnet-card::before{
+  content:'';position:absolute;
+  top:-60px;right:-60px;
+  width:160px;height:160px;
+  background:radial-gradient(circle,rgba(233,69,96,.2),transparent 70%);
+  border-radius:50%;pointer-events:none;
+}
+.carnet-card::after{
+  content:'';position:absolute;
+  bottom:-40px;left:-40px;
+  width:120px;height:120px;
+  background:radial-gradient(circle,rgba(147,51,234,.15),transparent 70%);
+  border-radius:50%;pointer-events:none;
+}
+.carnet-header{
+  display:flex;align-items:center;gap:.875rem;
+  margin-bottom:1.125rem;padding-bottom:1rem;
+  border-bottom:1px solid rgba(147,51,234,.25);
+}
+.carnet-photo{
+  width:76px;height:76px;
+  border-radius:var(--r-md);
+  object-fit:cover;
+  border:2px solid rgba(147,51,234,.5);
+  flex-shrink:0;
+}
+.carnet-photo-placeholder{
+  width:76px;height:76px;
+  border-radius:var(--r-md);
+  background:rgba(147,51,234,.1);
+  border:2px dashed rgba(147,51,234,.4);
+  display:flex;align-items:center;justify-content:center;
+  color:rgba(147,51,234,.7);flex-shrink:0;
+}
+.carnet-body .field{margin-bottom:.5rem}
+.carnet-body .field-label{
+  font-size:.62rem;
+  color:rgba(255,255,255,.4);
+  text-transform:uppercase;letter-spacing:.07em;font-weight:500;
+}
+.carnet-body .field-value{font-size:.9rem;font-weight:600;color:rgba(255,255,255,.9)}
+
+/* ═══════════════════════════════
+   OVERLAYS
+═══════════════════════════════ */
+.full-overlay{
+  position:fixed;inset:0;
+  background:var(--bg);
+  z-index:100;overflow-y:auto;display:none;
+}
+.full-overlay.active{display:block;animation:fadeIn .2s ease}
+.full-overlay-inner{max-width:640px;margin:0 auto;padding:2rem 1.25rem}
+
+/* ─── Presentation overlay ─── */
+#presentation-overlay{
+  position:fixed;inset:0;
+  background:#040608;
+  z-index:300;display:none;
+  flex-direction:column;padding:2.5rem;
+}
+#presentation-overlay.active{display:flex}
+
+/* ═══════════════════════════════
+   CHART CONTAINERS
+═══════════════════════════════ */
+.chart-wrap{position:relative;height:300px}
+
+/* ═══════════════════════════════
+   UTILITY CLASSES
+═══════════════════════════════ */
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:1.25rem 0}
+
+/* Info / link cards on the info page */
+.info-link-card{
+  display:flex;align-items:center;gap:1rem;
+  padding:1rem 1.25rem;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r-md);
+  color:var(--text-soft);
+  text-decoration:none;
+  transition:all var(--t-fast);
+}
+.info-link-card:hover{
+  border-color:rgba(59,130,246,.4);
+  background:rgba(59,130,246,.04);
+  color:var(--text);
+  transform:translateX(2px);
+}
+.info-link-card .link-icon{
+  color:var(--blue);flex-shrink:0;
+  opacity:.8;
+}
+
+/* ═══════════════════════════════
+   RESPONSIVE
+═══════════════════════════════ */
+@media(max-width:768px){
+  .nav-inner{padding:0 1rem;gap:.5rem}
+  .nav-brand .brand-sub{display:none}
+  .page-view{padding:1.5rem 1rem 5rem}
+}
+@media(max-width:640px){
+  .nav-brand span.brand-name{display:none}
+  .page-view{padding:1rem .875rem 4.5rem}
+  .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+  .modal-actions{flex-direction:column}
+  .section-hero{padding:2rem .75rem 1.5rem}
+  .filter-bar{flex-direction:column}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     NAVIGATION
+══════════════════════════════════════ -->
+<nav class="nav-bar">
+  <div class="nav-inner">
+    <div class="nav-brand">
+      <svg class="cross" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M9 2h6v7h7v6h-7v7H9v-7H2v-6h7z"/>
+      </svg>
+      <span>Misión Médica · HRNO</span>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showView('inicio')" id="tab-inicio">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Inicio
+      </button>
+      <button class="nav-tab" onclick="showView('info')" id="tab-info">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Información
+      </button>
+      <button class="nav-tab" onclick="showView('reportar')" id="tab-reportar">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Reportar
+      </button>
+      <button class="nav-tab" onclick="showView('emblemas')" id="tab-emblemas">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Emblemas
+      </button>
+      <button class="nav-tab" onclick="showView('capacitacion')" id="tab-capacitacion">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Capacitación
+      </button>
+      <button class="nav-tab admin-btn" onclick="showView('admin')" id="tab-admin">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Admin
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════
+     VISTA: INICIO
+══════════════════════════════════════ -->
+<div id="view-inicio" class="page-view active">
+  <!-- contenido inyectado por JS -->
+</div>
+
+<!-- ══════════════════════════════════════
+     VISTA: INFORMACIÓN
+══════════════════════════════════════ -->
+<div id="view-info" class="page-view">
+  <!-- contenido inyectado por JS -->
+</div>
+
+<!-- ══════════════════════════════════════
+     VISTA: REPORTAR INFRACCIÓN
+══════════════════════════════════════ -->
+<div id="view-reportar" class="page-view">
+  <!-- contenido inyectado por JS -->
+</div>
+
+<!-- ══════════════════════════════════════
+     VISTA: EMBLEMAS (público)
+══════════════════════════════════════ -->
+<div id="view-emblemas" class="page-view">
+  <!-- contenido inyectado por JS -->
+</div>
+
+<!-- ══════════════════════════════════════
+     VISTA: CAPACITACIÓN
+══════════════════════════════════════ -->
+<div id="view-capacitacion" class="page-view">
+  <!-- contenido inyectado por JS -->
+</div>
+
+<!-- ══════════════════════════════════════
+     VISTA: ADMIN
+══════════════════════════════════════ -->
+<div id="view-admin" class="page-view">
+  <!-- Lock screen -->
+  <div id="admin-lock">
+    <svg style="color:var(--yellow)" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    <h2>Acceso Administrador</h2>
+    <p>Ingresa la contraseña para acceder al panel de gestión</p>
+    <div style="display:flex;gap:.5rem;max-width:320px;width:100%">
+      <input type="password" id="admin-pwd" class="form-input" placeholder="Contraseña" onkeydown="if(event.key==='Enter')adminLogin()">
+      <button class="btn btn-yellow" onclick="adminLogin()">Ingresar</button>
+    </div>
+    <p id="admin-err" style="color:var(--red);font-size:.82rem;display:none">Contraseña incorrecta</p>
+  </div>
+  <!-- Admin panel (hidden until auth) -->
+  <div id="admin-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.5rem">
+      <h1 style="font-size:1.2rem;font-weight:700">Panel de Administración</h1>
+      <button class="btn btn-secondary btn-sm" onclick="adminLogout()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Cerrar sesión
+      </button>
+    </div>
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="showAdminPane('estadisticas')" id="atab-estadisticas">Estadísticas</button>
+      <button class="admin-tab" onclick="showAdminPane('carnets')" id="atab-carnets">Carnets</button>
+      <button class="admin-tab" onclick="showAdminPane('emblemas-admin')" id="atab-emblemas-admin">Emblemas</button>
+      <button class="admin-tab" onclick="showAdminPane('stock')" id="atab-stock">Stock</button>
+      <button class="admin-tab" onclick="showAdminPane('resultados')" id="atab-resultados">Pre/Postest</button>
+    </div>
+    <div id="apane-estadisticas" class="admin-pane active"><!-- inyectado --></div>
+    <div id="apane-carnets" class="admin-pane"><!-- inyectado --></div>
+    <div id="apane-emblemas-admin" class="admin-pane"><!-- inyectado --></div>
+    <div id="apane-stock" class="admin-pane"><!-- inyectado --></div>
+    <div id="apane-resultados" class="admin-pane"><!-- inyectado --></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     OVERLAY: FOTO CARNET
+══════════════════════════════════════ -->
+<div id="overlay-foto" class="full-overlay">
+  <div class="full-overlay-inner" id="overlay-foto-content">
+    <!-- inyectado por router -->
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     OVERLAY: TARJETA VIRTUAL
+══════════════════════════════════════ -->
+<div id="overlay-tarjeta" class="full-overlay">
+  <div class="full-overlay-inner" id="overlay-tarjeta-content">
+    <!-- inyectado por router -->
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     OVERLAY: PRESENTACIÓN PRE/POSTEST
+══════════════════════════════════════ -->
+<div id="presentation-overlay">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+    <h2 style="font-size:1.4rem;font-weight:800;color:var(--red)">Resultados de Capacitación</h2>
+    <button class="btn btn-secondary btn-sm" onclick="closePresentacion()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Cerrar
+    </button>
+  </div>
+  <div id="presentation-content" style="flex:1;overflow-y:auto"></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     CONFIRMACIÓN MODAL
+══════════════════════════════════════ -->
+<div id="confirm-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeConfirm()">
+  <div class="modal-box">
+    <h3 id="confirm-title">¿Confirmar acción?</h3>
+    <p id="confirm-msg"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeConfirm()">Cancelar</button>
+      <button class="btn btn-primary" id="confirm-ok-btn" onclick="confirmOk()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container"></div>
+
+<!-- PDF hidden container -->
+<div id="pdf-hidden" style="position:absolute;left:-9999px;top:-9999px;width:210mm;background:#fff;color:#000;font-family:Arial,sans-serif;font-size:10pt;padding:15mm"></div>
+
+<script>
+/* ═══════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════ */
+const CFG = {
+  SUPA_URL: 'https://kukauvbqosizlxrapmim.supabase.co',
+  SUPA_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1a2F1dmJxb3Npemx4cmFwbWltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4ODMzNTUsImV4cCI6MjA5NzQ1OTM1NX0.1ajCazK2YEb_DU14R96dQI5qU-ClwR0t7WHMYKWqOIU',
+  APPS_SCRIPT: 'https://script.google.com/macros/s/AKfycbx-CD6xVE3hcUYXqUxaj1mEaqNGITvajMSYeM9tzBLc1yFQrfhTZx9ghxUZ1FJ-ErAtmw/exec',
+  ADMIN_PWD: 'HRNO2026',
+  MUNICIPIOS: ['Ábrego','El Carmen','Convención','Teorama'],
+  CATEGORIAS: [
+    'Contra la Vida e Integridad de las Personas',
+    'Contra la Infraestructura Sanitaria',
+    'Contra las Actividades Sanitarias',
+    'Actos de Perfidia',
+    'Violaciones al Secreto Profesional',
+    'Otros'
+  ],
+  PERFILES: ['Médico(a)','Profesional de Enfermería','Psicología','Auxiliar de Enfermería','Nutricionista','Bacteriología','Odontología','Conductor de Ambulancia','Administrativo / Logístico','Otro'],
+  TIPOS_DOC: ['Cédula de Ciudadanía','Cédula de Extranjería','Pasaporte','Tarjeta de Identidad'],
+  EMBLEMAS: ['Chaleco','Bandera','Peto'],
+  TALLAS: ['XS','S','M','L','XL','XXL','No aplica'],
+  CARGOS: ['Médico(a)','Enfermero(a) Profesional','Auxiliar de Enfermería','Psicólogo(a)','Nutricionista','Bacteriólogo(a)','Odontólogo(a)','Conductor de Ambulancia','Promotor de Salud','Administrativo','Otro'],
+  BANNER: 'https://res.cloudinary.com/dj7qylkqh/image/upload/v1769545405/A%C3%B1adir_un_t%C3%ADtulo_4_ivlcia.png'
+};
+
+/* ═══════════════════════════════════════════
+   SUPABASE CLIENT
+═══════════════════════════════════════════ */
+const supa = supabase.createClient(CFG.SUPA_URL, CFG.SUPA_KEY);
+
+/* ═══════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════ */
+const S = { adminLoggedIn: false, confirmCb: null, chartRefs: {} };
+
+/* ═══════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════ */
+function toast(msg, type='info', dur=3500){
+  const tc = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  const icon = {success:'✓',error:'✕',info:'ℹ',warn:'⚠'}[type]||'ℹ';
+  t.className = `toast toast-${type}`;
+  t.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+  tc.appendChild(t);
+  setTimeout(()=>t.remove(), dur);
+}
+
+function showConfirm(title, msg, cb, btnLabel='Confirmar', btnClass='btn-primary'){
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  const btn = document.getElementById('confirm-ok-btn');
+  btn.textContent = btnLabel;
+  btn.className = `btn ${btnClass}`;
+  S.confirmCb = cb;
+  document.getElementById('confirm-modal').style.display = 'flex';
+}
+function closeConfirm(){ document.getElementById('confirm-modal').style.display='none'; S.confirmCb=null; }
+function confirmOk(){ if(S.confirmCb) S.confirmCb(); closeConfirm(); }
+
+function fmtDate(d){ if(!d) return '—'; return new Date(d+'T00:00:00').toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtDT(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function genRadicado(prefix='MM'){ const n=Date.now().toString(36).toUpperCase(); return `${prefix}-${n}`; }
+function ucfirst(s){ return s?s.charAt(0).toUpperCase()+s.slice(1):s; }
+
+function selOpts(arr, placeholder='Seleccionar...', val=''){
+  return `<option value="">${placeholder}</option>`+arr.map(a=>`<option value="${a}"${val===a?' selected':''}>${a}</option>`).join('');
+}
+
+async function callAppsScript(payload){
+  try{
+    // No explicit Content-Type → text/plain (simple request, no CORS preflight)
+    await fetch(CFG.APPS_SCRIPT, {method:'POST', mode:'no-cors', body:JSON.stringify(payload)});
+  } catch(e){ console.warn('Apps Script call failed:',e); }
+}
+
+/* ═══════════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════════ */
+function showView(id){
+  document.querySelectorAll('.page-view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.getElementById('tab-'+id)?.classList.add('active');
+  // lazy-init views
+  if(id==='inicio') renderInicio();
+  if(id==='info') renderInfo();
+  if(id==='reportar') renderReportar();
+  if(id==='emblemas') renderEmblemas();
+  if(id==='capacitacion') renderCapacitacion();
+  if(id==='admin') initAdmin();
+  window.scrollTo(0,0);
+}
+
+/* ═══════════════════════════════════════════
+   VISTA: INICIO
+═══════════════════════════════════════════ */
+function renderInicio(){
+  document.getElementById('view-inicio').innerHTML = `
+  <div style="padding-bottom:2rem">
+    <div style="border-radius:14px;overflow:hidden;margin-bottom:1.75rem;box-shadow:0 4px 24px rgba(0,0,0,.4)">
+      <img src="${CFG.BANNER}" alt="Misión Médica HRNO" style="width:100%;display:block;object-fit:cover;max-height:220px">
+    </div>
+    <div class="section-hero" style="padding:0 0 2rem">
+      <span class="badge badge-red" style="margin-bottom:.75rem">ESE Hospital Regional Noroccidental</span>
+      <h1 style="color:var(--text)">Módulo de <span style="color:var(--red)">Misión Médica</span></h1>
+      <p style="margin-top:.75rem">Plataforma institucional para la protección del personal de salud, gestión de emblemas y reporte de infracciones en zonas de conflicto armado.</p>
+    </div>
+
+    <div class="grid-3" style="margin-bottom:1.5rem">
+      ${[
+        {icon:'⚠️',label:'Reportar Infracción',desc:'Registra infracciones o incidentes contra la Misión Médica',view:'reportar',color:'var(--red)'},
+        {icon:'🛡️',label:'Emblemas e Identificación',desc:'Solicita chaleco, bandera, peto o carnet de identificación',view:'emblemas',color:'var(--purple)'},
+        {icon:'📚',label:'Capacitación',desc:'Lista de asistencia y evaluación pre/postest',view:'capacitacion',color:'var(--blue)'},
+        {icon:'📖',label:'Marco Normativo',desc:'Documentos legales y manuales de referencia',view:'info',color:'var(--green)'},
+      ].map(c=>`
+        <div class="card" style="cursor:pointer;border-color:${c.color}20;transition:transform .15s,box-shadow .15s" onclick="showView('${c.view}')" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(0,0,0,.3)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+          <div style="font-size:1.8rem;margin-bottom:.75rem">${c.icon}</div>
+          <div style="font-weight:700;font-size:.95rem;margin-bottom:.35rem;color:${c.color}">${c.label}</div>
+          <div style="font-size:.82rem;color:var(--muted);line-height:1.5">${c.desc}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="card" style="border-color:rgba(233,69,96,.2);background:rgba(233,69,96,.05)">
+      <div style="display:flex;gap:.75rem;align-items:flex-start">
+        <div style="color:var(--red);flex-shrink:0;margin-top:.1rem">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:.88rem;margin-bottom:.25rem;color:var(--red)">Aviso de confidencialidad</div>
+          <div style="font-size:.82rem;color:var(--muted);line-height:1.5">La información registrada en este módulo es de carácter institucional y confidencial. Los datos de incidentes y del personal de Misión Médica están protegidos conforme a la Ley 1581 de 2012 de Protección de Datos Personales.</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   VISTA: INFORMACIÓN
+═══════════════════════════════════════════ */
+function renderInfo(){
+  const docs = [
+    {
+      title:'Manual de Misión Médica',
+      desc:'Resolución 4481 de 2012 — Manual oficial que define la Misión Médica en Colombia, sus principios, el emblema protector y los deberes de las instituciones de salud en zonas de conflicto.',
+      url:'https://www.minsalud.gov.co/Normatividad_Nuevo/Resoluci%C3%B3n%204481%20de%202012.pdf',
+      badge:'Ministerio de Salud',badgeType:'badge-blue',icon:'📋'
+    },
+    {
+      title:'Resolución 4481 de 2012',
+      desc:'Por la cual se adopta el Manual de Misión Médica y se establecen normas relacionadas con la señalización y divulgación de su Emblema Protector.',
+      url:'https://www.minsalud.gov.co/Normatividad_Nuevo/Resoluci%C3%B3n%204481%20de%202012.pdf',
+      badge:'Normativa vigente',badgeType:'badge-green',icon:'⚖️'
+    },
+    {
+      title:'Circular 004 de 2025',
+      desc:'Circular del Ministerio de Salud sobre lineamientos actualizados para la protección de la Misión Médica en el contexto del conflicto armado colombiano.',
+      url:'https://www.minsalud.gov.co',
+      badge:'2025',badgeType:'badge-red',icon:'📄'
+    },
+    {
+      title:'Convenios de Ginebra y Protocolos Adicionales',
+      desc:'Instrumentos internacionales del Derecho Internacional Humanitario que protegen a heridos, enfermos y al personal sanitario en conflictos armados.',
+      url:'https://www.icrc.org/es/doc/resources/documents/publication/p0173.htm',
+      badge:'DIH · CICR',badgeType:'badge-purple',icon:'🌐'
+    },
+    {
+      title:'Ley 1444 de 2011',
+      desc:'Por la cual se escinden unos Ministerios, se otorgan precisiones sobre la Misión Médica y se dictan otras disposiciones.',
+      url:'https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=42867',
+      badge:'Ley',badgeType:'badge-yellow',icon:'📜'
+    },
+    {
+      title:'Protocolo de Seguridad HRNO',
+      desc:'Protocolo interno de comportamiento seguro para el personal de salud en terreno. Incluye gestión de incidentes, evacuación y cadena de llamadas.',
+      url:'#',
+      badge:'Interno',badgeType:'badge-blue',icon:'🏥'
+    }
+  ];
+
+  const principios = [
+    {n:'Humanidad',c:'var(--red)',d:'Prestar atención médica a toda persona herida o enferma, sin distinción alguna.'},
+    {n:'Imparcialidad',c:'var(--blue)',d:'Atender según la gravedad clínica (Triage), sin importar bando, raza, religión o ideología.'},
+    {n:'Neutralidad',c:'var(--green)',d:'No tomar partido en controversias políticas, militares o ideológicas.'},
+    {n:'Confidencialidad',c:'var(--purple)',d:'Guardar secreto profesional sobre la información de pacientes bajo toda circunstancia.'},
+  ];
+
+  document.getElementById('view-info').innerHTML = `
+  <div class="section-hero">
+    <span class="badge badge-blue" style="margin-bottom:.5rem">Marco Normativo</span>
+    <h1>Información y <span style="color:var(--blue)">Normativa</span></h1>
+    <p>Documentos legales, manuales y principios que rigen la Misión Médica en Colombia</p>
+  </div>
+
+  <div class="section-title">Principios Fundamentales</div>
+  <div class="grid-4" style="margin-bottom:2rem">
+    ${principios.map(p=>`
+      <div class="card" style="border-top:3px solid ${p.c};text-align:center">
+        <div style="font-size:.95rem;font-weight:700;color:${p.c};margin-bottom:.5rem">${p.n}</div>
+        <div style="font-size:.8rem;color:var(--muted);line-height:1.5">${p.d}</div>
+      </div>
+    `).join('')}
+  </div>
+
+  <div class="section-title">Documentos y Normativa</div>
+  <div class="grid-2">
+    ${docs.map(d=>`
+      <div class="card" style="display:flex;flex-direction:column;gap:.75rem">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <span style="font-size:1.3rem">${d.icon}</span>
+            <span style="font-weight:700;font-size:.92rem">${d.title}</span>
+          </div>
+          <span class="badge ${d.badgeType}" style="flex-shrink:0">${d.badge}</span>
+        </div>
+        <p style="font-size:.82rem;color:var(--muted);line-height:1.5">${d.desc}</p>
+        <a href="${d.url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:.35rem;color:var(--blue);font-size:.82rem;font-weight:600;text-decoration:none">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          Abrir documento
+        </a>
+      </div>
+    `).join('')}
+  </div>
+
+  <div class="card" style="margin-top:1.5rem;background:rgba(74,111,165,.07);border-color:rgba(74,111,165,.3)">
+    <div class="card-header">Contacto de emergencia — Misión Médica HRNO</div>
+    <div class="grid-3">
+      ${[
+        {label:'Coordinador Misión Médica',val:'Danilo Torrado Blanco'},
+        {label:'Teléfono institucional',val:'(7) XXX-XXXX'},
+        {label:'Correo',val:'misionmedica@hrno.gov.co'},
+      ].map(c=>`
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">${c.label}</div>
+          <div style="font-size:.9rem;font-weight:600;margin-top:.2rem">${c.val}</div>
+        </div>
+      `).join('')}
+    </div>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   VISTA: REPORTAR INFRACCIÓN
+═══════════════════════════════════════════ */
+function renderReportar(){
+  const el = document.getElementById('view-reportar');
+  if(el.dataset.init) return;
+  el.dataset.init = '1';
+  el.innerHTML = `
+  <div class="section-hero">
+    <span class="badge badge-red" style="margin-bottom:.5rem">Formulario oficial</span>
+    <h1>Reporte de <span style="color:var(--red)">Infracciones e Incidentes</span></h1>
+    <p>Conforme a la Resolución 4481 de 2012. Todos los campos marcados con <span style="color:var(--red)">*</span> son obligatorios.</p>
+  </div>
+
+  <form id="form-infraccion" onsubmit="submitInfraccion(event)">
+
+    <!-- SECCIÓN 1 -->
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-header">1. Información del Diligenciamiento</div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Quien diligencia <span class="req">*</span></label>
+          <input name="quien_diligencia" class="form-input" required placeholder="Institución o persona">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha del reporte <span class="req">*</span></label>
+          <input name="fecha_reporte" type="date" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lugar (diligenciamiento) <span class="req">*</span></label>
+          <input name="lugar_diligenciamiento" class="form-input" required placeholder="Vereda, barrio, institución...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Municipio <span class="req">*</span></label>
+          <select name="municipio_diligenciamiento" class="form-select" required>
+            ${selOpts(CFG.MUNICIPIOS,'Seleccione municipio...')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Departamento <span class="req">*</span></label>
+          <input name="departamento_diligenciamiento" class="form-input" value="Norte de Santander" required>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 2 -->
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-header">2. Información de la Infracción o Incidente</div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Tipo de evento <span class="req">*</span></label>
+          <div class="radio-group">
+            <label class="radio-item"><input type="radio" name="tipo_evento" value="Infracción" required> Infracción</label>
+            <label class="radio-item"><input type="radio" name="tipo_evento" value="Incidente"> Incidente</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Categoría del evento <span class="req">*</span></label>
+          <select name="categoria_evento" class="form-select" required>
+            ${selOpts(CFG.CATEGORIAS,'Seleccione categoría...')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de ocurrencia <span class="req">*</span></label>
+          <input name="fecha_ocurrencia" type="date" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lugar (ocurrencia) <span class="req">*</span></label>
+          <input name="lugar_ocurrencia" class="form-input" required placeholder="Vereda, vía, institución...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Municipio (ocurrencia) <span class="req">*</span></label>
+          <select name="municipio_ocurrencia" class="form-select" required>
+            ${selOpts(CFG.MUNICIPIOS,'Seleccione municipio...')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Departamento (ocurrencia) <span class="req">*</span></label>
+          <input name="departamento_ocurrencia" class="form-input" value="Norte de Santander" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Institución afectada <span class="req">*</span></label>
+          <input name="institucion_afectada" class="form-input" required placeholder="Nombre de la institución">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de institución <span class="req">*</span></label>
+          <div class="radio-group">
+            <label class="radio-item"><input type="radio" name="tipo_institucion" value="Publica" required> Pública</label>
+            <label class="radio-item"><input type="radio" name="tipo_institucion" value="Privada"> Privada</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Detalle institución</label>
+          <input name="detalle_institucion" class="form-input" placeholder="Hospital, Puesto de salud, Ambulancia...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fuente de la información <span class="req">*</span></label>
+          <input name="fuente_informacion" class="form-input" required placeholder="Víctima directa, testigo, institución...">
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:.5rem">
+        <div class="form-group">
+          <label class="form-label">¿Instalaciones señalizadas con Emblema Protector? <span class="req">*</span></label>
+          <div class="radio-group">
+            <label class="radio-item"><input type="radio" name="emblema" value="SI" required> SÍ</label>
+            <label class="radio-item"><input type="radio" name="emblema" value="NO"> NO</label>
+            <label class="radio-item"><input type="radio" name="emblema" value="NO SABE"> No sabe</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">¿Personal sanitario debidamente identificado? <span class="req">*</span></label>
+          <div class="radio-group">
+            <label class="radio-item"><input type="radio" name="personal_identificado" value="SI" required> SÍ</label>
+            <label class="radio-item"><input type="radio" name="personal_identificado" value="NO"> NO</label>
+            <label class="radio-item"><input type="radio" name="personal_identificado" value="NO SABE"> No sabe</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:.5rem">
+        <label class="form-label">Descripción detallada <span class="req">*</span></label>
+        <textarea name="descripcion" class="form-textarea" required placeholder="Describa con precisión los hechos: qué ocurrió, cómo, quiénes estaban involucrados, consecuencias..."></textarea>
+      </div>
+    </div>
+
+    <!-- SECCIÓN 3 -->
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-header">3. Apoyo o Soporte Recibido</div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">¿Recibió apoyo inicial la institución o persona afectada? <span class="req">*</span></label>
+          <div class="radio-group">
+            <label class="radio-item"><input type="radio" name="apoyo" value="SI" required> SÍ</label>
+            <label class="radio-item"><input type="radio" name="apoyo" value="NO"> NO</label>
+            <label class="radio-item"><input type="radio" name="apoyo" value="NO SABE"> No sabe</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">¿Cuál apoyo recibió?</label>
+          <input name="cual_apoyo" class="form-input" placeholder="Describa el tipo de apoyo recibido...">
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:.75rem;flex-wrap:wrap">
+      <button type="button" class="btn btn-secondary" onclick="document.getElementById('form-infraccion').reset()">Limpiar</button>
+      <button type="submit" class="btn btn-primary btn-lg" id="btn-submit-infraccion">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Registrar y Generar PDF
+      </button>
+    </div>
+  </form>`;
+
+  // set today's date
+  document.querySelector('[name=fecha_reporte]').value = new Date().toISOString().split('T')[0];
+}
+
+async function submitInfraccion(e){
+  e.preventDefault();
+  const btn = document.getElementById('btn-submit-infraccion');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Guardando...';
+
+  const fd = new FormData(e.target);
+  const data = Object.fromEntries(fd.entries());
+  data.radicado = genRadicado('MM');
+
+  const {error} = await supa.from('mm_infracciones').insert([data]);
+  if(error){
+    toast('Error al guardar: '+error.message,'error');
+    btn.disabled=false; btn.innerHTML='Registrar y Generar PDF'; return;
+  }
+
+  toast('Reporte registrado con radicado '+data.radicado,'success',5000);
+  generarPDFInfraccion(data);
+  e.target.reset();
+  document.querySelector('[name=fecha_reporte]').value = new Date().toISOString().split('T')[0];
+  btn.disabled=false;
+  btn.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Registrar y Generar PDF';
+}
+
+function generarPDFInfraccion(d){
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210, m=15, cw=W-m*2;
+
+  // Header
+  doc.setFillColor(13,17,23);
+  doc.rect(0,0,W,30,'F');
+  doc.setTextColor(233,69,96);
+  doc.setFontSize(14); doc.setFont('helvetica','bold');
+  doc.text('MISIÓN MÉDICA — ESE HRNO',W/2,12,{align:'center'});
+  doc.setTextColor(230,237,243);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text('Formato de Reporte de Infracciones e Incidentes — Resolución 4481 de 2012',W/2,19,{align:'center'});
+  doc.setFontSize(8);
+  doc.text(`Radicado: ${d.radicado}`,W/2,25,{align:'center'});
+
+  // Content
+  doc.setTextColor(0,0,0);
+  let y=40;
+  const line=(label,val,x=m,w=cw)=>{
+    doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    doc.text(label+': ',x,y);
+    const lw=doc.getTextWidth(label+': ');
+    doc.setFont('helvetica','normal');
+    doc.text(String(val||'—'),x+lw,y);
+    y+=6;
+  };
+  const section=(title)=>{
+    y+=3;
+    doc.setFillColor(240,240,240);
+    doc.rect(m,y-4,cw,7,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(50,50,50);
+    doc.text(title,m+2,y);
+    doc.setTextColor(0,0,0);
+    y+=6;
+  };
+
+  section('INFORMACIÓN DEL DILIGENCIAMIENTO');
+  line('Fecha reporte', fmtDate(d.fecha_reporte));
+  line('Quien diligencia', d.quien_diligencia);
+  line('Lugar / Municipio / Dpto', `${d.lugar_diligenciamiento} / ${d.municipio_diligenciamiento} / ${d.departamento_diligenciamiento}`);
+
+  section('INFORMACIÓN DEL EVENTO');
+  line('Tipo de evento', d.tipo_evento);
+  line('Categoría', d.categoria_evento);
+  line('Fecha ocurrencia', fmtDate(d.fecha_ocurrencia));
+  line('Lugar / Municipio', `${d.lugar_ocurrencia} / ${d.municipio_ocurrencia}`);
+  line('Institución afectada', d.institucion_afectada);
+  line('Tipo institución', d.tipo_institucion + (d.detalle_institucion?' — '+d.detalle_institucion:''));
+  line('Fuente de información', d.fuente_informacion);
+  line('Instalaciones señalizadas', d.emblema);
+  line('Personal identificado', d.personal_identificado);
+
+  section('DESCRIPCIÓN');
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  const lines = doc.splitTextToSize(d.descripcion||'', cw);
+  lines.forEach(l=>{ doc.text(l,m,y); y+=5; });
+
+  section('APOYO RECIBIDO');
+  line('¿Recibió apoyo?', d.apoyo);
+  if(d.cual_apoyo) line('¿Cuál apoyo?', d.cual_apoyo);
+
+  // Footer
+  doc.setDrawColor(200,200,200);
+  doc.line(m,y+5,W-m,y+5);
+  doc.setFontSize(7); doc.setTextColor(120,120,120);
+  doc.text('Documento generado automáticamente por el Sistema de Gestión Misión Médica · ESE HRNO',W/2,y+10,{align:'center'});
+
+  doc.save(`Reporte_MM_${d.radicado}.pdf`);
+}
+
+/* ═══════════════════════════════════════════
+   VISTA: EMBLEMAS (público)
+═══════════════════════════════════════════ */
+function renderEmblemas(){
+  const el = document.getElementById('view-emblemas');
+  if(el.dataset.init) return;
+  el.dataset.init = '1';
+  el.innerHTML = `
+  <div class="section-hero">
+    <span class="badge badge-purple" style="margin-bottom:.5rem">Identificación y Protección</span>
+    <h1>Gestión de <span style="color:var(--purple)">Emblemas</span></h1>
+    <p>Solicita tu tarjeta de identificación o emblemas de protección (chaleco, bandera, peto) para el ejercicio de la Misión Médica.</p>
+  </div>
+
+  <!-- Selector tipo -->
+  <div class="grid-2" style="margin-bottom:1.5rem" id="emblema-selector">
+    <div class="card" style="cursor:pointer;border-color:rgba(124,29,111,.4);text-align:center;transition:all .15s"
+      onclick="mostrarFormEmblema('carnet')"
+      onmouseover="this.style.borderColor='var(--purple)';this.style.transform='translateY(-3px)'"
+      onmouseout="this.style.borderColor='rgba(124,29,111,.4)';this.style.transform=''">
+      <div style="font-size:2.5rem;margin-bottom:.75rem">🪪</div>
+      <div style="font-weight:700;font-size:1rem;color:var(--purple);margin-bottom:.35rem">Tarjeta de Identificación</div>
+      <div style="font-size:.82rem;color:var(--muted);line-height:1.5">Solicita tu carnet oficial de Misión Médica con foto y código QR verificable.</div>
+    </div>
+    <div class="card" style="cursor:pointer;border-color:rgba(124,29,111,.4);text-align:center;transition:all .15s"
+      onclick="mostrarFormEmblema('emblema')"
+      onmouseover="this.style.borderColor='var(--purple)';this.style.transform='translateY(-3px)'"
+      onmouseout="this.style.borderColor='rgba(124,29,111,.4)';this.style.transform=''">
+      <div style="font-size:2.5rem;margin-bottom:.75rem">🛡️</div>
+      <div style="font-weight:700;font-size:1rem;color:var(--purple);margin-bottom:.35rem">Chaleco / Bandera / Peto</div>
+      <div style="font-size:.82rem;color:var(--muted);line-height:1.5">Solicita un emblema físico de protección para trabajo en campo o zona de conflicto.</div>
+    </div>
+  </div>
+
+  <!-- Formulario carnet -->
+  <div id="form-carnet-wrap" style="display:none">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem">
+      <button class="btn btn-secondary btn-sm" onclick="mostrarFormEmblema(null)">← Volver</button>
+      <h2 style="font-size:1rem;font-weight:700">Solicitud de Tarjeta de Identificación Misión Médica</h2>
+    </div>
+    <form id="form-carnet" onsubmit="submitCarnet(event)">
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">Datos Personales</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Nombres <span class="req">*</span></label><input name="nombres" class="form-input" required placeholder="Nombres completos"></div>
+          <div class="form-group"><label class="form-label">Apellidos <span class="req">*</span></label><input name="apellidos" class="form-input" required placeholder="Apellidos completos"></div>
+          <div class="form-group"><label class="form-label">Tipo documento <span class="req">*</span></label><select name="tipo_documento" class="form-select" required>${selOpts(CFG.TIPOS_DOC,'Seleccione...')}</select></div>
+          <div class="form-group"><label class="form-label">Número documento <span class="req">*</span></label><input name="numero_documento" class="form-input" required placeholder="Sin puntos ni comas"></div>
+          <div class="form-group"><label class="form-label">Cargo <span class="req">*</span></label><select name="cargo" class="form-select" required>${selOpts(CFG.CARGOS,'Seleccione cargo...')}</select></div>
+          <div class="form-group"><label class="form-label">Municipio <span class="req">*</span></label><select name="municipio" class="form-select" required>${selOpts(CFG.MUNICIPIOS,'Seleccione municipio...')}</select></div>
+          <div class="form-group"><label class="form-label">Correo electrónico <span class="req">*</span></label><input name="correo" type="email" class="form-input" required placeholder="correo@ejemplo.com"></div>
+          <div class="form-group"><label class="form-label">Teléfono</label><input name="telefono" type="tel" class="form-input" placeholder="Celular o fijo"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:1rem;background:rgba(124,29,111,.05);border-color:rgba(124,29,111,.3)">
+        <div style="display:flex;gap:.75rem;align-items:flex-start">
+          <input type="checkbox" id="ck-terms-carnet" required style="margin-top:3px;accent-color:var(--purple);width:16px;height:16px;flex-shrink:0">
+          <label for="ck-terms-carnet" style="font-size:.83rem;color:var(--muted);line-height:1.6;cursor:pointer">
+            Autorizo el uso de mis datos personales conforme a la Ley 1581 de 2012. Entiendo que una vez autorizado el carnet, recibiré un enlace en mi correo para tomar y enviar mi fotografía institucional y firmar el consentimiento informado. <strong style="color:var(--text)">El carnet es de uso exclusivamente institucional.</strong>
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:.75rem">
+        <button type="button" class="btn btn-secondary" onclick="mostrarFormEmblema(null)">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-carnet">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Enviar Solicitud
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Formulario emblema físico -->
+  <div id="form-emblema-wrap" style="display:none">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem">
+      <button class="btn btn-secondary btn-sm" onclick="mostrarFormEmblema(null)">← Volver</button>
+      <h2 style="font-size:1rem;font-weight:700">Solicitud de Emblema de Protección</h2>
+    </div>
+    <form id="form-emblema-pub" onsubmit="submitEmblemaPub(event)">
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">Datos del Solicitante</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Nombres <span class="req">*</span></label><input name="nombres" class="form-input" required></div>
+          <div class="form-group"><label class="form-label">Apellidos <span class="req">*</span></label><input name="apellidos" class="form-input" required></div>
+          <div class="form-group"><label class="form-label">Tipo documento <span class="req">*</span></label><select name="tipo_documento" class="form-select" required>${selOpts(CFG.TIPOS_DOC,'Seleccione...')}</select></div>
+          <div class="form-group"><label class="form-label">Número documento <span class="req">*</span></label><input name="numero_documento" class="form-input" required></div>
+          <div class="form-group"><label class="form-label">Cargo <span class="req">*</span></label><select name="cargo" class="form-select" required>${selOpts(CFG.CARGOS,'Seleccione cargo...')}</select></div>
+          <div class="form-group"><label class="form-label">Municipio <span class="req">*</span></label><select name="municipio" class="form-select" required>${selOpts(CFG.MUNICIPIOS,'Seleccione...')}</select></div>
+          <div class="form-group"><label class="form-label">Correo electrónico <span class="req">*</span></label><input name="correo" type="email" class="form-input" required></div>
+          <div class="form-group"><label class="form-label">Teléfono</label><input name="telefono" type="tel" class="form-input"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">Tipo de Emblema</div>
+        <div class="grid-3" style="margin-bottom:1rem">
+          ${CFG.EMBLEMAS.map(em=>`
+            <label class="radio-item" style="padding:.75rem;flex-direction:column;text-align:center;cursor:pointer">
+              <input type="radio" name="tipo_emblema" value="${em}" required>
+              <span style="font-size:1.5rem;margin:.35rem 0">${em==='Chaleco'?'🦺':em==='Bandera'?'🚩':'🛡️'}</span>
+              <span style="font-weight:600;font-size:.85rem">${em}</span>
+            </label>
+          `).join('')}
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Talla (si aplica)</label><select name="talla" class="form-select">${selOpts(CFG.TALLAS,'Seleccione talla...')}</select></div>
+          <div class="form-group"><label class="form-label">Justificación <span class="req">*</span></label><textarea name="justificacion" class="form-textarea" required placeholder="Explique por qué necesita este emblema y para qué actividades lo usará..."></textarea></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:1rem;background:rgba(255,180,50,.05);border-color:rgba(255,180,50,.3)">
+        <div style="display:flex;gap:.75rem;align-items:flex-start">
+          <span style="font-size:1.2rem">⚠️</span>
+          <div style="font-size:.82rem;color:var(--muted);line-height:1.6">
+            <strong style="color:var(--yellow)">Compromiso de uso y devolución:</strong> Al recibir este emblema me comprometo a usarlo exclusivamente para actividades de Misión Médica, a mantenerlo en buen estado y a devolverlo a la institución en cualquier circunstancia, independientemente de su estado de conservación.
+          </div>
+        </div>
+        <div style="margin-top:.75rem;display:flex;gap:.5rem;align-items:center">
+          <input type="checkbox" id="ck-terms-emblema" required style="accent-color:var(--yellow);width:16px;height:16px">
+          <label for="ck-terms-emblema" style="font-size:.83rem;cursor:pointer">Acepto los términos de uso y devolución del emblema</label>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:.75rem">
+        <button type="button" class="btn btn-secondary" onclick="mostrarFormEmblema(null)">Cancelar</button>
+        <button type="submit" class="btn btn-purple" id="btn-submit-emblema" style="background:var(--purple);color:#fff">
+          Enviar Solicitud
+        </button>
+      </div>
+    </form>
+  </div>`;
+}
+
+function mostrarFormEmblema(tipo){
+  document.getElementById('emblema-selector').style.display = tipo ? 'none' : 'grid';
+  document.getElementById('form-carnet-wrap').style.display = tipo==='carnet' ? 'block' : 'none';
+  document.getElementById('form-emblema-wrap').style.display = tipo==='emblema' ? 'block' : 'none';
+}
+
+async function submitCarnet(e){
+  e.preventDefault();
+  const btn = document.getElementById('btn-submit-carnet');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Enviando...';
+  const fd = new FormData(e.target);
+  const data = Object.fromEntries(fd.entries());
+  const {error} = await supa.from('mm_solicitudes_carnet').insert([data]);
+  if(error){ toast('Error: '+error.message,'error'); btn.disabled=false; btn.textContent='Enviar Solicitud'; return; }
+  toast('Solicitud enviada. Recibirás un correo cuando sea autorizada.','success',6000);
+  e.target.reset();
+  mostrarFormEmblema(null);
+  btn.disabled=false; btn.textContent='Enviar Solicitud';
+}
+
+async function submitEmblemaPub(e){
+  e.preventDefault();
+  const btn = document.getElementById('btn-submit-emblema');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Enviando...';
+  const fd = new FormData(e.target);
+  const data = Object.fromEntries(fd.entries());
+  const {error} = await supa.from('mm_solicitudes_emblemas').insert([data]);
+  if(error){ toast('Error: '+error.message,'error'); btn.disabled=false; btn.textContent='Enviar Solicitud'; return; }
+  toast('Solicitud de emblema enviada correctamente.','success',6000);
+  e.target.reset();
+  mostrarFormEmblema(null);
+  btn.disabled=false; btn.textContent='Enviar Solicitud';
+}
+
+/* ═══════════════════════════════════════════
+   PREGUNTAS PRE/POSTEST
+═══════════════════════════════════════════ */
+const PREGUNTAS = [
+  {q:"¿A quiénes protege principalmente el Derecho Internacional Humanitario (DIH)?",opts:["Exclusivamente a la población civil ajena al conflicto.","A los civiles y a los combatientes que han dejado de participar en las hostilidades (heridos, prisioneros).","A cualquier persona en todo momento, incluyendo en tiempos de paz.","Solo al personal médico y religioso de las partes en conflicto."],c:"A los civiles y a los combatientes que han dejado de participar en las hostilidades (heridos, prisioneros).",r:"El DIH protege a civiles y también a quienes ya no pueden combatir. Como Misión Médica, protegemos la vida sin juzgar el pasado del paciente."},
+  {q:"¿Qué significa el principio de 'Imparcialidad' en la Misión Médica?",opts:["No tomar partido en las controversias políticas, militares o ideológicas.","Atender a las personas basándose únicamente en la gravedad médica, sin distinción de bando, raza o religión.","Prestar atención de salud en igual cantidad de tiempo a todos los actores del conflicto.","Abstenerse de informar a las autoridades sobre los pacientes que se atienden."],c:"Atender a las personas basándose únicamente en la gravedad médica, sin distinción de bando, raza o religión.",r:"No tomar partido es 'Neutralidad'. La 'Imparcialidad' significa que el orden de atención en urgencias debe guiarse al 100% por el Triage médico."},
+  {q:"Son las 2:00 a.m., se desplazan en ambulancia y son detenidos en un retén ilegal con hombres armados. El comportamiento seguro es:",opts:["Acelerar para salir rápido del área de peligro, ya que el emblema los protege de disparos.","Apagar las luces del vehículo para no ser un blanco fácil y usar el radio para pedir auxilio.","Detenerse suavemente, encender las luces interiores de la cabina, bajar ventanillas y mantener manos visibles.","Bajarse de la ambulancia inmediatamente con las manos arriba gritando 'Misión Médica'."],c:"Detenerse suavemente, encender las luces interiores de la cabina, bajar ventanillas y mantener manos visibles.",r:"La transparencia visual (luces encendidas adentro) y los movimientos lentos son el mejor escudo protector en la noche."},
+  {q:"En urgencias atienden a dos heridos de un combate. Uno es un guerrillero con un rasguño, el otro un soldado inconsciente con trauma craneoencefálico. ¿Cómo se define el orden de atención?",opts:["Primero el soldado por tener una condición clínica más grave (Triage).","Primero el guerrillero para que se vaya rápido y evitar ataques a la IPS.","A ambos al mismo tiempo para demostrar neutralidad ante los bandos.","El médico debe llamar a la Policía para que autoricen quién se atiende primero."],c:"Primero el soldado por tener una condición clínica más grave (Triage).",r:"El personal de salud no debe alterar el orden del Triage por presiones armadas. La gravedad clínica es el único medidor de atención éticamente aceptable."},
+  {q:"El conductor reporta: 'Central, aquí águila 1, llevamos un paquete pesado a la base'. ¿Es esto correcto?",opts:["Sí, el uso de claves protege la identidad clínica del paciente en zonas de riesgo.","Sí, es el estándar internacional para proteger la misión de interceptaciones.","No, la Misión Médica debe usar lenguaje claro, directo y médico; usar claves se confunde con inteligencia militar.","Solo es correcto si las claves han sido acordadas previamente con los grupos armados locales."],c:"No, la Misión Médica debe usar lenguaje claro, directo y médico; usar claves se confunde con inteligencia militar.",r:"Cualquier actor que intercepte la radio pensará que 'paquete pesado' es munición. Transmitir con lenguaje médico directo es fundamental para no ser catalogados como espías."},
+  {q:"Un actor armado llega a la IPS y exige la Historia Clínica de un paciente alegando que es un 'infiltrado'. El equipo debe:",opts:["Entregarla inmediatamente para proteger sus vidas y la infraestructura de la IPS.","Argumentar con firmeza pero sin hostilidad que la ley y el Secreto Profesional prohíben estrictamente su entrega.","Entregarle solo un resumen clínico sin detalles comprometedores.","Pedirle que vuelva mañana cuando esté el director del hospital."],c:"Argumentar con firmeza pero sin hostilidad que la ley y el Secreto Profesional prohíben estrictamente su entrega.",r:"Entregar registros médicos convierte a la IPS en una red de informantes, rompiendo el sigilo médico y exponiendo a todo el equipo a represalias graves."},
+  {q:"Para un desplazamiento rural, la enfermera decide llevar su reloj inteligente de alta gama y anillos de oro. ¿Por qué esto es un riesgo?",opts:["Porque los dispositivos electrónicos interfieren con las frecuencias de radio de los actores armados.","No es un riesgo, es un derecho constitucional el libre desarrollo de la personalidad.","Porque vulnera el principio de 'Perfil Bajo' (Low Profile), exponiendo al equipo a extorsiones, hurtos o retenciones.","Porque a las comunidades rurales les ofende la ostentación económica."],c:"Porque vulnera el principio de 'Perfil Bajo' (Low Profile), exponiendo al equipo a extorsiones, hurtos o retenciones.",r:"En zonas de conflicto, exhibir joyas o tecnología costosa promueve la extorsión y desdibuja nuestra imagen como trabajadores humanitarios."},
+  {q:"Una ambulancia en ruta es detenida por un grupo armado que exige revisar el vehículo. ¿Están autorizados por el DIH para hacerlo?",opts:["No, las ambulancias con emblema tienen inmunidad absoluta y no pueden ser inspeccionadas.","Sí, tienen derecho a inspeccionar para verificar que no se transporten armas o combatientes sanos, el equipo debe cooperar pacíficamente.","Solo pueden revisar la cabina del conductor, pero la parte trasera es territorio protegido.","Sí, pero solo si presentan una orden judicial de un comandante reconocido."],c:"Sí, tienen derecho a inspeccionar para verificar que no se transporten armas o combatientes sanos, el equipo debe cooperar pacíficamente.",r:"La inmunidad no es un 'escudo antibalas legal'. Los actores tienen derecho a verificar que no estemos moviendo armamento. Cooperar pacíficamente es la regla."},
+  {q:"¿Qué elementos conforman la 'Misión Médica'?",opts:["Únicamente los médicos, enfermeras y las ambulancias.","Los vehículos con el emblema rojo y el Ministerio de Salud.","Personal sanitario, infraestructura (hospitales), medios de transporte y los pacientes.","Las instalaciones de salud y el personal de la Cruz Roja Internacional."],c:"Personal sanitario, infraestructura (hospitales), medios de transporte y los pacientes.",r:"Los PACIENTES y las INFRAESTRUCTURAS son elementos centrales protegidos por la Misión Médica. Un ataque al paciente en la camilla es una infracción gravísima."},
+  {q:"El Alcalde le pide a la ESE que lo transporten en la ambulancia hacia una vereda para un consejo de seguridad. ¿Qué se debe hacer?",opts:["Llevarlo, porque como máxima autoridad del municipio es el jefe de la Misión Médica local.","Negarse rotundamente, el uso de emblemas y vehículos por autoridades políticas para fines ajenos a la salud está estrictamente prohibido.","Llevarlo, pero pidiéndole que no use prendas distintivas de la alcaldía.","Cobrarle el costo del combustible como si fuera un transporte privado."],c:"Negarse rotundamente, el uso de emblemas y vehículos por autoridades políticas para fines ajenos a la salud está estrictamente prohibido.",r:"Permitir que políticos o militares usen los emblemas politiza la ayuda humanitaria ('Perfidia'). Todos los futuros traslados de la ambulancia serán vistos como sospechosos."},
+  {q:"Un paciente herido ingresa a Urgencias y usted nota que lleva un revólver en la pretina del pantalón. La acción segura es:",opts:["Decomisarle el arma, descargarla por seguridad y guardarla en la caja fuerte del hospital.","No manipular el arma bajo ninguna circunstancia y pedirle a él o su acompañante que la dejen fuera de las instalaciones.","Atenderlo rápido y no decir nada para evitar que se ponga agresivo con el personal.","Llamar a la policía para que lo arresten inmediatamente dentro del área de urgencias."],c:"No manipular el arma bajo ninguna circunstancia y pedirle a él o su acompañante que la dejen fuera de las instalaciones.",r:"Las IPS son zonas libres de armas. Jamás debes manipular armamento pues corres riesgo de un disparo accidental. Se debe exigir, con respeto, el retiro del arma."},
+  {q:"El equipo médico queda atrapado en medio de un fuego cruzado sorpresivo en el parque del pueblo. ¿Cuál es el comportamiento seguro?",opts:["Salir corriendo hacia el centro de salud con las manos arriba gritando 'Somos médicos'.","Grabar la situación con el celular para tener evidencia del incidente de Misión Médica.","Tirarse al suelo inmediatamente, buscar cobertura (paredes sólidas), alejarse de ventanas y esperar que cese el fuego.","Sacar una bandera blanca y caminar lentamente hacia el grupo armado más cercano."],c:"Tirarse al suelo inmediatamente, buscar cobertura (paredes sólidas), alejarse de ventanas y esperar que cese el fuego.",r:"Correr en balaceras es la primera causa de muerte civil. La protección balística dicta tirarse al suelo de inmediato, hacerse pequeño y proteger la cabeza."},
+  {q:"El equipo realiza una brigada en una zona controlada por actores armados. Un médico se toma una 'selfie' frente al paisaje. ¿Qué protocolo incumple?",opts:["Ninguno, las fotos personales son permitidas si no se publican en Facebook.","Incumple la prohibición estricta de tomar fotografías, ya que puede revelar posiciones, generar desconfianza y ser visto como espionaje.","Protocolo de bioseguridad, por usar el celular con guantes.","Falta a la ética por no invitar a la comunidad a salir en la foto."],c:"Incumple la prohibición estricta de tomar fotografías, ya que puede revelar posiciones, generar desconfianza y ser visto como espionaje.",r:"Las fotografías en zonas de conflicto son peligrosísimas. Un actor armado puede pensar que estás fotografiando sus posiciones, causando retenciones o amenazas."},
+  {q:"Un grupo armado ocupa el patio del puesto de salud para resguardarse de la lluvia y descansar. ¿Cuál es la consecuencia directa según el DIH?",opts:["El puesto de salud pierde su protección internacional y puede convertirse en un objetivo militar lícito para el bando contrario.","Ninguna, el DIH obliga a los hospitales a dar refugio a cualquier persona de la guerra.","La Secretaría de Salud los multará por daños a la infraestructura.","El personal médico tendrá que atender a los armados obligatoriamente."],c:"El puesto de salud pierde su protección internacional y puede convertirse en un objetivo militar lícito para el bando contrario.",r:"Una IPS pierde su inmunidad si es usada para actos hostiles como servir de base o lugar de descanso para combatientes sanos."},
+  {q:"Un grupo armado detiene a la ambulancia y exige '10 cajas de antibióticos para dejarlos pasar'. El equipo debe:",opts:["Entregar la mitad para calmar los ánimos y garantizar su propia seguridad.","Entregar medicamentos vencidos que tengan en la parte de atrás.","Negarse diplomáticamente, argumentando el control estricto de inventarios del Estado y su uso exclusivo para civiles.","Confrontarlos fuertemente amenazando con denunciarlos ante la Cruz Roja."],c:"Negarse diplomáticamente, argumentando el control estricto de inventarios del Estado y su uso exclusivo para civiles.",r:"Entregar recursos médicos nos convierte en financiadores de un actor armado, arruinando nuestra neutralidad. La excusa administrativa suele ser la forma más segura de rechazar."},
+  {q:"El conductor de la ambulancia es nuevo y no tiene el curso de Misión Médica ni sabe de primeros auxilios. En un retén sufre una herida, ¿por qué es esto un riesgo?",opts:["No es un riesgo, la enfermera puede atenderlo porque esa es su función.","Porque la norma exige que el conductor sea médico general.","Porque en terreno TODO el personal (incluido logística y conductores) debe tener la capacitación y saber autoprotegerse en emergencias.","Porque la ARL no le pagará la incapacidad."],c:"Porque en terreno TODO el personal (incluido logística y conductores) debe tener la capacitación y saber autoprotegerse en emergencias.",r:"En el terreno, todos corren el mismo riesgo. El conductor o el logístico deben tener los conocimientos básicos para salvar su vida y la del equipo."},
+  {q:"Un líder comunal armado exige a una auxiliar de enfermería que llame 'Héroes' a sus hombres heridos y 'Bandidos' a los del otro grupo en los registros. ¿Qué principio se afecta?",opts:["La eficiencia, porque gastaría más tiempo escribiendo esos términos.","La Neutralidad y la Imparcialidad, ya que el equipo de salud JAMÁS debe usar etiquetas políticas, apodos o tomar partido verbal.","El respeto a la autoridad, ya que el líder manda en esa región.","Ninguno, lo importante es atender la herida sin importar cómo se les llame."],c:"La Neutralidad y la Imparcialidad, ya que el equipo de salud JAMÁS debe usar etiquetas políticas, apodos o tomar partido verbal.",r:"El lenguaje construye nuestra seguridad. Usar alias o términos del conflicto nos politiza y puede causar que un grupo armado nos declare objetivo militar."},
+  {q:"Al conducir por una vía terciaria en el Catatumbo, el equipo nota cables sueltos, ramas atravesadas y un animal muerto de forma inusual. Sospechan de un campo minado (MAP/MUSE).",opts:["Deben bajarse y lanzar piedras para ver si hay explosivos.","El conductor debe acelerar a fondo para pasar la zona rápidamente.","Deben detenerse, no intentar despejar la vía, y retroceder lentamente sobre las mismas huellas de las llantas.","Deben salir del vehículo y caminar por la maleza (fuera de la vía) para rodear el obstáculo."],c:"Deben detenerse, no intentar despejar la vía, y retroceder lentamente sobre las mismas huellas de las llantas.",r:"Caminar por la maleza es la principal causa de amputaciones, ya que ahí siembran las minas anti-persona. La única zona garantizada como libre es la huella que las llantas acaban de dejar."},
+  {q:"Un familiar de un paciente herido de bala se pone agresivo en Urgencias y exige atención inmediata. La técnica de desescalamiento adecuada es:",opts:["Gritarle más fuerte para demostrar autoridad y que se calme.","Llamar a los guardias de seguridad para que lo saquen a golpes del hospital.","Mantener la calma, usar un tono de voz bajo, postura no amenazante y ofrecer escuchar su preocupación (siempre evaluando ruta de escape).","Ignorarlo por completo y darle la espalda hasta que se canse de gritar."],c:"Mantener la calma, usar un tono de voz bajo, postura no amenazante y ofrecer escuchar su preocupación (siempre evaluando ruta de escape).",r:"Las técnicas de desescalamiento requieren voz calmada, escucha activa y control emocional, sin descuidar tu ruta de escape."},
+  {q:"Antes de salir a una zona rural de alta tensión, nota que el emblema de Misión Médica en el vehículo está casi borrado por el sol. ¿Qué debe hacer?",opts:["Pintarlo rápidamente con marcadores rojos o pintura en spray para que se vea algo.","Suspender la salida en ese vehículo a la zona de riesgo y reportarlo inmediatamente para su restauración adecuada.","Salir de todos modos; si los detienen, explican verbalmente que son del hospital.","Pegar una hoja tamaño carta con el logo impreso en el vidrio delantero."],c:"Suspender la salida en ese vehículo a la zona de riesgo y reportarlo inmediatamente para su restauración adecuada.",r:"El emblema de la Misión Médica es la primera línea de defensa visual. Improvisar con marcadores no cumple la norma legal y pone en riesgo tu vida."}
+];
+
+/* ═══════════════════════════════════════════
+   VISTA: CAPACITACIÓN
+═══════════════════════════════════════════ */
+function renderCapacitacion(){
+  const el = document.getElementById('view-capacitacion');
+  if(el.dataset.init) return;
+  el.dataset.init = '1';
+  el.innerHTML = `
+  <div class="section-hero">
+    <span class="badge badge-blue" style="margin-bottom:.5rem">Formación en Misión Médica</span>
+    <h1>Módulo de <span style="color:var(--blue)">Capacitación</span></h1>
+    <p>Registro de asistencia y evaluación de conocimientos antes y después de la capacitación.</p>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:1.5rem" id="cap-selector">
+    <div class="card" style="cursor:pointer;text-align:center;border-color:rgba(74,111,165,.4);transition:all .15s"
+      onclick="mostrarCapModule('asistencia')"
+      onmouseover="this.style.borderColor='var(--blue)';this.style.transform='translateY(-3px)'"
+      onmouseout="this.style.borderColor='rgba(74,111,165,.4)';this.style.transform=''">
+      <div style="font-size:2.5rem;margin-bottom:.75rem">📋</div>
+      <div style="font-weight:700;color:var(--blue);margin-bottom:.35rem">Lista de Asistencia</div>
+      <div style="font-size:.82rem;color:var(--muted)">Registra la asistencia de los participantes con su información personal y fecha automática.</div>
+    </div>
+    <div class="card" style="cursor:pointer;text-align:center;border-color:rgba(74,111,165,.4);transition:all .15s"
+      onclick="mostrarCapModule('prepostest')"
+      onmouseover="this.style.borderColor='var(--blue)';this.style.transform='translateY(-3px)'"
+      onmouseout="this.style.borderColor='rgba(74,111,165,.4)';this.style.transform=''">
+      <div style="font-size:2.5rem;margin-bottom:.75rem">📝</div>
+      <div style="font-weight:700;color:var(--blue);margin-bottom:.35rem">Pre / Postest</div>
+      <div style="font-size:.82rem;color:var(--muted)">Evaluación de 20 preguntas sobre Misión Médica y comportamiento seguro.</div>
+    </div>
+  </div>
+
+  <!-- Asistencia -->
+  <div id="cap-asistencia" style="display:none">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm" onclick="mostrarCapModule(null)">← Volver</button>
+      <h2 style="font-size:1rem;font-weight:700">Lista de Asistencia</h2>
+      <div style="margin-left:auto;display:flex;gap:.5rem">
+        <button class="btn btn-blue btn-sm" onclick="exportAsistenciaPDF()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Exportar PDF
+        </button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-header">Datos de la Capacitación</div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Sesión / Título <span class="req">*</span></label><input id="cap-titulo" class="form-input" placeholder="Ej: Inducción Misión Médica 2026" value="Capacitación Misión Médica"></div>
+        <div class="form-group"><label class="form-label">Fecha</label><input id="cap-fecha" type="date" class="form-input"></div>
+        <div class="form-group"><label class="form-label">Municipio</label><select id="cap-municipio" class="form-select">${selOpts(CFG.MUNICIPIOS,'Seleccione...')}</select></div>
+        <div class="form-group"><label class="form-label">Lugar / Sede</label><input id="cap-lugar" class="form-input" placeholder="Auditorio, hospital, sala..."></div>
+        <div class="form-group"><label class="form-label">Facilitador</label><input id="cap-facilitador" class="form-input" placeholder="Nombre del facilitador"></div>
+      </div>
+    </div>
+    <form id="form-asistente" onsubmit="agregarAsistente(event)">
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">Agregar Participante</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Nombres <span class="req">*</span></label><input name="nombres" class="form-input" required placeholder="Nombres completos"></div>
+          <div class="form-group"><label class="form-label">Apellidos <span class="req">*</span></label><input name="apellidos" class="form-input" required placeholder="Apellidos completos"></div>
+          <div class="form-group"><label class="form-label">Tipo documento <span class="req">*</span></label><select name="tipo_documento" class="form-select" required>${selOpts(CFG.TIPOS_DOC,'Seleccione...')}</select></div>
+          <div class="form-group"><label class="form-label">Número documento <span class="req">*</span></label><input name="numero_documento" class="form-input" required></div>
+          <div class="form-group"><label class="form-label">Cargo / Perfil <span class="req">*</span></label><select name="cargo" class="form-select" required>${selOpts(CFG.PERFILES,'Seleccione...')}</select></div>
+          <div class="form-group"><label class="form-label">Municipio <span class="req">*</span></label><select name="municipio" class="form-select" required>${selOpts(CFG.MUNICIPIOS,'Seleccione...')}</select></div>
+          <div class="form-group"><label class="form-label">Entidad / Institución</label><input name="entidad" class="form-input" placeholder="ESE HRNO, otra IPS..."></div>
+          <div class="form-group"><label class="form-label">Teléfono</label><input name="telefono" type="tel" class="form-input"></div>
+          <div class="form-group md-span-2"><label class="form-label">Correo electrónico</label><input name="correo" type="email" class="form-input"></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:.5rem">
+          <button type="submit" class="btn btn-blue">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Agregar Participante
+          </button>
+        </div>
+      </div>
+    </form>
+    <div id="asistencia-lista">
+      <div style="color:var(--muted);font-size:.85rem;text-align:center;padding:2rem">No hay participantes registrados aún.</div>
+    </div>
+  </div>
+
+  <!-- Pre/Postest -->
+  <div id="cap-prepostest" style="display:none">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem">
+      <button class="btn btn-secondary btn-sm" onclick="mostrarCapModule(null)">← Volver</button>
+      <h2 style="font-size:1rem;font-weight:700">Evaluación Pre / Postest</h2>
+    </div>
+    <div id="test-container"><!-- renderizado por JS --></div>
+  </div>`;
+
+  document.getElementById('cap-fecha').value = new Date().toISOString().split('T')[0];
+  window._asistentes = [];
+  renderTestForm();
+}
+
+function mostrarCapModule(m){
+  document.getElementById('cap-selector').style.display = m ? 'none' : 'grid';
+  document.getElementById('cap-asistencia').style.display = m==='asistencia' ? 'block' : 'none';
+  document.getElementById('cap-prepostest').style.display = m==='prepostest' ? 'block' : 'none';
+}
+
+/* ── ASISTENCIA ── */
+function agregarAsistente(e){
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const data = Object.fromEntries(fd.entries());
+  data.fecha_registro = new Date().toISOString();
+  data._id = Date.now();
+  window._asistentes = window._asistentes||[];
+  window._asistentes.push(data);
+  renderAsistenciaLista();
+  e.target.reset();
+}
+
+function renderAsistenciaLista(){
+  const el = document.getElementById('asistencia-lista');
+  if(!window._asistentes?.length){ el.innerHTML='<div style="color:var(--muted);font-size:.85rem;text-align:center;padding:2rem">No hay participantes registrados aún.</div>'; return; }
+  el.innerHTML = `
+  <div class="section-title" style="margin-top:1rem">Participantes registrados (${window._asistentes.length})</div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Nombre completo</th><th>Documento</th><th>Cargo</th><th>Municipio</th><th>Hora registro</th><th></th></tr></thead>
+      <tbody>
+        ${window._asistentes.map((a,i)=>`
+          <tr>
+            <td style="color:var(--muted)">${i+1}</td>
+            <td style="font-weight:600">${a.nombres} ${a.apellidos}</td>
+            <td style="color:var(--muted)">${a.tipo_documento} ${a.numero_documento}</td>
+            <td>${a.cargo}</td>
+            <td>${a.municipio}</td>
+            <td style="color:var(--muted);font-size:.78rem">${new Date(a.fecha_registro).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}</td>
+            <td><button class="btn btn-secondary btn-sm btn-icon" onclick="eliminarAsistente(${a._id})" title="Eliminar">✕</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-top:.75rem;gap:.5rem">
+    <button class="btn btn-green btn-sm" onclick="guardarAsistenciaDB()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Guardar en base de datos
+    </button>
+  </div>`;
+}
+
+function eliminarAsistente(id){
+  window._asistentes = window._asistentes.filter(a=>a._id!==id);
+  renderAsistenciaLista();
+}
+
+async function guardarAsistenciaDB(){
+  const titulo = document.getElementById('cap-titulo')?.value||'Capacitación MM';
+  const fecha = document.getElementById('cap-fecha')?.value||new Date().toISOString().split('T')[0];
+  const municipio = document.getElementById('cap-municipio')?.value||'';
+  const lugar = document.getElementById('cap-lugar')?.value||'';
+  const facilitador = document.getElementById('cap-facilitador')?.value||'';
+
+  // Crear sesión de capacitación
+  const {data:cap, error:e1} = await supa.from('mm_capacitaciones').insert([{titulo,fecha,municipio,lugar,facilitador}]).select().single();
+  if(e1){ toast('Error al crear sesión: '+e1.message,'error'); return; }
+
+  const registros = window._asistentes.map(a=>({...a, capacitacion_id:cap.id, _id:undefined}));
+  const {error:e2} = await supa.from('mm_asistencia').insert(registros);
+  if(e2){ toast('Error al guardar asistentes: '+e2.message,'error'); return; }
+  toast(`${window._asistentes.length} participantes guardados en la base de datos.`,'success');
+}
+
+function exportAsistenciaPDF(){
+  if(!window._asistentes?.length){ toast('No hay participantes para exportar','warn'); return; }
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const W=297, m=12;
+  doc.setFontSize(14); doc.setFont('helvetica','bold');
+  doc.text('LISTA DE ASISTENCIA — MISIÓN MÉDICA · ESE HRNO', W/2, 14, {align:'center'});
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  const titulo=document.getElementById('cap-titulo')?.value||'';
+  const fecha=document.getElementById('cap-fecha')?.value||'';
+  doc.text(`Sesión: ${titulo}   Fecha: ${fmtDate(fecha)}   Municipio: ${document.getElementById('cap-municipio')?.value||''}   Facilitador: ${document.getElementById('cap-facilitador')?.value||''}`, W/2, 20, {align:'center'});
+  // Table headers
+  const cols=[['#',10],['Nombre Completo',60],['Documento',40],['Cargo',40],['Municipio',30],['Entidad',40],['Firma',40]];
+  let x=m, y=28;
+  doc.setFillColor(40,40,40); doc.rect(m,y,W-m*2,7,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(8); doc.setFont('helvetica','bold');
+  cols.forEach(([h,w])=>{ doc.text(h,x+1,y+5); x+=w; });
+  doc.setTextColor(0,0,0); doc.setFont('helvetica','normal');
+  y+=7;
+  window._asistentes.forEach((a,i)=>{
+    if(y>190){ doc.addPage(); y=20; }
+    doc.setFillColor(i%2===0?250:255,i%2===0?250:255,i%2===0?250:255);
+    doc.rect(m,y,W-m*2,7,'F');
+    x=m;
+    const vals=[i+1, `${a.nombres} ${a.apellidos}`, `${a.tipo_documento} ${a.numero_documento}`, a.cargo, a.municipio, a.entidad||''];
+    cols.slice(0,6).forEach(([,w],ci)=>{ doc.text(String(vals[ci]),x+1,y+5,{maxWidth:w-2}); x+=w; });
+    y+=7;
+  });
+  doc.save(`Lista_Asistencia_MM_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+/* ── PRE/POSTEST ── */
+function renderTestForm(){
+  const el = document.getElementById('test-container');
+  if(!el) return;
+  el.innerHTML = `
+  <form id="form-prepostest" onsubmit="submitPrepostest(event)">
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-header">Datos del Evaluado</div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Tipo de evaluación <span class="req">*</span></label>
+          <div class="radio-group">
+            <label class="radio-item"><input type="radio" name="tipo_evaluacion" value="Pretest" required> Pretest</label>
+            <label class="radio-item"><input type="radio" name="tipo_evaluacion" value="Postest"> Postest</label>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Nombre completo <span class="req">*</span></label><input name="nombres" class="form-input" required placeholder="Nombres y apellidos"></div>
+        <div class="form-group"><label class="form-label">Número de documento <span class="req">*</span></label><input name="numero_documento" class="form-input" required></div>
+        <div class="form-group"><label class="form-label">Municipio <span class="req">*</span></label><select name="municipio" class="form-select" required>${selOpts(CFG.MUNICIPIOS,'Seleccione...')}</select></div>
+        <div class="form-group"><label class="form-label">Perfil profesional <span class="req">*</span></label><select name="perfil" class="form-select" required>${selOpts(CFG.PERFILES,'Seleccione...')}</select></div>
+      </div>
+    </div>
+    <div class="section-title">Preguntas (${PREGUNTAS.length})</div>
+    ${PREGUNTAS.map((p,i)=>`
+      <div class="card" style="margin-bottom:.75rem">
+        <div style="font-size:.82rem;color:var(--muted);margin-bottom:.5rem">Pregunta ${i+1} de ${PREGUNTAS.length}</div>
+        <div style="font-weight:600;font-size:.92rem;line-height:1.5;margin-bottom:.85rem">${p.q}</div>
+        <div style="display:flex;flex-direction:column;gap:.4rem">
+          ${p.opts.map((o,j)=>`
+            <label style="display:flex;align-items:flex-start;gap:.6rem;padding:.55rem .75rem;border:1px solid var(--border);border-radius:7px;cursor:pointer;font-size:.85rem;line-height:1.4;transition:all .15s" class="test-opt">
+              <input type="radio" name="q${i}" value="${j}" required style="margin-top:2px;accent-color:var(--blue);flex-shrink:0">
+              <span>${o}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+    `).join('')}
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button type="submit" class="btn btn-blue btn-lg" id="btn-submit-test">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Enviar Evaluación
+      </button>
+    </div>
+  </form>`;
+  // hover effect on options
+  el.querySelectorAll('.test-opt').forEach(opt=>{
+    opt.addEventListener('mouseover',()=>opt.style.borderColor='var(--blue)');
+    opt.addEventListener('mouseout',()=>{ if(!opt.querySelector('input').checked) opt.style.borderColor='var(--border)'; });
+    opt.querySelector('input').addEventListener('change',()=>{
+      const name=opt.querySelector('input').name;
+      el.querySelectorAll(`input[name="${name}"]`).forEach(inp=>{
+        inp.closest('.test-opt').style.borderColor = inp.checked?'var(--blue)':'var(--border)';
+      });
+    });
+  });
+}
+
+async function submitPrepostest(e){
+  e.preventDefault();
+  const btn = document.getElementById('btn-submit-test');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Procesando...';
+  const fd = new FormData(e.target);
+  const nombres = fd.get('nombres');
+  const numero_documento = fd.get('numero_documento');
+  const municipio = fd.get('municipio');
+  const perfil = fd.get('perfil');
+  const tipo_evaluacion = fd.get('tipo_evaluacion');
+
+  // evaluate
+  let puntaje=0;
+  const respuestas={};
+  PREGUNTAS.forEach((p,i)=>{
+    const sel=parseInt(fd.get('q'+i));
+    const correcto = p.opts[sel]===p.c;
+    if(correcto) puntaje++;
+    respuestas[i]={seleccionado:sel,opcion:p.opts[sel],correcto,correcta:p.c,rationale:p.r};
+  });
+  const porcentaje = ((puntaje/PREGUNTAS.length)*100).toFixed(1);
+
+  const {error} = await supa.from('mm_prepostest').insert([{nombres,numero_documento,municipio,perfil,tipo_evaluacion,respuestas,puntaje,total_preguntas:PREGUNTAS.length,porcentaje}]);
+  if(error){ toast('Error al guardar: '+error.message,'error'); btn.disabled=false; btn.textContent='Enviar Evaluación'; return; }
+
+  // Show result
+  mostrarResultadoTest(nombres,tipo_evaluacion,puntaje,PREGUNTAS.length,porcentaje,respuestas);
+  btn.disabled=false;
+  btn.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Enviar Evaluación';
+}
+
+function mostrarResultadoTest(nombre,tipo,puntaje,total,porcentaje,respuestas){
+  const aprobado = porcentaje>=70;
+  const el = document.getElementById('test-container');
+  el.innerHTML = `
+  <div class="card" style="text-align:center;border-color:${aprobado?'var(--green)':'var(--red)'};margin-bottom:1.25rem">
+    <div style="font-size:3rem;margin-bottom:.5rem">${aprobado?'✅':'❌'}</div>
+    <div style="font-size:1.5rem;font-weight:800;color:${aprobado?'var(--green)':'var(--red)'}">${puntaje}/${total} — ${porcentaje}%</div>
+    <div style="color:var(--muted);font-size:.88rem;margin-top:.35rem">${nombre} · ${tipo} · ${aprobado?'APROBADO':'REQUIERE REFUERZO'}</div>
+    <div style="display:flex;gap:.75rem;justify-content:center;margin-top:1rem;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm" onclick="renderTestForm()">Nueva Evaluación</button>
+      <button class="btn btn-blue btn-sm" onclick="exportTestPDF('${nombre}','${tipo}',${puntaje},${total},'${porcentaje}',${JSON.stringify(respuestas).replace(/'/g,"\\'")})" >Descargar PDF</button>
+    </div>
+  </div>
+  <div class="section-title">Revisión de respuestas</div>
+  ${PREGUNTAS.map((p,i)=>{
+    const r=respuestas[i];
+    return `<div class="card" style="margin-bottom:.6rem;border-left:3px solid ${r.correcto?'var(--green)':'var(--red)'}">
+      <div style="font-size:.78rem;color:var(--muted)">Pregunta ${i+1} · ${r.correcto?'<span style=color:var(--green)>CORRECTO</span>':'<span style=color:var(--red)>INCORRECTO</span>'}</div>
+      <div style="font-weight:600;font-size:.88rem;margin:.35rem 0">${p.q}</div>
+      ${!r.correcto?`<div style="font-size:.82rem;color:var(--red);margin-bottom:.25rem">Tu respuesta: ${r.opcion}</div>`:''}
+      <div style="font-size:.82rem;color:var(--green);margin-bottom:.35rem">Respuesta correcta: ${r.correcta}</div>
+      <div style="font-size:.8rem;color:var(--muted);background:rgba(255,255,255,.03);padding:.5rem .75rem;border-radius:6px;line-height:1.5">${r.rationale}</div>
+    </div>`;
+  }).join('')}`;
+}
+
+function exportTestPDF(nombre,tipo,puntaje,total,porcentaje,respuestas){
+  // simple text PDF
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({unit:'mm',format:'a4'});
+  const W=210,m=15,cw=180;
+  doc.setFillColor(13,17,23); doc.rect(0,0,W,28,'F');
+  doc.setTextColor(233,69,96); doc.setFontSize(13); doc.setFont('helvetica','bold');
+  doc.text('MISIÓN MÉDICA — ESE HRNO',W/2,11,{align:'center'});
+  doc.setTextColor(220,220,220); doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text(`Evaluación ${tipo} · ${nombre}`,W/2,18,{align:'center'});
+  doc.text(`Puntaje: ${puntaje}/${total} (${porcentaje}%) · ${new Date().toLocaleDateString('es-CO')}`,W/2,24,{align:'center'});
+  doc.setTextColor(0,0,0);
+  let y=36;
+  PREGUNTAS.forEach((p,i)=>{
+    const r=respuestas[i];
+    if(y>270){doc.addPage();y=20;}
+    doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    doc.setTextColor(r.correcto?0:180,r.correcto?120:0,r.correcto?0:0);
+    doc.text(`P${i+1}. ${r.correcto?'✓':'✗'} ${p.q}`,m,y,{maxWidth:cw}); y+=5;
+    if(!r.correcto){doc.setFont('helvetica','normal');doc.setTextColor(150,0,0);doc.text(`Tu respuesta: ${r.opcion}`,m+3,y,{maxWidth:cw-3});y+=5;}
+    doc.setTextColor(0,100,0); doc.text(`Correcto: ${r.correcta}`,m+3,y,{maxWidth:cw-3}); y+=5;
+    doc.setTextColor(100,100,100); doc.setFont('helvetica','italic');
+    const rat=doc.splitTextToSize(r.rationale,cw-3);
+    rat.forEach(l=>{doc.text(l,m+3,y);y+=4;});
+    y+=3;
+  });
+  doc.save(`Test_MM_${tipo}_${nombre.replace(/ /g,'_')}.pdf`);
+}
+
+/* ═══════════════════════════════════════════
+   ADMIN AUTH
+═══════════════════════════════════════════ */
+function adminLogin(){
+  const pwd = document.getElementById('admin-pwd').value;
+  const err = document.getElementById('admin-err');
+  if(pwd === CFG.ADMIN_PWD){
+    S.adminLoggedIn = true;
+    document.getElementById('admin-lock').style.display = 'none';
+    document.getElementById('admin-panel').style.display = 'block';
+    initAdminPanel();
+  } else {
+    err.style.display = 'block';
+    document.getElementById('admin-pwd').value='';
+    setTimeout(()=>err.style.display='none', 3000);
+  }
+}
+function adminLogout(){
+  S.adminLoggedIn = false;
+  document.getElementById('admin-lock').style.display = 'flex';
+  document.getElementById('admin-panel').style.display = 'none';
+  document.getElementById('admin-pwd').value = '';
+}
+function initAdmin(){
+  if(S.adminLoggedIn) initAdminPanel();
+}
+function showAdminPane(id){
+  document.querySelectorAll('.admin-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.admin-pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('atab-'+id).classList.add('active');
+  document.getElementById('apane-'+id).classList.add('active');
+  if(id==='estadisticas') loadEstadisticas();
+  if(id==='carnets') loadCarnets();
+  if(id==='emblemas-admin') loadEmblemasAdmin();
+  if(id==='stock') loadStock();
+  if(id==='resultados') loadResultados();
+}
+function initAdminPanel(){ showAdminPane('estadisticas'); }
+
+/* ═══════════════════════════════════════════
+   ADMIN: ESTADÍSTICAS
+═══════════════════════════════════════════ */
+async function loadEstadisticas(){
+  const el = document.getElementById('apane-estadisticas');
+  el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--muted)"><span class="spinner" style="display:inline-block"></span> Cargando estadísticas...</div>`;
+
+  const {data, error} = await supa.from('mm_infracciones').select('*').order('fecha_ocurrencia',{ascending:false});
+  if(error){ el.innerHTML=`<div style="color:var(--red)">Error: ${error.message}</div>`; return; }
+
+  const total = data.length;
+  const infrac = data.filter(r=>r.tipo_evento==='Infracción').length;
+  const incid = data.filter(r=>r.tipo_evento==='Incidente').length;
+  const municipios = [...new Set(data.map(r=>r.municipio_ocurrencia))];
+
+  // Category counts
+  const catCounts = {};
+  CFG.CATEGORIAS.forEach(c=>catCounts[c]=0);
+  data.forEach(r=>{ if(catCounts[r.categoria_evento]!==undefined) catCounts[r.categoria_evento]++; });
+
+  // Monthly trend (last 12 months)
+  const meses = {};
+  for(let i=11;i>=0;i--){
+    const d=new Date(); d.setMonth(d.getMonth()-i);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    meses[key]=0;
+  }
+  data.forEach(r=>{ const k=r.fecha_ocurrencia?.slice(0,7); if(meses[k]!==undefined) meses[k]++; });
+
+  // Municipio counts
+  const munCounts = {};
+  CFG.MUNICIPIOS.forEach(m=>munCounts[m]=0);
+  data.forEach(r=>{ if(munCounts[r.municipio_ocurrencia]!==undefined) munCounts[r.municipio_ocurrencia]++; });
+
+  el.innerHTML = `
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+    <div class="section-title" style="margin-bottom:0;flex:1">Estadísticas de Infracciones e Incidentes</div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <select id="filt-tipo" class="form-select" style="min-width:140px;padding:.35rem .6rem;font-size:.8rem" onchange="filtrarTabla()">
+        <option value="">Todos los tipos</option>
+        <option value="Infracción">Solo Infracciones</option>
+        <option value="Incidente">Solo Incidentes</option>
+      </select>
+      <select id="filt-cat" class="form-select" style="min-width:200px;padding:.35rem .6rem;font-size:.8rem" onchange="filtrarTabla()">
+        <option value="">Todas las categorías</option>
+        ${CFG.CATEGORIAS.map(c=>`<option value="${c}">${c}</option>`).join('')}
+      </select>
+      <select id="filt-mun" class="form-select" style="min-width:140px;padding:.35rem .6rem;font-size:.8rem" onchange="filtrarTabla()">
+        <option value="">Todos los municipios</option>
+        ${CFG.MUNICIPIOS.map(m=>`<option value="${m}">${m}</option>`).join('')}
+      </select>
+      <select id="filt-anio" class="form-select" style="min-width:110px;padding:.35rem .6rem;font-size:.8rem" onchange="filtrarTabla()">
+        <option value="">Todos los años</option>
+        ${[...new Set(data.map(r=>r.fecha_ocurrencia?.slice(0,4)).filter(Boolean))].sort().reverse().map(y=>`<option value="${y}">${y}</option>`).join('')}
+      </select>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="grid-4" style="margin-bottom:1.25rem">
+    <div class="stat-card"><div class="stat-value" style="color:var(--text)">${total}</div><div class="stat-label">Total eventos</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--red)">${infrac}</div><div class="stat-label">Infracciones</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--yellow)">${incid}</div><div class="stat-label">Incidentes</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--blue)">${municipios.length}</div><div class="stat-label">Municipios afectados</div></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid-2" style="margin-bottom:1.25rem">
+    <div class="card">
+      <div class="card-header">Tendencia mensual (últimos 12 meses)</div>
+      <div class="chart-wrap"><canvas id="chart-trend"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Eventos por categoría</div>
+      <div class="chart-wrap"><canvas id="chart-cat"></canvas></div>
+    </div>
+  </div>
+  <div class="grid-2" style="margin-bottom:1.25rem">
+    <div class="card">
+      <div class="card-header">Distribución Infracción vs Incidente</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-tipo"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Eventos por municipio</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="chart-mun"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="section-title">Registros recientes</div>
+  <div class="table-wrap" id="tabla-infracciones">
+    ${renderTablaInfracciones(data)}
+  </div>`;
+
+  window._infraccionesData = data;
+
+  // Draw charts
+  const chartOpts = { responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#8b949e',font:{size:11}}}}, scales:{x:{ticks:{color:'#8b949e'},grid:{color:'#21262d'}},y:{ticks:{color:'#8b949e'},grid:{color:'#21262d'},beginAtZero:true}} };
+
+  destroyChart('trend');
+  S.chartRefs.trend = new Chart(document.getElementById('chart-trend'), {
+    type:'line',
+    data:{labels:Object.keys(meses).map(k=>{const[y,m]=k.split('-');return`${m}/${y.slice(2)}`}),datasets:[{label:'Eventos',data:Object.values(meses),borderColor:'#e94560',backgroundColor:'rgba(233,69,96,.15)',tension:.35,fill:true,pointBackgroundColor:'#e94560'}]},
+    options:{...chartOpts}
+  });
+
+  destroyChart('cat');
+  S.chartRefs.cat = new Chart(document.getElementById('chart-cat'), {
+    type:'bar',
+    data:{labels:Object.keys(catCounts).map(c=>c.length>22?c.slice(0,22)+'…':c),datasets:[{label:'Eventos',data:Object.values(catCounts),backgroundColor:['#e94560','#7c1d6f','#4a6fa5','#ffb432','#38c793','#8b949e']}]},
+    options:{...chartOpts,indexAxis:'y',plugins:{legend:{display:false}}}
+  });
+
+  destroyChart('tipo');
+  S.chartRefs.tipo = new Chart(document.getElementById('chart-tipo'), {
+    type:'doughnut',
+    data:{labels:['Infracciones','Incidentes'],datasets:[{data:[infrac,incid],backgroundColor:['#e94560','#ffb432'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8b949e'}}}}
+  });
+
+  destroyChart('mun');
+  S.chartRefs.mun = new Chart(document.getElementById('chart-mun'), {
+    type:'bar',
+    data:{labels:Object.keys(munCounts),datasets:[{label:'Eventos',data:Object.values(munCounts),backgroundColor:'#4a6fa5'}]},
+    options:{...chartOpts,plugins:{legend:{display:false}}}
+  });
+}
+
+function destroyChart(k){ if(S.chartRefs[k]){ S.chartRefs[k].destroy(); delete S.chartRefs[k]; } }
+
+function renderTablaInfracciones(data){
+  if(!data.length) return '<div style="padding:1.5rem;text-align:center;color:var(--muted)">No hay registros.</div>';
+  return `<table class="data-table">
+    <thead><tr><th>Radicado</th><th>Tipo</th><th>Categoría</th><th>Municipio</th><th>Fecha ocurrencia</th><th>Institución</th></tr></thead>
+    <tbody>${data.slice(0,50).map(r=>`
+      <tr>
+        <td style="font-family:monospace;font-size:.78rem;color:var(--blue)">${r.radicado}</td>
+        <td><span class="badge ${r.tipo_evento==='Infracción'?'badge-red':'badge-yellow'}">${r.tipo_evento}</span></td>
+        <td style="font-size:.8rem;max-width:200px">${r.categoria_evento}</td>
+        <td>${r.municipio_ocurrencia}</td>
+        <td style="color:var(--muted);font-size:.8rem">${fmtDate(r.fecha_ocurrencia)}</td>
+        <td style="font-size:.8rem">${r.institucion_afectada}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function filtrarTabla(){
+  const tipo = document.getElementById('filt-tipo')?.value||'';
+  const cat  = document.getElementById('filt-cat')?.value||'';
+  const mun  = document.getElementById('filt-mun')?.value||'';
+  const anio = document.getElementById('filt-anio')?.value||'';
+  let data = window._infraccionesData||[];
+  if(tipo) data=data.filter(r=>r.tipo_evento===tipo);
+  if(cat)  data=data.filter(r=>r.categoria_evento===cat);
+  if(mun)  data=data.filter(r=>r.municipio_ocurrencia===mun);
+  if(anio) data=data.filter(r=>r.fecha_ocurrencia?.startsWith(anio));
+  document.getElementById('tabla-infracciones').innerHTML = renderTablaInfracciones(data);
+}
+
+/* ═══════════════════════════════════════════
+   ADMIN: CARNETS
+═══════════════════════════════════════════ */
+async function loadCarnets(){
+  const el = document.getElementById('apane-carnets');
+  el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--muted)"><span class="spinner" style="display:inline-block"></span></div>`;
+  const {data,error} = await supa.from('mm_solicitudes_carnet').select('*').order('fecha_solicitud',{ascending:false});
+  if(error){ el.innerHTML=`<div style="color:var(--red)">Error: ${error.message}</div>`; return; }
+
+  const estadoBadge={pendiente:'badge-yellow',autorizado:'badge-blue',foto_pendiente:'badge-purple',completado:'badge-green',rechazado:'badge-red'};
+  const estadoLabel={pendiente:'Pendiente',autorizado:'Autorizado',foto_pendiente:'Foto pendiente',completado:'Completado',rechazado:'Rechazado'};
+
+  el.innerHTML = `
+  <div class="section-title">Solicitudes de Carnet de Identificación</div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Nombre</th><th>Documento</th><th>Cargo</th><th>Municipio</th><th>Correo</th><th>Estado</th><th>Fecha</th><th>Acciones</th></tr></thead>
+      <tbody>
+        ${data.length ? data.map(r=>`
+          <tr id="carnet-row-${r.id}">
+            <td style="font-weight:600">${r.nombres} ${r.apellidos}</td>
+            <td style="font-size:.8rem;color:var(--muted)">${r.tipo_documento} ${r.numero_documento}</td>
+            <td style="font-size:.82rem">${r.cargo}</td>
+            <td>${r.municipio}</td>
+            <td style="font-size:.78rem">${r.correo}</td>
+            <td><span class="badge ${estadoBadge[r.estado]||'badge-blue'}">${estadoLabel[r.estado]||r.estado}</span></td>
+            <td style="color:var(--muted);font-size:.78rem">${fmtDT(r.fecha_solicitud)}</td>
+            <td>
+              <div style="display:flex;gap:.35rem;flex-wrap:wrap">
+                ${r.estado==='pendiente'?`
+                  <button class="btn btn-green btn-sm" onclick="autorizarCarnet('${r.id}','${r.correo}','${r.nombres} ${r.apellidos}')">Autorizar</button>
+                  <button class="btn btn-secondary btn-sm" style="color:var(--red)" onclick="rechazarCarnet('${r.id}')">Rechazar</button>
+                `:''}
+                ${r.estado==='completado'?`<button class="btn btn-blue btn-sm" onclick="verTarjeta('${r.id}')">Ver tarjeta</button>`:''}
+                ${r.foto_url?`<span class="badge badge-green" style="font-size:.7rem">Foto ✓</span>`:''}
+              </div>
+            </td>
+          </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">No hay solicitudes.</td></tr>'}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+async function autorizarCarnet(id, correo, nombre){
+  const num = genRadicado('CA');
+  const fotoUrl = `${window.location.origin}${window.location.pathname}#foto?id=${id}`;
+  const {error} = await supa.from('mm_solicitudes_carnet').update({estado:'autorizado', numero_carnet:num, fecha_autorizacion:new Date().toISOString()}).eq('id',id);
+  if(error){ toast('Error: '+error.message,'error'); return; }
+  // Send email via Apps Script
+  await callAppsScript({action:'sendEmail',to:correo,subject:'Tu carnet de Misión Médica fue autorizado — ESE HRNO',body:`Estimado(a) ${nombre},\n\nTu solicitud de carnet de identificación de la Misión Médica ha sido AUTORIZADA.\n\nNúmero de carnet: ${num}\n\nPara completar el proceso debes:\n1. Abrir el siguiente enlace desde tu celular o computador\n2. Tomar tu fotografía institucional\n3. Firmar el consentimiento informado\n\nEnlace de foto: ${fotoUrl}\n\nAtentamente,\nMisión Médica — ESE Hospital Regional Noroccidental`});
+  toast(`Carnet ${num} autorizado. Correo enviado a ${correo}`,'success',5000);
+  loadCarnets();
+}
+
+async function rechazarCarnet(id){
+  showConfirm('Rechazar solicitud','¿Estás seguro de rechazar esta solicitud de carnet?',async()=>{
+    const {error} = await supa.from('mm_solicitudes_carnet').update({estado:'rechazado'}).eq('id',id);
+    if(error){ toast('Error: '+error.message,'error'); return; }
+    toast('Solicitud rechazada','warn'); loadCarnets();
+  },'Rechazar','btn-secondary');
+}
+
+function verTarjeta(id){ window.location.hash=`tarjeta?id=${id}`; }
+
+/* ═══════════════════════════════════════════
+   ADMIN: EMBLEMAS
+═══════════════════════════════════════════ */
+async function loadEmblemasAdmin(){
+  const el = document.getElementById('apane-emblemas-admin');
+  el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--muted)"><span class="spinner" style="display:inline-block"></span></div>`;
+  const {data,error} = await supa.from('mm_solicitudes_emblemas').select('*').order('fecha_solicitud',{ascending:false});
+  if(error){ el.innerHTML=`<div style="color:var(--red)">Error: ${error.message}</div>`; return; }
+
+  const estadoBadge={pendiente:'badge-yellow',autorizado:'badge-blue',entregado:'badge-green',rechazado:'badge-red'};
+  const estadoLabel={pendiente:'Pendiente',autorizado:'Autorizado',entregado:'Entregado',rechazado:'Rechazado'};
+
+  el.innerHTML = `
+  <div class="section-title">Solicitudes de Emblemas de Protección</div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Nombre</th><th>Emblema</th><th>Cargo</th><th>Municipio</th><th>Correo</th><th>Estado</th><th>Fecha</th><th>Acciones</th></tr></thead>
+      <tbody>
+        ${data.length ? data.map(r=>`
+          <tr id="emblema-row-${r.id}">
+            <td style="font-weight:600">${r.nombres} ${r.apellidos}</td>
+            <td><span class="badge badge-purple">${r.tipo_emblema}${r.talla&&r.talla!=='No aplica'?' ('+r.talla+')':''}</span></td>
+            <td style="font-size:.82rem">${r.cargo}</td>
+            <td>${r.municipio}</td>
+            <td style="font-size:.78rem">${r.correo}</td>
+            <td><span class="badge ${estadoBadge[r.estado]||'badge-yellow'}">${estadoLabel[r.estado]||r.estado}</span></td>
+            <td style="color:var(--muted);font-size:.78rem">${fmtDT(r.fecha_solicitud)}</td>
+            <td>
+              <div style="display:flex;gap:.35rem;flex-wrap:wrap">
+                ${r.estado==='pendiente'?`
+                  <button class="btn btn-green btn-sm" onclick="autorizarEmblema('${r.id}','${r.correo}','${r.nombres} ${r.apellidos}','${r.tipo_emblema}')">Autorizar</button>
+                  <button class="btn btn-secondary btn-sm" style="color:var(--red)" onclick="rechazarEmblema('${r.id}')">Rechazar</button>
+                `:''}
+                ${r.estado==='autorizado'?`<button class="btn btn-blue btn-sm" onclick="marcarEntregado('${r.id}')">Marcar entregado</button>`:''}
+                ${r.estado==='entregado'?`<button class="btn btn-secondary btn-sm" onclick="marcarDevuelto('${r.id}')">Devuelto</button>`:''}
+              </div>
+            </td>
+          </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">No hay solicitudes.</td></tr>'}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+async function autorizarEmblema(id, correo, nombre, tipo){
+  const {error} = await supa.from('mm_solicitudes_emblemas').update({estado:'autorizado',fecha_autorizacion:new Date().toISOString()}).eq('id',id);
+  if(error){ toast('Error: '+error.message,'error'); return; }
+  // Actualizar stock
+  await supa.from('mm_stock_emblemas').update({stock_entregado: supa.rpc('increment',{count:1})}).eq('tipo_emblema',tipo).catch(()=>{});
+  // Email
+  await callAppsScript({action:'sendEmail',to:correo,subject:`Tu solicitud de ${tipo} Misión Médica fue aprobada — ESE HRNO`,body:`Estimado(a) ${nombre},\n\nTu solicitud de ${tipo} de Misión Médica ha sido APROBADA.\n\nPor favor acércate a la Coordinación de Salud Pública para recibir tu emblema.\n\nRECUERDA:\n• El emblema es de uso exclusivo para actividades de Misión Médica\n• Debes portarlo correctamente durante tus actividades en campo\n• Tienes la OBLIGACIÓN de devolverlo a la institución en cualquier circunstancia, independientemente de su estado de conservación.\n\nAtentamente,\nMisión Médica — ESE HRNO`});
+  toast(`${tipo} autorizado. Correo enviado a ${correo}`,'success');
+  loadEmblemasAdmin();
+}
+async function rechazarEmblema(id){ const {error}=await supa.from('mm_solicitudes_emblemas').update({estado:'rechazado'}).eq('id',id); if(!error){toast('Rechazado','warn');loadEmblemasAdmin();} }
+async function marcarEntregado(id){ const {error}=await supa.from('mm_solicitudes_emblemas').update({estado:'entregado'}).eq('id',id); if(!error){toast('Marcado como entregado','success');loadEmblemasAdmin();} }
+async function marcarDevuelto(id){ const {error}=await supa.from('mm_solicitudes_emblemas').update({estado:'pendiente',fecha_devolucion:new Date().toISOString()}).eq('id',id); if(!error){toast('Emblema devuelto registrado','info');loadEmblemasAdmin();} }
+
+/* ═══════════════════════════════════════════
+   ADMIN: STOCK
+═══════════════════════════════════════════ */
+async function loadStock(){
+  const el = document.getElementById('apane-stock');
+  const {data,error} = await supa.from('mm_stock_emblemas').select('*');
+  if(error){ el.innerHTML=`<div style="color:var(--red)">Error: ${error.message}</div>`; return; }
+
+  el.innerHTML = `
+  <div class="section-title">Gestión de Stock de Emblemas</div>
+  <div class="grid-3" style="margin-bottom:1.5rem">
+    ${data.map(s=>`
+      <div class="card" style="border-top:3px solid var(--purple)">
+        <div style="font-size:1.8rem;margin-bottom:.5rem">${s.tipo_emblema==='Chaleco'?'🦺':s.tipo_emblema==='Bandera'?'🚩':'🛡️'}</div>
+        <div style="font-weight:700;font-size:1rem;margin-bottom:.75rem">${s.tipo_emblema}</div>
+        <div class="grid-3" style="gap:.5rem;margin-bottom:1rem">
+          <div style="text-align:center">
+            <div style="font-size:1.4rem;font-weight:800;color:var(--text)">${s.stock_total}</div>
+            <div style="font-size:.7rem;color:var(--muted)">TOTAL</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:1.4rem;font-weight:800;color:var(--green)">${s.stock_disponible}</div>
+            <div style="font-size:.7rem;color:var(--muted)">DISPONIBLE</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:1.4rem;font-weight:800;color:var(--yellow)">${s.stock_entregado}</div>
+            <div style="font-size:.7rem;color:var(--muted)">ENTREGADO</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:.4rem;margin-bottom:.5rem">
+          <input id="stock-total-${s.tipo_emblema}" type="number" min="0" class="form-input" style="font-size:.82rem;padding:.4rem" value="${s.stock_total}" placeholder="Total">
+          <input id="stock-disp-${s.tipo_emblema}" type="number" min="0" class="form-input" style="font-size:.82rem;padding:.4rem" value="${s.stock_disponible}" placeholder="Disponible">
+        </div>
+        <button class="btn btn-blue btn-sm btn-full" onclick="actualizarStock('${s.tipo_emblema}','${s.id}')">Actualizar stock</button>
+      </div>
+    `).join('')}
+  </div>
+  <div class="card" style="background:rgba(255,180,50,.05);border-color:rgba(255,180,50,.3)">
+    <div class="card-header">Registro de movimiento manual</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">Emblema</label>
+        <select id="stock-mov-tipo" class="form-select">${selOpts(CFG.EMBLEMAS,'Seleccione...')}</select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Movimiento</label>
+        <select id="stock-mov-accion" class="form-select">
+          <option value="entrada">Entrada (ingreso a bodega)</option>
+          <option value="salida">Salida (entrega)</option>
+          <option value="devolucion">Devolución</option>
+          <option value="baja">Baja (pérdida/daño)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cantidad</label>
+        <input id="stock-mov-qty" type="number" min="1" value="1" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observación</label>
+        <input id="stock-mov-obs" class="form-input" placeholder="Motivo del movimiento...">
+      </div>
+    </div>
+    <button class="btn btn-yellow" onclick="registrarMovimiento()">Registrar movimiento</button>
+  </div>`;
+}
+
+async function actualizarStock(tipo, id){
+  const total = parseInt(document.getElementById(`stock-total-${tipo}`).value)||0;
+  const disp  = parseInt(document.getElementById(`stock-disp-${tipo}`).value)||0;
+  const {error} = await supa.from('mm_stock_emblemas').update({stock_total:total,stock_disponible:disp,updated_at:new Date().toISOString()}).eq('id',id);
+  if(error){ toast('Error: '+error.message,'error'); return; }
+  toast(`Stock de ${tipo} actualizado`,'success'); loadStock();
+}
+
+async function registrarMovimiento(){
+  const tipo = document.getElementById('stock-mov-tipo').value;
+  const accion = document.getElementById('stock-mov-accion').value;
+  const qty = parseInt(document.getElementById('stock-mov-qty').value)||0;
+  if(!tipo||!qty){ toast('Seleccione tipo y cantidad','warn'); return; }
+  const {data} = await supa.from('mm_stock_emblemas').select('*').eq('tipo_emblema',tipo).single();
+  if(!data){ toast('Stock no encontrado','error'); return; }
+  let {stock_total,stock_disponible,stock_entregado} = data;
+  if(accion==='entrada'){ stock_total+=qty; stock_disponible+=qty; }
+  else if(accion==='salida'){ stock_disponible=Math.max(0,stock_disponible-qty); stock_entregado+=qty; }
+  else if(accion==='devolucion'){ stock_disponible+=qty; stock_entregado=Math.max(0,stock_entregado-qty); }
+  else if(accion==='baja'){ stock_total=Math.max(0,stock_total-qty); stock_disponible=Math.max(0,stock_disponible-qty); }
+  await supa.from('mm_stock_emblemas').update({stock_total,stock_disponible,stock_entregado,updated_at:new Date().toISOString()}).eq('tipo_emblema',tipo);
+  toast(`Movimiento de ${tipo} registrado`,'success'); loadStock();
+}
+
+/* ═══════════════════════════════════════════
+   ADMIN: PRE/POSTEST RESULTADOS
+═══════════════════════════════════════════ */
+async function loadResultados(){
+  const el = document.getElementById('apane-resultados');
+  el.innerHTML=`<div style="text-align:center;padding:2rem;color:var(--muted)"><span class="spinner" style="display:inline-block"></span></div>`;
+  const {data,error} = await supa.from('mm_prepostest').select('*').order('fecha',{ascending:false});
+  if(error){ el.innerHTML=`<div style="color:var(--red)">Error: ${error.message}</div>`; return; }
+  window._testData = data;
+
+  const pre = data.filter(r=>r.tipo_evaluacion==='Pretest');
+  const post = data.filter(r=>r.tipo_evaluacion==='Postest');
+  const avgPre = pre.length ? (pre.reduce((s,r)=>s+Number(r.porcentaje),0)/pre.length).toFixed(1) : 0;
+  const avgPost = post.length ? (post.reduce((s,r)=>s+Number(r.porcentaje),0)/post.length).toFixed(1) : 0;
+  const aprobados = post.filter(r=>r.porcentaje>=70).length;
+
+  el.innerHTML=`
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+    <div class="section-title" style="margin-bottom:0;flex:1">Resultados de Evaluaciones</div>
+    <button class="btn btn-primary" onclick="abrirPresentacion()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><polyline points="8 21 12 17 16 21"/></svg>
+      Presentar resultados
+    </button>
+  </div>
+  <div class="grid-4" style="margin-bottom:1.25rem">
+    <div class="stat-card"><div class="stat-value" style="color:var(--text)">${data.length}</div><div class="stat-label">Total evaluaciones</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--yellow)">${avgPre}%</div><div class="stat-label">Promedio Pretest</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--green)">${avgPost}%</div><div class="stat-label">Promedio Postest</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--blue)">${aprobados}</div><div class="stat-label">Aprobaron postest</div></div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Nombre</th><th>Documento</th><th>Municipio</th><th>Perfil</th><th>Tipo</th><th>Puntaje</th><th>%</th><th>Fecha</th></tr></thead>
+      <tbody>
+        ${data.length ? data.map(r=>`<tr>
+          <td style="font-weight:600">${r.nombres}</td>
+          <td style="color:var(--muted);font-size:.8rem">${r.numero_documento}</td>
+          <td>${r.municipio}</td>
+          <td style="font-size:.8rem">${r.perfil}</td>
+          <td><span class="badge ${r.tipo_evaluacion==='Pretest'?'badge-yellow':'badge-green'}">${r.tipo_evaluacion}</span></td>
+          <td style="font-weight:700">${r.puntaje}/${r.total_preguntas}</td>
+          <td><span class="badge ${Number(r.porcentaje)>=70?'badge-green':'badge-red'}">${r.porcentaje}%</span></td>
+          <td style="color:var(--muted);font-size:.78rem">${fmtDT(r.fecha)}</td>
+        </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">No hay evaluaciones.</td></tr>'}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   OVERLAY: FOTO CARNET
+═══════════════════════════════════════════ */
+async function openFotoOverlay(id){
+  const overlay = document.getElementById('overlay-foto');
+  const content = document.getElementById('overlay-foto-content');
+  overlay.classList.add('active');
+  content.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--muted)"><span class="spinner" style="display:inline-block;margin:auto"></span><p style="margin-top:1rem">Cargando solicitud...</p></div>`;
+
+  const {data,error} = await supa.from('mm_solicitudes_carnet').select('*').eq('id',id).single();
+  if(error||!data){
+    content.innerHTML=`<div style="text-align:center;padding:3rem"><p style="color:var(--red);margin-bottom:1rem">Solicitud no encontrada o enlace inválido.</p><button class="btn btn-secondary" onclick="cerrarFotoOverlay()">Cerrar</button></div>`;
+    return;
+  }
+  if(data.estado==='completado'){
+    content.innerHTML=`<div style="text-align:center;padding:3rem"><p style="color:var(--green);font-size:1.1rem;font-weight:700;margin-bottom:.5rem">✅ Proceso completado</p><p style="color:var(--muted);margin-bottom:1.25rem">Tu carnet de Misión Médica ya está listo.</p><button class="btn btn-blue" onclick="openTarjetaOverlay('${id}')">Ver mi tarjeta</button></div>`;
+    return;
+  }
+  if(data.estado==='rechazado'){
+    content.innerHTML=`<div style="text-align:center;padding:3rem"><p style="color:var(--red)">Esta solicitud fue rechazada.</p></div>`;
+    return;
+  }
+  if(data.estado!=='autorizado'){
+    content.innerHTML=`<div style="text-align:center;padding:3rem"><p style="color:var(--yellow)">Tu solicitud aún está en proceso de autorización. Serás notificado(a) por correo.</p><button class="btn btn-secondary" onclick="cerrarFotoOverlay()">Cerrar</button></div>`;
+    return;
+  }
+
+  content.innerHTML = `
+  <div style="max-width:520px;margin:auto">
+    <div style="text-align:center;margin-bottom:2rem">
+      <img src="${CFG.BANNER}" style="width:100%;border-radius:10px;margin-bottom:1rem;max-height:120px;object-fit:cover">
+      <h1 style="font-size:1.3rem;font-weight:800;margin-bottom:.35rem">Activación de Carnet de <span style="color:var(--purple)">Misión Médica</span></h1>
+      <p style="color:var(--muted);font-size:.88rem">Hola <strong style="color:var(--text)">${data.nombres} ${data.apellidos}</strong> — Carnet N° ${data.numero_carnet}</p>
+    </div>
+
+    <!-- CONSENTIMIENTO -->
+    <div id="foto-step-consent">
+      <div class="card" style="border-color:rgba(124,29,111,.4);margin-bottom:1rem">
+        <div class="card-header">Consentimiento Informado</div>
+        <div style="font-size:.83rem;color:var(--muted);line-height:1.7">
+          <p style="margin-bottom:.75rem">Al continuar, declaro que:</p>
+          <p>1. Soy <strong style="color:var(--text)">${data.nombres} ${data.apellidos}</strong>, identificado(a) con ${data.tipo_documento} N° ${data.numero_documento}.</p>
+          <p>2. Autorizo a la ESE Hospital Regional Noroccidental el uso de mi fotografía exclusivamente para la elaboración del carnet de identificación de Misión Médica.</p>
+          <p>3. Entiendo que el carnet es de carácter institucional y sólo puede ser usado para actividades de Misión Médica.</p>
+          <p>4. Conozco y acepto los principios de humanidad, imparcialidad y neutralidad de la Misión Médica.</p>
+          <p style="margin-top:.75rem">Esta autorización está amparada por la <strong>Ley 1581 de 2012</strong> de Protección de Datos Personales.</p>
+        </div>
+        <div style="margin-top:1rem;display:flex;gap:.5rem;align-items:center">
+          <input type="checkbox" id="ck-consentimiento" style="width:18px;height:18px;accent-color:var(--purple);cursor:pointer">
+          <label for="ck-consentimiento" style="font-size:.85rem;cursor:pointer;font-weight:600">Acepto los términos del consentimiento informado</label>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full btn-lg" onclick="irAFoto()">
+        Aceptar y tomar fotografía →
+      </button>
+    </div>
+
+    <!-- CÁMARA -->
+    <div id="foto-step-camera" style="display:none">
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">Fotografía para el carnet</div>
+        <p style="font-size:.83rem;color:var(--muted);margin-bottom:1rem">Centra tu rostro, asegúrate de tener buena iluminación y fondo neutro.</p>
+        <div style="position:relative;border-radius:10px;overflow:hidden;background:#000;margin-bottom:.75rem">
+          <video id="foto-video" autoplay playsinline muted style="width:100%;display:block;max-height:300px;object-fit:cover"></video>
+          <div style="position:absolute;inset:0;border:2px dashed rgba(124,29,111,.6);border-radius:10px;pointer-events:none"></div>
+        </div>
+        <canvas id="foto-canvas" style="display:none"></canvas>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-primary btn-full" onclick="capturarFoto()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M20.94 11A8.994 8.994 0 1 1 5.06 11"/></svg>
+            Capturar foto
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PREVIEW FOTO -->
+    <div id="foto-step-preview" style="display:none">
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">Confirma tu fotografía</div>
+        <div style="text-align:center;margin-bottom:1rem">
+          <img id="foto-preview-img" style="width:180px;height:180px;object-fit:cover;border-radius:12px;border:3px solid var(--purple)">
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-secondary btn-full" onclick="repetirFoto()">Repetir foto</button>
+          <button class="btn btn-green btn-full" id="btn-enviar-foto" onclick="enviarFoto('${id}','${data.nombres} ${data.apellidos}','${data.correo}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Confirmar y generar carnet
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:1rem">
+      <button class="btn btn-secondary btn-sm" onclick="cerrarFotoOverlay()">← Cancelar</button>
+    </div>
+  </div>`;
+}
+
+let _fotoStream = null;
+let _fotoDataUrl = null;
+
+function cerrarFotoOverlay(){
+  if(_fotoStream){ _fotoStream.getTracks().forEach(t=>t.stop()); _fotoStream=null; }
+  document.getElementById('overlay-foto').classList.remove('active');
+  history.pushState('','',window.location.pathname);
+}
+
+function irAFoto(){
+  if(!document.getElementById('ck-consentimiento').checked){ toast('Debes aceptar el consentimiento para continuar','warn'); return; }
+  document.getElementById('foto-step-consent').style.display='none';
+  document.getElementById('foto-step-camera').style.display='block';
+  iniciarCamara();
+}
+
+async function iniciarCamara(){
+  try{
+    _fotoStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}}});
+    document.getElementById('foto-video').srcObject = _fotoStream;
+  } catch(e){
+    toast('No se pudo acceder a la cámara. Verifica los permisos.','error');
+    document.getElementById('foto-step-camera').innerHTML='<p style="color:var(--red);padding:1rem">Cámara no disponible. Intenta desde otro dispositivo.</p>';
+  }
+}
+
+function capturarFoto(){
+  const video = document.getElementById('foto-video');
+  const canvas = document.getElementById('foto-canvas');
+  canvas.width = video.videoWidth||640;
+  canvas.height = video.videoHeight||480;
+  canvas.getContext('2d').drawImage(video,0,0);
+  _fotoDataUrl = canvas.toDataURL('image/jpeg',0.85);
+  if(_fotoStream){ _fotoStream.getTracks().forEach(t=>t.stop()); _fotoStream=null; }
+  document.getElementById('foto-step-camera').style.display='none';
+  document.getElementById('foto-step-preview').style.display='block';
+  document.getElementById('foto-preview-img').src = _fotoDataUrl;
+}
+
+function repetirFoto(){
+  document.getElementById('foto-step-preview').style.display='none';
+  document.getElementById('foto-step-camera').style.display='block';
+  _fotoDataUrl=null;
+  iniciarCamara();
+}
+
+async function enviarFoto(id, nombre, correo){
+  if(!_fotoDataUrl){ toast('No hay foto capturada','warn'); return; }
+  const btn = document.getElementById('btn-enviar-foto');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando...';
+  // Store base64 in DB (foto_url field)
+  const {error} = await supa.from('mm_solicitudes_carnet').update({foto_url:_fotoDataUrl, consentimiento_firmado:true, estado:'completado'}).eq('id',id);
+  if(error){ toast('Error al guardar foto: '+error.message,'error'); btn.disabled=false; btn.textContent='Confirmar y generar carnet'; return; }
+  // Email
+  const tarjetaUrl = `${window.location.origin}${window.location.pathname}#tarjeta?id=${id}`;
+  await callAppsScript({action:'sendEmail',to:correo,subject:'Tu carnet de Misión Médica está listo — ESE HRNO',body:`Estimado(a) ${nombre},\n\nTu carnet digital de identificación de la Misión Médica está listo.\n\nPuedes verlo y compartirlo en el siguiente enlace:\n${tarjetaUrl}\n\nEste carnet contiene un código QR que puede ser escaneado para verificar tu identidad.\n\nAtentamente,\nMisión Médica — ESE HRNO`});
+  toast('¡Carnet generado! Revisa tu correo.','success',5000);
+  cerrarFotoOverlay();
+  openTarjetaOverlay(id);
+}
+
+/* ═══════════════════════════════════════════
+   OVERLAY: TARJETA VIRTUAL
+═══════════════════════════════════════════ */
+async function openTarjetaOverlay(id){
+  const overlay = document.getElementById('overlay-tarjeta');
+  const content = document.getElementById('overlay-tarjeta-content');
+  overlay.classList.add('active');
+  content.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--muted)"><span class="spinner" style="display:inline-block;margin:auto"></span><p style="margin-top:1rem">Cargando tarjeta...</p></div>`;
+
+  const {data,error} = await supa.from('mm_solicitudes_carnet').select('*').eq('id',id).single();
+  if(error||!data||!data.foto_url){
+    content.innerHTML=`<div style="text-align:center;padding:3rem"><p style="color:var(--red)">Tarjeta no disponible.</p><button class="btn btn-secondary" onclick="cerrarTarjetaOverlay()">Cerrar</button></div>`;
+    return;
+  }
+
+  const tarjetaUrl = `${window.location.origin}${window.location.pathname}#tarjeta?id=${id}`;
+
+  content.innerHTML = `
+  <div style="max-width:440px;margin:auto">
+    <div style="text-align:center;margin-bottom:1.5rem">
+      <h1 style="font-size:1.2rem;font-weight:800">Tarjeta de <span style="color:var(--purple)">Misión Médica</span></h1>
+      <p style="color:var(--muted);font-size:.83rem">ESE Hospital Regional Noroccidental</p>
+    </div>
+
+    <!-- CARNET CARD -->
+    <div id="carnet-render" class="carnet-card" style="margin:auto auto 1.5rem">
+      <!-- Header -->
+      <div style="text-align:center;margin-bottom:1rem;padding-bottom:.75rem;border-bottom:1px solid rgba(124,29,111,.4)">
+        <div style="display:flex;align-items:center;justify-content:center;gap:.5rem;margin-bottom:.25rem">
+          <svg style="color:var(--red)" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 2h6v7h7v6h-7v7H9v-7H2v-6h7z"/></svg>
+          <span style="font-size:.65rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.7)">Misión Médica · ESE HRNO</span>
+        </div>
+        <div style="font-size:.6rem;color:rgba(255,255,255,.5);letter-spacing:.05em">Norte de Santander · Colombia</div>
+      </div>
+      <!-- Body -->
+      <div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:1rem">
+        <img src="${data.foto_url}" alt="Foto" style="width:80px;height:80px;border-radius:8px;object-fit:cover;border:2px solid var(--purple);flex-shrink:0">
+        <div style="flex:1">
+          <div style="font-size:1rem;font-weight:800;line-height:1.2;margin-bottom:.4rem">${data.nombres}<br>${data.apellidos}</div>
+          <div style="font-size:.72rem;color:rgba(255,255,255,.6);margin-bottom:.2rem">${data.cargo}</div>
+          <div style="font-size:.72rem;color:rgba(255,255,255,.5)">${data.tipo_documento}: <span style="color:rgba(255,255,255,.8)">${data.numero_documento}</span></div>
+          <div style="font-size:.72rem;color:rgba(255,255,255,.5)">Municipio: <span style="color:rgba(255,255,255,.8)">${data.municipio}</span></div>
+        </div>
+      </div>
+      <!-- Footer -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:.75rem;border-top:1px solid rgba(124,29,111,.4)">
+        <div>
+          <div style="font-size:.6rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.06em">N° Carnet</div>
+          <div style="font-size:.82rem;font-weight:700;font-family:monospace;color:var(--purple)">${data.numero_carnet}</div>
+          <div style="font-size:.62rem;color:rgba(255,255,255,.4);margin-top:.2rem">Válido institucional</div>
+        </div>
+        <div id="qr-code-container" style="background:#fff;padding:6px;border-radius:6px;width:72px;height:72px"></div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
+      <button class="btn btn-secondary btn-sm" onclick="cerrarTarjetaOverlay()">← Cerrar</button>
+      <button class="btn btn-blue btn-sm" onclick="compartirTarjeta('${tarjetaUrl}')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Compartir enlace
+      </button>
+      <button class="btn btn-green btn-sm" onclick="descargarCarnet()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Guardar imagen
+      </button>
+    </div>
+
+    <div class="card" style="background:rgba(74,111,165,.07);border-color:rgba(74,111,165,.3)">
+      <div style="font-size:.78rem;color:var(--muted);line-height:1.6">
+        <strong style="color:var(--blue)">Enlace público verificable:</strong><br>
+        <code style="font-size:.72rem;word-break:break-all;color:var(--text)">${tarjetaUrl}</code>
+      </div>
+    </div>
+  </div>`;
+
+  // Generate QR
+  setTimeout(()=>{
+    const qrEl = document.getElementById('qr-code-container');
+    if(qrEl){ try{ new QRCode(qrEl,{text:tarjetaUrl,width:60,height:60,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M}); }catch(e){} }
+  },200);
+}
+
+function cerrarTarjetaOverlay(){
+  document.getElementById('overlay-tarjeta').classList.remove('active');
+  history.pushState('','',window.location.pathname);
+}
+
+async function compartirTarjeta(url){
+  if(navigator.share){ try{ await navigator.share({title:'Mi carnet de Misión Médica',url}); return; }catch(e){} }
+  await navigator.clipboard.writeText(url).catch(()=>{});
+  toast('Enlace copiado al portapapeles','success');
+}
+
+async function descargarCarnet(){
+  const el = document.getElementById('carnet-render');
+  if(!el){ toast('No hay tarjeta para descargar','warn'); return; }
+  try{
+    const canvas = await html2canvas(el,{backgroundColor:'#1a0d26',scale:2});
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'Carnet_Mision_Medica.png';
+    a.click();
+  } catch(e){ toast('Error al generar imagen','error'); }
+}
+
+/* ═══════════════════════════════════════════
+   PRESENTACIÓN FULLSCREEN PRE/POSTEST
+═══════════════════════════════════════════ */
+function abrirPresentacion(){
+  const data = window._testData || [];
+  if(!data.length){ toast('No hay evaluaciones para presentar','warn'); return; }
+
+  const pre  = data.filter(r=>r.tipo_evaluacion==='Pretest');
+  const post = data.filter(r=>r.tipo_evaluacion==='Postest');
+  const avgPre  = pre.length  ? (pre.reduce((s,r)=>s+Number(r.porcentaje),0)/pre.length).toFixed(1)  : 0;
+  const avgPost = post.length ? (post.reduce((s,r)=>s+Number(r.porcentaje),0)/post.length).toFixed(1) : 0;
+  const mejora  = (avgPost - avgPre).toFixed(1);
+  const aprobados   = post.filter(r=>Number(r.porcentaje)>=70).length;
+  const reprobados  = post.filter(r=>Number(r.porcentaje)<70).length;
+
+  // Per-person comparison (match by document)
+  const preMap = {};
+  pre.forEach(r=>preMap[r.numero_documento]=Number(r.porcentaje));
+  const comparacion = post.filter(r=>preMap[r.numero_documento]!==undefined).map(r=>({
+    nombre: r.nombres, doc: r.numero_documento,
+    pre: preMap[r.numero_documento], post: Number(r.porcentaje),
+    mejora: (Number(r.porcentaje)-preMap[r.numero_documento]).toFixed(1)
+  }));
+
+  const el = document.getElementById('presentation-overlay');
+  const ct = document.getElementById('presentation-content');
+
+  ct.innerHTML = `
+  <!-- ROW 1: KPIs animados -->
+  <div class="grid-4" style="margin-bottom:2rem">
+    ${[
+      {label:'Promedio Pretest',  val:avgPre+'%',  color:'var(--yellow)', id:'kpi-pre'},
+      {label:'Promedio Postest',  val:avgPost+'%', color:'var(--green)',  id:'kpi-post'},
+      {label:'Mejora promedio',   val:(mejora>=0?'+':'')+mejora+'%', color:mejora>=0?'var(--green)':'var(--red)', id:'kpi-mejora'},
+      {label:'Aprobaron (≥70%)',  val:aprobados+' / '+post.length, color:'var(--blue)', id:'kpi-apro'},
+    ].map(k=>`
+      <div class="card" style="text-align:center;border-top:3px solid ${k.color};animation:fadeIn .5s ease both">
+        <div id="${k.id}" style="font-size:2.2rem;font-weight:900;color:${k.color};line-height:1">—</div>
+        <div style="font-size:.72rem;color:var(--muted);margin-top:.4rem;text-transform:uppercase;letter-spacing:.05em">${k.label}</div>
+      </div>
+    `).join('')}
+  </div>
+
+  <!-- ROW 2: Gráficas -->
+  <div class="grid-2" style="margin-bottom:2rem">
+    <div class="card">
+      <div class="card-header">Comparación Pre vs Post por persona</div>
+      <div style="position:relative;height:300px"><canvas id="pres-chart-compare"></canvas></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;gap:1rem;flex-direction:column;height:100%">
+        <div>
+          <div class="card-header">Aprobación postest</div>
+          <div style="position:relative;height:180px"><canvas id="pres-chart-pie"></canvas></div>
+        </div>
+        <div>
+          <div class="card-header">Distribución de notas (postest)</div>
+          <div style="position:relative;height:120px"><canvas id="pres-chart-dist"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3: Tabla semaforo -->
+  <div class="card">
+    <div class="card-header">Detalle por participante — Postest</div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th>#</th><th>Nombre</th><th>Pretest %</th><th>Postest %</th><th>Mejora</th><th>Estado</th></tr></thead>
+        <tbody>
+          ${post.map((r,i)=>{
+            const pre_ = preMap[r.numero_documento];
+            const dif  = pre_!==undefined ? (Number(r.porcentaje)-pre_).toFixed(1) : null;
+            const apro = Number(r.porcentaje)>=70;
+            return `<tr>
+              <td style="color:var(--muted)">${i+1}</td>
+              <td style="font-weight:600">${r.nombres}</td>
+              <td style="color:var(--yellow)">${pre_!==undefined?pre_+'%':'—'}</td>
+              <td style="font-weight:700;color:${apro?'var(--green)':'var(--red)'}">${r.porcentaje}%</td>
+              <td style="color:${dif===null?'var(--muted)':Number(dif)>=0?'var(--green)':'var(--red)'}">${dif===null?'—':(Number(dif)>=0?'+':'')+dif+'%'}</td>
+              <td><span class="badge ${apro?'badge-green':'badge-red'}">${apro?'✓ Aprobado':'✗ Refuerzo'}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+
+  el.classList.add('active');
+
+  // Animate KPIs
+  setTimeout(()=>{
+    animateCounter('kpi-pre',  0, parseFloat(avgPre),  1500, '%');
+    animateCounter('kpi-post', 0, parseFloat(avgPost), 1800, '%');
+    animateCounter('kpi-mejora', 0, parseFloat(Math.abs(mejora)), 2000, '%', mejora>=0?'+':'-');
+    document.getElementById('kpi-apro').textContent = aprobados+' / '+post.length;
+  }, 300);
+
+  // Charts
+  const baseOpts = {responsive:true,maintainAspectRatio:false,animation:{duration:1200,easing:'easeOutQuart'},plugins:{legend:{labels:{color:'#8b949e',font:{size:11}}}},scales:{x:{ticks:{color:'#8b949e'},grid:{color:'#21262d'}},y:{ticks:{color:'#8b949e'},grid:{color:'#21262d'},beginAtZero:true,max:100}}};
+
+  setTimeout(()=>{
+    // Comparison chart (pre vs post per person)
+    if(comparacion.length){
+      destroyChart('presCompare');
+      S.chartRefs.presCompare = new Chart(document.getElementById('pres-chart-compare'),{
+        type:'bar',
+        data:{
+          labels: comparacion.map(c=>c.nombre.split(' ')[0]),
+          datasets:[
+            {label:'Pretest %',data:comparacion.map(c=>c.pre),backgroundColor:'rgba(255,180,50,.7)',borderRadius:4},
+            {label:'Postest %',data:comparacion.map(c=>c.post),backgroundColor:'rgba(56,199,147,.7)',borderRadius:4}
+          ]
+        },
+        options:{...baseOpts}
+      });
+    } else if(post.length){
+      destroyChart('presCompare');
+      S.chartRefs.presCompare = new Chart(document.getElementById('pres-chart-compare'),{
+        type:'bar',
+        data:{labels:post.map(r=>r.nombres.split(' ')[0]),datasets:[{label:'Postest %',data:post.map(r=>Number(r.porcentaje)),backgroundColor:post.map(r=>Number(r.porcentaje)>=70?'rgba(56,199,147,.8)':'rgba(233,69,96,.8)'),borderRadius:4}]},
+        options:{...baseOpts}
+      });
+    }
+
+    // Pie
+    destroyChart('presPie');
+    S.chartRefs.presPie = new Chart(document.getElementById('pres-chart-pie'),{
+      type:'doughnut',
+      data:{labels:['Aprobados','Requieren refuerzo'],datasets:[{data:[aprobados,reprobados],backgroundColor:['#38c793','#e94560'],borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:1200},plugins:{legend:{position:'bottom',labels:{color:'#8b949e',font:{size:11}}}}}
+    });
+
+    // Distribution
+    const bins=[{l:'<50%',min:0,max:50},{l:'50-69%',min:50,max:70},{l:'70-84%',min:70,max:85},{l:'85-100%',min:85,max:101}];
+    destroyChart('presDist');
+    S.chartRefs.presDist = new Chart(document.getElementById('pres-chart-dist'),{
+      type:'bar',
+      data:{
+        labels:bins.map(b=>b.l),
+        datasets:[{label:'Personas',data:bins.map(b=>post.filter(r=>Number(r.porcentaje)>=b.min&&Number(r.porcentaje)<b.max).length),backgroundColor:['#e94560','#ffb432','#4a6fa5','#38c793'],borderRadius:4}]
+      },
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:1200},plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b949e'},grid:{color:'#21262d'}},y:{ticks:{color:'#8b949e',stepSize:1},grid:{color:'#21262d'},beginAtZero:true}}}
+    });
+  }, 400);
+}
+
+function closePresentacion(){
+  document.getElementById('presentation-overlay').classList.remove('active');
+  destroyChart('presCompare'); destroyChart('presPie'); destroyChart('presDist');
+}
+
+function animateCounter(id, from, to, duration, suffix='', prefix=''){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const start = performance.now();
+  const step = (now)=>{
+    const progress = Math.min((now-start)/duration,1);
+    const ease = 1-Math.pow(1-progress,3);
+    const val = from + (to-from)*ease;
+    el.textContent = prefix + val.toFixed(1) + suffix;
+    if(progress<1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+/* ═══════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', ()=>{
+  renderInicio();
+  handleRoute();
+});
+window.addEventListener('hashchange', handleRoute);
+
+function handleRoute(){
+  const hash = window.location.hash;
+  if(hash.startsWith('#foto')){
+    const id = new URLSearchParams(hash.slice(5)).get('id');
+    if(id) openFotoOverlay(id);
+  } else if(hash.startsWith('#tarjeta')){
+    const id = new URLSearchParams(hash.slice(8)).get('id');
+    if(id) openTarjetaOverlay(id);
+  } else {
+    document.getElementById('overlay-foto').classList.remove('active');
+    document.getElementById('overlay-tarjeta').classList.remove('active');
+  }
+}
+</script>
+</body>
+</html>

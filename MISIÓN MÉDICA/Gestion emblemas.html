@@ -1,0 +1,491 @@
+<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gestión Misión Médica - V4.3 Mobile Optimized</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .tab-active { border-bottom: 2px solid #ef4444; color: #ef4444; }
+        .spinner { border: 3px solid rgba(0,0,0,0.1); border-left-color: #ef4444; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .selection-card:hover { transform: translateY(-5px); transition: all 0.3s ease; }
+        
+        /* OPTIMIZACIÓN MÓVIL PARA BANNERS: 
+           height: auto permite que la imagen crezca/encoja según el ancho sin deformarse.
+           object-fit: contain asegura que se vea toda la imagen sin recortes. */
+        .banner-img { 
+            width: 100%; 
+            border-radius: 1.5rem 1.5rem 0 0; 
+            object-fit: contain; 
+            height: auto; 
+            display: block;
+        }
+
+        /* Ajustes específicos para inputs en móvil para evitar zoom automático en iOS */
+        @media (max-width: 640px) {
+            input, select, textarea { font-size: 16px !important; }
+        }
+    </style>
+
+
+
+    <script>
+        // URL original mantenida intacta
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx-CD6xVE3hcUYXqUxaj1mEaqNGITvajMSYeM9tzBLc1yFQrfhTZx9ghxUZ1FJ-ErAtmw/exec"; 
+    </script>
+
+    <nav class="bg-white shadow-sm sticky top-0 z-50 transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2 shrink-0">
+                    <i data-lucide="cross" class="text-red-600 w-6 h-6 sm:w-8 sm:h-8"></i>
+                    
+                    <span class="font-bold text-lg sm:text-xl tracking-tight truncate max-w-[150px] sm:max-w-none">Misión Médica</span>
+                </div>
+                <div class="flex space-x-2 sm:space-x-4">
+                    <button onclick="switchTab('public')" id="nav-public" class="px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium tab-active flex items-center gap-1 transition-colors">
+                        <i data-lucide="file-text" class="w-4 h-4"></i> <span class="hidden sm:inline">Solicitudes</span><span class="sm:hidden">Form</span>
+                    </button>
+                    <button onclick="switchTab('admin')" id="nav-admin" class="px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-slate-500 hover:text-red-600 flex items-center gap-1 transition-colors">
+                        <i data-lucide="shield-check" class="w-4 h-4"></i> <span class="hidden sm:inline">Administración</span><span class="sm:hidden">Admin</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 sm:py-8">
+        
+        <div id="view-public" class="space-y-6 sm:space-y-8">
+            <div id="public-selector" class="max-w-4xl mx-auto animate-in fade-in duration-500">
+                
+                <div class="mb-6 sm:mb-10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg border border-slate-200 bg-white">
+                    <img src="https://res.cloudinary.com/dj7qylkqh/image/upload/v1769545405/A%C3%B1adir_un_t%C3%ADtulo_4_ivlcia.png" alt="Banner Principal" class="w-full h-auto object-contain" onerror="this.src='https://placehold.co/1200x300/f8fafc/64748b?text=Portal+de+Gestión+Institucional'" loading="lazy">
+                </div>
+
+                <div class="text-center mb-6 sm:mb-10 px-2">
+                    <h1 class="text-2xl sm:text-4xl font-extrabold text-slate-800 tracking-tight leading-tight">Portal de Gestión Institucional</h1>
+                    <p class="text-slate-500 mt-2 sm:mt-3 text-sm sm:text-lg">ESE Hospital Regional Noroccidental</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
+                    
+                    <button onclick="showForm('tarjeta')" class="selection-card group bg-white p-6 sm:p-8 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 text-left hover:shadow-xl transition-all w-full">
+                        <div class="bg-red-100 w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl flex items-center justify-center text-red-600 mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
+                            <i data-lucide="contact-2" class="w-6 h-6 sm:w-8 sm:h-8"></i>
+                        </div>
+                        <h3 class="text-lg sm:text-2xl font-bold mb-2">Tarjetas de Identidad</h3>
+                        <p class="text-sm sm:text-base text-slate-500">Trámite oficial de identificación institucional.</p>
+                        <div class="mt-4 sm:mt-6 flex items-center text-red-600 font-bold gap-2 text-sm sm:text-base">Comenzar <i data-lucide="arrow-right" class="w-4 h-4"></i></div>
+                    </button>
+
+                    
+                    <button onclick="showForm('emblema')" class="selection-card group bg-white p-6 sm:p-8 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-100 text-left hover:shadow-xl transition-all w-full">
+                        <div class="bg-blue-100 w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl flex items-center justify-center text-blue-600 mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
+                            <i data-lucide="shield" class="w-6 h-6 sm:w-8 sm:h-8"></i>
+                        </div>
+                        <h3 class="text-lg sm:text-2xl font-bold mb-2">Solicitud de Emblemas</h3>
+                        <p class="text-sm sm:text-base text-slate-500">Elementos protectores (Banderas, Chalecos, Petos).</p>
+                        <div class="mt-4 sm:mt-6 flex items-center text-blue-600 font-bold gap-2 text-sm sm:text-base">Comenzar <i data-lucide="arrow-right" class="w-4 h-4"></i></div>
+                    </button>
+                </div>
+            </div>
+
+            <div id="forms-container" class="hidden max-w-4xl mx-auto">
+                <button onclick="returnToSelector()" class="mb-4 sm:mb-6 flex items-center gap-2 text-slate-500 hover:text-slate-800 font-medium text-sm sm:text-base p-2 -ml-2"><i data-lucide="chevron-left" class="w-5 h-5"></i> Volver</button>
+                
+                <section id="section-tarjeta" class="hidden bg-white rounded-2xl sm:rounded-3xl shadow-xl sm:shadow-2xl overflow-hidden border border-slate-100">
+                    
+                    <img src="https://res.cloudinary.com/dj7qylkqh/image/upload/v1769545554/A%C3%B1adir_un_t%C3%ADtulo_5_edv7cm.png" alt="Banner Misión Médica" class="banner-img" loading="lazy">
+                    <div class="p-5 sm:p-8">
+                        <h2 class="text-xl sm:text-2xl font-bold mb-6 sm:mb-8 text-slate-800 border-b pb-4">Nueva Solicitud de Tarjeta</h2>
+                        <form id="form-tarjeta" class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6" onsubmit="handleFormSubmit(event, 'tarjeta')">
+                            
+                            <div>
+                                <label class="block text-xs font-bold text-slate-400 uppercase">1. Fecha de Solicitud</label>
+                                <input type="date" id="fecha-actual-tarjeta" name="fecha_solicitud" readonly="" class="w-full mt-1 p-3 bg-slate-100 rounded-xl ring-1 ring-slate-200 cursor-not-allowed">
+                            </div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">2. Nombre Completo</label><input type="text" name="nombre" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">3. Documento de Identidad</label><input type="number" name="documento" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">4. Perfil o Profesión</label><input type="text" name="perfil" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">5. Cargo</label><input type="text" name="cargo" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">6. Municipio</label>
+                                <select name="municipio" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200">
+                                    <option value="Abrego">Ábrego</option><option value="El Carmen">El Carmen</option><option value="Convencion">Convención</option><option value="Teorama">Teorama</option>
+                                </select>
+                            </div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">7. IPS</label>
+                                <select name="ips" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200 text-sm">
+                                    <option value="">Seleccione una opción</option>
+                                    <option value="IPS Ábrego">IPS Ábrego</option><option value="IPS Convención">IPS Convención</option>
+                                    <option value="IPS El Carmen">IPS El Carmen</option><option value="IPS Guamalito">IPS Guamalito</option>
+                                    <option value="IPS San Pablo">IPS San Pablo</option><option value="PS La Trinidad">PS La Trinidad</option>
+                                    <option value="PS Cartagenita">PS Cartagenita</option><option value="PS Aserrío">PS Aserrío</option>
+                                    <option value="PS Casitas">PS Casitas</option><option value="PS Capitanlargo">PS Capitanlargo</option>
+                                </select>
+                            </div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">8. Fecha de Nacimiento</label><input type="date" name="fecha_nacimiento" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">9. Sexo</label>
+                                <select name="sexo" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200">
+                                    <option value="Masculino">Masculino</option><option value="Femenino">Femenino</option>
+                                </select>
+                            </div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">10. Vinculación</label>
+                                <select name="vinculacion" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200">
+                                    <option value="Nómina">Nómina</option><option value="SSO">SSO</option>
+                                    <option value="OPS">OPS</option><option value="Contrato Sindical">Contrato Sindical</option>
+                                    <option value="Otro">Otro</option>
+                                </select>
+                            </div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">11. Teléfono</label><input type="tel" name="telefono" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">12. Correo Electrónico</label><input type="email" name="email" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">13. Grupo Sanguíneo y RH</label>
+                                <select name="rh" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200">
+                                    <option value="A+">A+</option><option value="A-">A-</option>
+                                    <option value="B+">B+</option><option value="B-">B-</option>
+                                    <option value="O+">O+</option><option value="O-">O-</option>
+                                    <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                                </select>
+                            </div>
+                            <div><label class="block text-xs font-bold text-slate-400 uppercase">14. Estatura (cms)</label><input type="number" name="estatura" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div class="md:col-span-2"><label class="block text-xs font-bold text-slate-400 uppercase">15. Responsable de la Solicitud</label>
+                                <select name="responsable" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200 text-sm">
+                                    <option value="Mónica Quintero Pérez - IPS San Pablo">Mónica Quintero Pérez - IPS San Pablo</option>
+                                    <option value="Jesus Evelio Ríos - IPS Convención">Jesus Evelio Ríos - IPS Convención</option>
+                                    <option value="Danilo Torrado Blanco - IPS Ábrego">Danilo Torrado Blanco - IPS Ábrego</option>
+                                    <option value="Zayde Quintero - IPS El Carmen">Zayde Quintero - IPS El Carmen</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2 border-2 border-dashed border-slate-200 rounded-2xl p-4 sm:p-6 text-center bg-slate-50">
+                                <label class="block text-sm font-bold text-slate-600 mb-2">16. Documento PDF (Ambas caras, máx 10MB)</label>
+                                <input type="file" id="file-input-tarjeta" accept=".pdf" required="" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-red-50 file:text-red-700">
+                            </div>
+                            <button type="submit" class="md:col-span-2 bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-3 mt-2 active:scale-95">
+                                <span>Enviar Solicitud Final</span>
+                                <div id="loader-tarjeta" class="hidden"><div class="spinner !border-white !w-4 !h-4"></div></div>
+                            </button>
+                        </form>
+                    </div>
+                </section>
+
+                <section id="section-emblema" class="hidden bg-white rounded-2xl sm:rounded-3xl shadow-xl sm:shadow-2xl overflow-hidden border border-slate-100">
+                    
+                    <img src="https://res.cloudinary.com/dj7qylkqh/image/upload/v1769542819/A%C3%B1adir_un_t%C3%ADtulo_2_lq4p3b.png" alt="Banner Misión Médica" class="banner-img" loading="lazy">
+                    <div class="p-5 sm:p-8">
+                        <h2 class="text-xl sm:text-2xl font-bold mb-6 sm:mb-8 text-slate-800 border-b pb-4">Solicitud de Emblemas</h2>
+                        <form id="form-emblema" class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6" onsubmit="handleFormSubmit(event, 'emblema')">
+                            <div><label class="block text-xs font-bold text-slate-500 uppercase">Nombre Completo</label><input type="text" name="nombre" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div><label class="block text-xs font-bold text-slate-500 uppercase">Documento</label><input type="number" name="documento" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div><label class="block text-xs font-bold text-slate-500 uppercase">Correo</label><input type="email" name="email" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div><label class="block text-xs font-bold text-slate-500 uppercase">Teléfono</label><input type="tel" name="telefono" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200"></div>
+                            <div><label class="block text-xs font-bold text-slate-500 uppercase">Municipio</label>
+                                <select name="municipio" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200">
+                                    <option value="Abrego">Ábrego</option><option value="El Carmen">El Carmen</option><option value="Convencion">Convención</option><option value="Teorama">Teorama</option>
+                                </select>
+                            </div>
+                            <div><label class="block text-xs font-bold text-slate-500 uppercase">IPS</label>
+                                <select name="ips" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200 text-sm">
+                                    <option value="">Seleccione una opción</option>
+                                    <option value="IPS Ábrego">IPS Ábrego</option><option value="IPS Convención">IPS Convención</option>
+                                    <option value="IPS El Carmen">IPS El Carmen</option><option value="IPS Guamalito">IPS Guamalito</option>
+                                    <option value="IPS San Pablo">IPS San Pablo</option><option value="PS La Trinidad">PS La Trinidad</option>
+                                    <option value="PS Cartagenita">PS Cartagenita</option><option value="PS Aserrío">PS Aserrío</option>
+                                    <option value="PS Casitas">PS Casitas</option><option value="PS Capitanlargo">PS Capitanlargo</option>
+                                </select>
+                            </div>
+                            <div><label class="block text-xs font-bold text-slate-500 uppercase">Tipo de Emblema</label>
+                                <select name="tipo_emblema" required="" class="w-full mt-1 p-3 bg-slate-50 rounded-xl ring-1 ring-slate-200">
+                                    <option value="Bandera">Bandera</option><option value="Chaleco">Chaleco</option><option value="Peto">Peto</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase">Cantidad Requerida</label>
+                                <input type="number" name="cantidad_solicitada" min="1" value="1" required="" class="w-full mt-1 p-3 bg-blue-50 rounded-xl ring-1 ring-blue-200 text-lg font-bold">
+                            </div>
+                            <button type="submit" class="md:col-span-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl transition-all shadow-xl flex items-center justify-center gap-3 mt-2 active:scale-95">
+                                <span>Enviar Solicitud de Emblemas</span>
+                                <div id="loader-emblema" class="hidden"><div class="spinner !border-white !w-4 !h-4"></div></div>
+                            </button>
+                        </form>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <div id="view-admin" class="hidden space-y-8">
+            <div id="admin-login" class="max-w-md mx-auto bg-white p-6 sm:p-10 rounded-3xl shadow-2xl border border-slate-100 text-center">
+                <h2 class="text-2xl font-bold mb-8">Acceso Administración</h2>
+                <input type="password" id="admin-pass" placeholder="Contraseña" class="w-full p-4 mb-4 bg-slate-50 rounded-2xl outline-none ring-1 ring-slate-200 text-center">
+                <button onclick="loginAdmin()" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-colors">Ingresar</button>
+            </div>
+
+            <div id="admin-dashboard" class="hidden animate-in fade-in duration-700">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
+                    <div class="lg:col-span-1 bg-white p-5 sm:p-6 rounded-3xl shadow-sm border border-slate-100 h-fit lg:sticky lg:top-24">
+                        <h3 class="font-bold text-lg mb-6 flex items-center gap-2"><i data-lucide="package" class="text-emerald-500"></i> Stock en Excel</h3>
+                        
+                        <div class="max-w-[200px] mx-auto lg:max-w-none">
+                             <canvas id="inventoryChart" class="mb-8"></canvas>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                <span class="text-xs font-black uppercase">Banderas</span>
+                                <input type="number" id="inv-banderas" class="w-14 text-center bg-transparent font-black text-emerald-600" value="0">
+                            </div>
+                            <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                <span class="text-xs font-black uppercase">Chalecos</span>
+                                <input type="number" id="inv-chalecos" class="w-14 text-center bg-transparent font-black text-blue-600" value="0">
+                            </div>
+                            <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                <span class="text-xs font-black uppercase">Petos</span>
+                                <input type="number" id="inv-petos" class="w-14 text-center bg-transparent font-black text-orange-600" value="0">
+                            </div>
+                            <button onclick="saveInventoryToExcel()" class="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-lg active:scale-95 transition-transform">
+                                <i data-lucide="save" class="w-4 h-4"></i> Actualizar en Excel
+                            </button>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-3 bg-white p-4 sm:p-8 rounded-3xl shadow-sm border border-slate-100 overflow-x-auto">
+                        <div class="flex justify-between items-center mb-6 sm:mb-8">
+                            <div><h2 class="text-xl sm:text-2xl font-extrabold text-slate-800">Gestión de Trámites</h2><p class="text-slate-400 text-xs mt-1">Sincronizado</p></div>
+                            <button onclick="fetchAdminData()" class="p-3 bg-slate-100 text-slate-500 rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors"><i data-lucide="rotate-ccw" class="w-5 h-5"></i></button>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left whitespace-nowrap">
+                                <thead class="bg-slate-50/50">
+                                    <tr class="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400 tracking-tighter">
+                                        <th class="p-2 sm:p-4">Solicitante</th><th class="p-2 sm:p-4">Tipo Trámite</th><th class="p-2 sm:p-4">Elemento (Col I)</th><th class="p-2 sm:p-4">Cant. (Sol/Aut)</th><th class="p-2 sm:p-4">Estado</th><th class="p-2 sm:p-4 text-right">Gestión</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="requests-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    
+    <div id="toast" class="hidden fixed bottom-4 left-4 right-4 sm:left-auto sm:right-8 sm:bottom-8 glass border p-4 sm:p-5 rounded-xl sm:rounded-2xl shadow-2xl flex items-center gap-4 z-[100] border-slate-200 animate-in slide-in-from-bottom duration-300">
+        <div id="toast-icon" class="p-2 rounded-xl text-white shrink-0"></div>
+        <p id="toast-msg" class="font-bold text-slate-700 text-xs sm:text-sm"></p>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        let inventoryChart = null;
+
+        window.onload = function() {
+            const today = new Date().toISOString().split('T')[0];
+            const inputFecha = document.getElementById('fecha-actual-tarjeta');
+            if(inputFecha) inputFecha.value = today;
+        };
+
+        function switchTab(tab) {
+            document.getElementById('view-public').classList.toggle('hidden', tab !== 'public');
+            document.getElementById('view-admin').classList.toggle('hidden', tab !== 'admin');
+            
+            // Actualización responsive de clases para pestañas
+            const commonClasses = "px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium flex items-center gap-1 transition-colors";
+            const activeClasses = `${commonClasses} tab-active`;
+            const inactiveClasses = `${commonClasses} text-slate-500 hover:text-red-600`;
+
+            document.getElementById('nav-public').className = tab === 'public' ? activeClasses : inactiveClasses;
+            document.getElementById('nav-admin').className = tab === 'admin' ? activeClasses : inactiveClasses;
+            
+            if (tab === 'public') returnToSelector();
+        }
+
+        function showForm(type) {
+            document.getElementById('public-selector').classList.add('hidden');
+            document.getElementById('forms-container').classList.remove('hidden');
+            document.getElementById('section-tarjeta').classList.toggle('hidden', type !== 'tarjeta');
+            document.getElementById('section-emblema').classList.toggle('hidden', type !== 'emblema');
+            // Scroll al inicio del formulario en móvil
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function returnToSelector() {
+            document.getElementById('public-selector').classList.remove('hidden');
+            document.getElementById('forms-container').classList.add('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function loginAdmin() {
+            if(document.getElementById('admin-pass').value === 'MM.contrasenna.2026') {
+                document.getElementById('admin-login').classList.add('hidden');
+                document.getElementById('admin-dashboard').classList.remove('hidden');
+                initCharts();
+                syncInventoryFromExcel();
+                fetchAdminData();
+            } else { showToast('Contraseña incorrecta', 'error'); }
+        }
+
+        async function syncInventoryFromExcel() {
+            try {
+                // Agregamos Date.now() para evitar caché
+                const response = await fetch(`${WEB_APP_URL}?action=getInventory&t=${Date.now()}`);
+                const stock = await response.json();
+                
+                // Aseguramos que son números
+                const banderas = parseInt(stock.banderas) || 0;
+                const chalecos = parseInt(stock.chalecos) || 0;
+                const petos = parseInt(stock.petos) || 0;
+
+                document.getElementById('inv-banderas').value = banderas;
+                document.getElementById('inv-chalecos').value = chalecos;
+                document.getElementById('inv-petos').value = petos;
+                updateInventoryVisual();
+            } catch (e) { console.error("Error stock sync", e); }
+        }
+
+        async function saveInventoryToExcel() {
+            const data = {
+                action: 'updateInventory',
+                banderas: document.getElementById('inv-banderas').value,
+                chalecos: document.getElementById('inv-chalecos').value,
+                petos: document.getElementById('inv-petos').value
+            };
+            try {
+                await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
+                showToast("Stock actualizado en Excel", "success");
+                setTimeout(syncInventoryFromExcel, 1000);
+            } catch (e) { showToast("Error al guardar stock", "error"); }
+        }
+
+        async function fetchAdminData() {
+            const container = document.getElementById('requests-body');
+            container.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-slate-400">Consultando base de datos...</td></tr>';
+            try {
+                // Anti-cache param
+                const response = await fetch(`${WEB_APP_URL}?action=getData&t=${Date.now()}`);
+                const data = await response.json();
+                if(!data || data.length === 0) {
+                    container.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-slate-300">No hay solicitudes.</td></tr>';
+                    return;
+                }
+                container.innerHTML = data.map(req => {
+                    const isE = req.tipo === 'Emblema';
+                    const itemE = isE ? (req.tipo_emblema || 'NO ESPECIFICADO') : '-';
+                    // Optimizacion: padding reducido en celdas para móviles (p-2 sm:p-4)
+                    return `
+                    <tr class="border-b border-slate-50 hover:bg-slate-50/80 transition-colors">
+                        <td class="p-2 sm:p-4"><div class="font-black text-slate-800 text-sm sm:text-base">${req.nombre}</div><div class="text-[10px] text-slate-400 font-bold">CC: ${req.documento}</div></td>
+                        <td class="p-2 sm:p-4"><span class="px-2 py-0.5 rounded text-[10px] font-black uppercase ${!isE ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}">${req.tipo}</span></td>
+                        <td class="p-2 sm:p-4"><span class="text-[10px] font-black uppercase text-slate-600 italic underline decoration-slate-300">${itemE}</span></td>
+                        <td class="p-2 sm:p-4 text-center">
+                            ${isE && req.estado === 'Pendiente' ? `
+                                <div class="flex flex-col gap-1 items-center">
+                                    <div class="text-[9px] text-slate-400 font-bold uppercase">S: ${req.cantidad_solicitada || 1} / A:</div>
+                                    <input type="number" id="aut-${req.documento}" class="w-14 p-1 text-xs border-2 border-blue-100 rounded-lg text-center font-black" value="${req.cantidad_solicitada || 1}">
+                                </div>
+                            ` : `<div class="text-[11px] font-bold text-slate-500">${isE ? `S: ${req.cantidad_solicitada} / A: ${req.cantidad_autorizada}` : 'N/A'}</div>`}
+                        </td>
+                        <td class="p-2 sm:p-4"><span class="px-2 py-1 rounded-full text-[9px] font-black uppercase ${req.estado === 'Pendiente' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}">${req.estado}</span></td>
+                        <td class="p-2 sm:p-4 text-right">
+                            ${req.estado === 'Pendiente' ? `
+                                <div class="flex justify-end gap-2">
+                                    <button onclick="processRequest('${req.documento}', 'Aceptado', '${req.tipo}')" class="bg-emerald-50 text-emerald-600 p-2 rounded-lg sm:rounded-xl hover:bg-emerald-600 hover:text-white shadow-sm transition-all"><i data-lucide="check" class="w-4 h-4"></i></button>
+                                    <button onclick="processRequest('${req.documento}', 'Negado', '${req.tipo}')" class="bg-red-50 text-red-600 p-2 rounded-lg sm:rounded-xl hover:bg-red-600 hover:text-white shadow-sm transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                </div>
+                            ` : '<i data-lucide="check-check" class="w-5 h-5 text-slate-300 ml-auto"></i>'}
+                        </td>
+                    </tr>`;
+                }).join('');
+                lucide.createIcons();
+            } catch (err) { container.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-red-400 font-bold">Error de conexión con Excel.</td></tr>'; }
+        }
+
+        async function processRequest(doc, status, type) {
+            let payload = { action: 'updateStatus', documento: doc, status: status, type: type };
+            if (type === 'Emblema' && status === 'Aceptado') {
+                payload.cantidad_autorizada = document.getElementById(`aut-${doc}`).value;
+            }
+            try {
+                await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                showToast(`Solicitud ${status} correctamente`, "success");
+                // Esperamos un poco más para asegurar que Apps Script procesó
+                setTimeout(() => { fetchAdminData(); syncInventoryFromExcel(); }, 2000);
+            } catch (e) { showToast("Error de servidor", "error"); }
+        }
+
+        async function handleFormSubmit(event, type) {
+            event.preventDefault();
+            const form = event.target;
+            const btn = form.querySelector('button[type="submit"]');
+            const loader = document.getElementById(`loader-${type}`);
+            let fileData = null;
+            if (type === 'tarjeta') {
+                const fileInput = document.getElementById('file-input-tarjeta');
+                const file = fileInput.files[0];
+                if (file) {
+                    if (file.size > 10 * 1024 * 1024) return showToast("PDF excede 10MB", "error");
+                    fileData = await readFileAsBase64(file);
+                }
+            }
+            btn.disabled = true;
+            loader.classList.remove('hidden');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            data.action = type === 'tarjeta' ? 'uploadCard' : 'requestEmblem';
+            if(fileData) data.file = fileData;
+            try {
+                await fetch(WEB_APP_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
+                showToast("Solicitud Enviada con Éxito", "success");
+                form.reset();
+                setTimeout(returnToSelector, 2000);
+            } catch (err) { showToast("Error en el envío", "error"); }
+            finally { btn.disabled = false; loader.classList.add('hidden'); }
+        }
+
+        function readFileAsBase64(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve({ base64: reader.result.split(',')[1], name: file.name, mimeType: file.type });
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function initCharts() {
+            const ctx = document.getElementById('inventoryChart').getContext('2d');
+            if(inventoryChart) inventoryChart.destroy();
+            inventoryChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Banderas', 'Chalecos', 'Petos'],
+                    datasets: [{ data: [0, 0, 0], backgroundColor: ['#10b981', '#3b82f6', '#f59e0b'], borderWidth: 8, borderColor: '#ffffff' }]
+                },
+                options: { cutout: '80%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { size: 10, weight: 'bold' } } } } }
+            });
+        }
+
+        function updateInventoryVisual() {
+            const b = parseInt(document.getElementById('inv-banderas').value) || 0;
+            const c = parseInt(document.getElementById('inv-chalecos').value) || 0;
+            const p = parseInt(document.getElementById('inv-petos').value) || 0;
+            inventoryChart.data.datasets[0].data = [b, c, p];
+            inventoryChart.update();
+        }
+
+        function showToast(msg, type) {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-msg');
+            const iconEl = document.getElementById('toast-icon');
+
+            msgEl.innerText = msg;
+            iconEl.className = `p-2 rounded-xl text-white ${type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`;
+            iconEl.innerHTML = `<i data-lucide="${type === 'success' ? 'check' : 'alert-circle'}"></i>`;
+            lucide.createIcons();
+
+            // Mostramos el toast quitando 'hidden'
+            toast.classList.remove('hidden');
+            
+            // Timeout para ocultarlo limpiamente
+            setTimeout(() => { 
+                toast.classList.add('hidden'); 
+            }, 4000);
+        }
+    </script>

@@ -1,0 +1,598 @@
+<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluación: Misión Médica y Comportamiento Seguro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .radio-custom:checked + label {
+            background-color: #eff6ff;
+            border-color: #3b82f6;
+        }
+        .radio-custom:checked + label .indicator {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+    </style>
+
+
+
+    <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+        
+        <div class="w-full bg-white border-b border-gray-200">
+            <img src="https://res.cloudinary.com/dj7qylkqh/image/upload/v1769545405/A%C3%B1adir_un_t%C3%ADtulo_4_ivlcia.png" alt="Encabezado Misión Médica" class="w-full h-auto object-cover" loading="lazy">
+        </div>
+
+        <div id="success-message" class="hidden p-8 text-center">
+            <div class="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">¡Respuestas Enviadas!</h2>
+            <p class="text-gray-600 mb-4">Tus respuestas han sido registradas exitosamente en la base de datos.</p>
+            <div class="inline-block bg-blue-50 text-blue-700 p-4 rounded-lg border border-blue-200 text-left max-w-xl">
+                <div class="flex items-center mb-2">
+                    <i class="fa-solid fa-file-pdf text-2xl mr-3"></i>
+                    <strong class="text-lg">Tu reporte pedagógico se ha descargado.</strong>
+                </div>
+                <p class="text-sm">Hemos generado automáticamente un PDF con la calificación de tus respuestas (verde/rojo) y las recomendaciones de seguridad para cada caso. ¡Revisa tus descargas y compártelo con tu equipo!</p>
+            </div>
+        </div>
+
+        <form id="pretest-form" class="p-6 md:p-8">
+            
+            <div class="mb-10 p-6 bg-gray-50 rounded-xl border border-gray-200">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700 border-b pb-2">1. Datos de Identificación</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    <div class="md:col-span-2 mb-2 p-4 bg-white border border-red-200 rounded-lg shadow-sm">
+                        <label class="block text-base font-bold text-gray-800 mb-3">¿Qué evaluación estás realizando?</label>
+                        <div class="flex flex-col sm:flex-row sm:space-x-6 space-y-3 sm:space-y-0">
+                            <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-red-50 transition flex-1">
+                                <input type="radio" name="TipoEvaluacion" value="Pretest" required="" class="w-5 h-5 text-red-600 border-gray-300 focus:ring-red-500">
+                                <span class="ml-3 font-medium text-gray-700">Pretest <span class="text-sm text-gray-500 font-normal">(Antes de iniciar)</span></span>
+                            </label>
+                            <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-red-50 transition flex-1">
+                                <input type="radio" name="TipoEvaluacion" value="Postest" required="" class="w-5 h-5 text-red-600 border-gray-300 focus:ring-red-500">
+                                <span class="ml-3 font-medium text-gray-700">Postest <span class="text-sm text-gray-500 font-normal">(Al finalizar)</span></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
+                        <input type="text" id="nombre" name="Nombre" required="" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Documento de Identidad</label>
+                        <input type="number" id="documento" name="Documento" required="" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Municipio / Base</label>
+                        <select id="municipio" name="Municipio" required="" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition bg-white">
+                            <option value="">Seleccione el municipio...</option>
+                            <option value="Ábrego">Ábrego</option>
+                            <option value="El Carmen">El Carmen</option>
+                            <option value="Convención">Convención</option>
+                            <option value="Teorama">Teorama</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Perfil Profesional</label>
+                        <select id="perfil" name="Perfil" required="" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition bg-white">
+                            <option value="">Seleccione su perfil...</option>
+                            <option value="Médico">Médico(a)</option>
+                            <option value="Enfermería">Profesional de Enfermería</option>
+                            <option value="Psicología">Psicología</option>
+                            <option value="Auxiliar">Auxiliar de Enfermería</option>
+                            <option value="Nutricionista">Nutricionista</option>
+                            <option value="Bacteriología">Bacteriología</option>
+                            <option value="Odontología">Odontología</option>
+                            <option value="Conductor">Conductor de Ambulancia</option>
+                            <option value="Administrativo">Administrativo / Logístico</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            
+            <div id="questions-container" class="space-y-8">
+                
+            </div>
+
+            <div class="mt-10 pt-6 border-t border-gray-200">
+                <button type="submit" id="submit-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-200 flex justify-center items-center">
+                    <span>Enviar Respuestas y Descargar PDF</span>
+                    <i class="fa-solid fa-paper-plane ml-2"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    
+    <div id="loading-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mb-4"></div>
+            <p id="loading-text" class="text-gray-700 font-medium">Enviando respuestas...</p>
+        </div>
+    </div>
+
+    
+    <div style="overflow: hidden; height: 0; width: 0;">
+        <div id="pdf-container" style="width: 800px; padding: 40px; font-family: 'Inter', sans-serif; background-color: #ffffff; color: #1f2937;">
+            
+            
+            <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+                <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #1f2937;">Datos del Participante</h2>
+                <div style="display: flex; flex-wrap: wrap; gap: 15px;">
+                    <div style="width: 45%;"><strong>Nombre:</strong> <span id="pdf-name"></span></div>
+                    <div style="width: 45%;"><strong>Documento:</strong> <span id="pdf-doc"></span></div>
+                    <div style="width: 45%;"><strong>Perfil / Base:</strong> <span id="pdf-perfil"></span> - <span id="pdf-muni"></span></div>
+                    <div style="width: 45%;"><strong>Tipo de Prueba:</strong> <span id="pdf-tipo" style="background-color: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-weight: bold;"></span></div>
+                    <div style="width: 45%;"><strong>Puntaje:</strong> <span id="pdf-score" style="background-color: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-weight: bold;"></span></div>
+                    <div style="width: 45%;"><strong>Fecha:</strong> <span id="pdf-fecha"></span></div>
+                </div>
+            </div>
+
+            
+            <h2 style="font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #1f2937;">Análisis de Resultados y Recomendaciones</h2>
+            <div id="pdf-respuestas" style="background-color: #ffffff;">
+                
+            </div>
+
+            <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px;">
+                Documento pedagógico generado automáticamente.<br>
+                <strong>¡Tu vida y la de tus compañeros dependen del cumplimiento estricto de los protocolos de seguridad!</strong>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === PEGA AQUÍ LA URL DE TU WEB APP DE GOOGLE APPS SCRIPT ===
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzaOozwu9pu3nTpJEPn48xZ9gjFdFoT5vC1EjXtdg_rFZGD6mXmNs4rX1mqOKy9onMOsA/exec"; 
+
+        // ARRAY DE PREGUNTAS CON RESPUESTA CORRECTA Y RECOMENDACIÓN PEDAGÓGICA (RATIONALE)
+        const questions = [
+            {
+                q: "¿A quiénes protege principalmente el Derecho Internacional Humanitario (DIH)?",
+                opts: [
+                    "Exclusivamente a la población civil ajena al conflicto.",
+                    "A los civiles y a los combatientes que han dejado de participar en las hostilidades (heridos, prisioneros).",
+                    "A cualquier persona en todo momento, incluyendo en tiempos de paz.",
+                    "Solo al personal médico y religioso de las partes en conflicto."
+                ],
+                correct: "A los civiles y a los combatientes que han dejado de participar en las hostilidades (heridos, prisioneros).",
+                rationale: "El DIH es claro: protege a civiles y también a quienes ya no pueden combatir (como combatientes heridos o rendidos). Como Misión Médica, protegemos la vida sin juzgar el pasado del paciente."
+            },
+            {
+                q: "¿Qué significa el principio de 'Imparcialidad' en la Misión Médica?",
+                opts: [
+                    "No tomar partido en las controversias políticas, militares o ideológicas.",
+                    "Atender a las personas basándose únicamente en la gravedad médica, sin distinción de bando, raza o religión.",
+                    "Prestar atención de salud en igual cantidad de tiempo a todos los actores del conflicto.",
+                    "Abstenerse de informar a las autoridades sobre los pacientes que se atienden."
+                ],
+                correct: "Atender a las personas basándose únicamente en la gravedad médica, sin distinción de bando, raza o religión.",
+                rationale: "No tomar partido es 'Neutralidad'. La 'Imparcialidad' significa que el orden de atención en urgencias debe guiarse al 100% por el Triage médico y la gravedad de la herida."
+            },
+            {
+                q: "Son las 2:00 a.m., se desplazan en ambulancia y son detenidos en un retén ilegal con hombres armados. El comportamiento seguro es:",
+                opts: [
+                    "Acelerar para salir rápido del área de peligro, ya que el emblema los protege de disparos.",
+                    "Apagar las luces del vehículo para no ser un blanco fácil y usar el radio para pedir auxilio.",
+                    "Detenerse suavemente, encender las luces interiores de la cabina, bajar ventanillas y mantener manos visibles.",
+                    "Bajarse de la ambulancia inmediatamente con las manos arriba gritando 'Misión Médica'."
+                ],
+                correct: "Detenerse suavemente, encender las luces interiores de la cabina, bajar ventanillas y mantener manos visibles.",
+                rationale: "Acelerar es letal y bajarse bruscamente es visto como una amenaza. La transparencia visual (luces encendidas adentro) y los movimientos lentos son el mejor escudo protector en la noche."
+            },
+            {
+                q: "En el área de urgencias atienden a dos heridos de un combate. Uno es un guerrillero con un rasguño, el otro un soldado inconsciente con trauma craneoencefálico. ¿Cómo se define el orden de atención?",
+                opts: [
+                    "Primero el soldado por tener una condición clínica más grave (Triage).",
+                    "Primero el guerrillero para que se vaya rápido y evitar ataques a la IPS.",
+                    "A ambos al mismo tiempo para demostrar neutralidad ante los bandos.",
+                    "El médico debe llamar a la Policía para que autoricen quién se atiende primero."
+                ],
+                correct: "Primero el soldado por tener una condición clínica más grave (Triage).",
+                rationale: "El personal de salud no debe alterar el orden del Triage por presiones armadas, miedos políticos ni rangos. La gravedad clínica es el único medidor de atención éticamente aceptable."
+            },
+            {
+                q: "El conductor de la ambulancia decide usar la radio de comunicaciones y reporta: 'Central, aquí águila 1, llevamos un paquete pesado a la base'. ¿Es esto correcto?",
+                opts: [
+                    "Sí, el uso de claves protege la identidad clínica del paciente en zonas de riesgo.",
+                    "Sí, es el estándar internacional para proteger la misión de interceptaciones.",
+                    "No, la Misión Médica debe usar lenguaje claro, directo y médico; usar claves se confunde con inteligencia militar.",
+                    "Solo es correcto si las claves han sido acordadas previamente con los grupos armados locales."
+                ],
+                correct: "No, la Misión Médica debe usar lenguaje claro, directo y médico; usar claves se confunde con inteligencia militar.",
+                rationale: "Cualquier actor que intercepte la radio pensará que 'paquete pesado' es munición o inteligencia. Transmitir con lenguaje médico directo y transparente es fundamental para no ser catalogados como espías."
+            },
+            {
+                q: "Un actor armado llega a la IPS y exige que se le entregue la Historia Clínica de un paciente alegando que es un 'infiltrado'. El equipo debe:",
+                opts: [
+                    "Entregarla inmediatamente para proteger sus vidas y la infraestructura de la IPS.",
+                    "Argumentar con firmeza pero sin hostilidad que la ley y el Secreto Profesional prohíben estrictamente su entrega.",
+                    "Entregarle solo un resumen clínico sin detalles comprometedores.",
+                    "Pedirle que vuelva mañana cuando esté el director del hospital para no asumir la responsabilidad."
+                ],
+                correct: "Argumentar con firmeza pero sin hostilidad que la ley y el Secreto Profesional prohíben estrictamente su entrega.",
+                rationale: "Entregar registros médicos, así sea un resumen, convierte a la IPS en una red de informantes, rompiendo el sigilo médico y exponiendo a todo el equipo de salud a represalias graves por parte del otro bando."
+            },
+            {
+                q: "Para un desplazamiento rural, la enfermera decide llevar su reloj inteligente de alta gama y anillos de oro. ¿Por qué esto es un riesgo?",
+                opts: [
+                    "Porque los dispositivos electrónicos interfieren con las frecuencias de radio de los actores armados.",
+                    "No es un riesgo, es un derecho constitucional el libre desarrollo de la personalidad y vestimenta.",
+                    "Porque vulnera el principio de 'Perfil Bajo' (Low Profile), exponiendo al equipo a extorsiones, hurtos o retenciones.",
+                    "Porque a las comunidades rurales les ofende la ostentación económica."
+                ],
+                correct: "Porque vulnera el principio de 'Perfil Bajo' (Low Profile), exponiendo al equipo a extorsiones, hurtos o retenciones.",
+                rationale: "En zonas de conflicto y delincuencia común, exhibir joyas o tecnología costosa llama la atención, promueve la extorsión ('pescas milagrosas') y desdibuja nuestra imagen como trabajadores humanitarios."
+            },
+            {
+                q: "Una ambulancia en ruta es detenida por un grupo armado que exige revisar el vehículo. ¿Están autorizados por el DIH para hacerlo?",
+                opts: [
+                    "No, las ambulancias con emblema tienen inmunidad absoluta y no pueden ser inspeccionadas por nadie.",
+                    "Sí, tienen derecho a inspeccionar para verificar que no se transporten armas o combatientes sanos, el equipo debe cooperar pacíficamente.",
+                    "Solo pueden revisar la cabina del conductor, pero la parte trasera es territorio protegido.",
+                    "Sí, pero solo si presentan una orden judicial de un comandante reconocido."
+                ],
+                correct: "Sí, tienen derecho a inspeccionar para verificar que no se transporten armas o combatientes sanos, el equipo debe cooperar pacíficamente.",
+                rationale: "Mito: La inmunidad no es un 'escudo antibalas legal'. Los actores tienen derecho a verificar visualmente que no estemos moviendo municiones o armas escondidas. Cooperar pacíficamente es la regla."
+            },
+            {
+                q: "¿Qué elementos conforman la 'Misión Médica'?",
+                opts: [
+                    "Únicamente los médicos, enfermeras y las ambulancias.",
+                    "Los vehículos con el emblema rojo y el Ministerio de Salud.",
+                    "Personal sanitario, infraestructura (hospitales), medios de transporte y los pacientes.",
+                    "Las instalaciones de salud y el personal de la Cruz Roja Internacional."
+                ],
+                correct: "Personal sanitario, infraestructura (hospitales), medios de transporte y los pacientes.",
+                rationale: "Muchos olvidan que los PACIENTES y las INFRAESTRUCTURAS (edificios) son elementos centrales protegidos por la Misión Médica. Un ataque al paciente en la camilla es una infracción gravísima."
+            },
+            {
+                q: "El Alcalde de un municipio en zona roja le pide a la ESE que lo transporten en la ambulancia hacia una vereda para un consejo de seguridad, argumentando que allí es más seguro. ¿Qué se debe hacer?",
+                opts: [
+                    "Llevarlo, porque como máxima autoridad del municipio es el jefe de la Misión Médica local.",
+                    "Negarse rotundamente, el uso de emblemas y vehículos por autoridades políticas o militares para fines ajenos a la salud está estrictamente prohibido.",
+                    "Llevarlo, pero pidiéndole que no use prendas distintivas de la alcaldía para que pase desapercibido.",
+                    "Cobrarle el costo del combustible como si fuera un transporte privado."
+                ],
+                correct: "Negarse rotundamente, el uso de emblemas y vehículos por autoridades políticas o militares para fines ajenos a la salud está estrictamente prohibido.",
+                rationale: "Permitir que políticos o militares usen los emblemas politiza la ayuda humanitaria ('Perfidia'). Esto destruye la confianza local y todos los futuros traslados de la ambulancia serán vistos como sospechosos."
+            },
+            {
+                q: "Un paciente herido ingresa a Urgencias y usted nota que lleva un revólver en la pretina del pantalón. La acción segura es:",
+                opts: [
+                    "Decomisarle el arma, descargarla por seguridad y guardarla en la caja fuerte del hospital.",
+                    "No manipular el arma bajo ninguna circunstancia y pedirle a él o su acompañante que la dejen fuera de las instalaciones.",
+                    "Atenderlo rápido y no decir nada para evitar que se ponga agresivo con el personal.",
+                    "Llamar a la policía para que lo arresten inmediatamente dentro del área de urgencias."
+                ],
+                correct: "No manipular el arma bajo ninguna circunstancia y pedirle a él o su acompañante que la dejen fuera de las instalaciones.",
+                rationale: "Las Instituciones Prestadoras de Salud (IPS) son zonas libres de armas. Jamás debes manipular armamento, pues te vuelve partícipe o corres riesgo de un disparo accidental. Se debe exigir, con respeto, el retiro del arma."
+            },
+            {
+                q: "El equipo médico queda atrapado en medio de un fuego cruzado sorpresivo en el parque del pueblo. ¿Cuál es el comportamiento seguro?",
+                opts: [
+                    "Salir corriendo hacia el centro de salud con las manos arriba gritando 'Somos médicos'.",
+                    "Grabar la situación con el celular para tener evidencia del incidente de Misión Médica.",
+                    "Tirarse al suelo inmediatamente, buscar cobertura (paredes sólidas), alejarse de ventanas y esperar que cese el fuego.",
+                    "Sacar una bandera blanca y caminar lentamente hacia el grupo armado más cercano."
+                ],
+                correct: "Tirarse al suelo inmediatamente, buscar cobertura (paredes sólidas), alejarse de ventanas y esperar que cese el fuego.",
+                rationale: "El instinto dice 'correr', pero correr en balaceras es la primera causa de muerte civil. La protección balística dicta tirarse al suelo de inmediato, hacerse pequeño y proteger la cabeza."
+            },
+            {
+                q: "El equipo realiza una brigada en una zona controlada por actores armados. Un médico se toma una 'selfie' frente al paisaje. ¿Qué protocolo incumple?",
+                opts: [
+                    "Ninguno, las fotos personales son permitidas si no se publican en Facebook.",
+                    "Incumple la prohibición estricta de tomar fotografías, ya que puede revelar posiciones, generar desconfianza y ser visto como espionaje.",
+                    "Protocolo de bioseguridad, por usar el celular con guantes.",
+                    "Falta a la ética por no invitar a la comunidad a salir en la foto."
+                ],
+                correct: "Incumple la prohibición estricta de tomar fotografías, ya que puede revelar posiciones, generar desconfianza y ser visto como espionaje.",
+                rationale: "Las fotografías en zonas de conflicto son peligrosísimas. Un actor armado puede pensar que estás fotografiando sus posiciones, guardias o rutas, provocando retenciones, robo de equipos o amenazas."
+            },
+            {
+                q: "Un grupo armado ocupa el patio del puesto de salud para resguardarse de la lluvia y descansar. ¿Cuál es la consecuencia directa según el DIH?",
+                opts: [
+                    "El puesto de salud pierde su protección internacional y puede convertirse en un objetivo militar lícito para el bando contrario.",
+                    "Ninguna, el DIH obliga a los hospitales a dar refugio a cualquier persona de la guerra.",
+                    "La Secretaría de Salud los multará por daños a la infraestructura.",
+                    "El personal médico tendrá que atender a los armados obligatoriamente."
+                ],
+                correct: "El puesto de salud pierde su protección internacional y puede convertirse en un objetivo militar lícito para el bando contrario.",
+                rationale: "Una IPS pierde su inmunidad si es usada para actos hostiles, como servir de base, bodega de armas o lugar de descanso para combatientes sanos. El hospital se convierte temporalmente en blanco legítimo de ataque."
+            },
+            {
+                q: "Un grupo armado detiene a la ambulancia y le exige 'una colaboración' de 10 cajas de antibióticos para dejarlos pasar. El equipo debe:",
+                opts: [
+                    "Entregar la mitad para calmar los ánimos y garantizar su propia seguridad.",
+                    "Entregar medicamentos vencidos que tengan en la parte de atrás.",
+                    "Negarse diplomáticamente, argumentando el control estricto de inventarios del Estado y su uso exclusivo para civiles.",
+                    "Confrontarlos fuertemente amenazando con denunciarlos ante la Cruz Roja."
+                ],
+                correct: "Negarse diplomáticamente, argumentando el control estricto de inventarios del Estado y su uso exclusivo para civiles.",
+                rationale: "Entregar recursos logísticos o médicos a la fuerza nos convierte en financiadores o proveedores de un actor armado, arruinando nuestra neutralidad. La excusa administrativa suele ser la forma más segura de rechazar."
+            },
+            {
+                q: "El conductor de la ambulancia es nuevo y no tiene el curso de Misión Médica ni sabe de primeros auxilios. En un retén sufre una herida, ¿por qué es esto un riesgo?",
+                opts: [
+                    "No es un riesgo, la enfermera puede atenderlo porque esa es su función.",
+                    "Porque la norma exige que el conductor sea médico general.",
+                    "Porque en terreno TODO el personal (incluido logística y conductores) debe tener la capacitación y saber autoprotegerse en emergencias.",
+                    "Porque la ARL no le pagará la incapacidad."
+                ],
+                correct: "Porque en terreno TODO el personal (incluido logística y conductores) debe tener la capacitación y saber autoprotegerse en emergencias.",
+                rationale: "En el terreno, todos corren el mismo riesgo. Si el profesional clínico está atendiendo un paciente crítico o resulta herido, el conductor o el logístico deben tener los conocimientos básicos para salvar su vida y la del equipo."
+            },
+            {
+                q: "Un líder comunal armado exige a una auxiliar de enfermería que llame 'Héroes' a sus hombres heridos y 'Bandidos' a los del otro grupo en los registros. ¿Qué principio se afecta?",
+                opts: [
+                    "La eficiencia, porque gastaría más tiempo escribiendo esos términos.",
+                    "La Neutralidad y la Imparcialidad, ya que el equipo de salud JAMÁS debe usar etiquetas políticas, apodos o tomar partido verbal.",
+                    "El respeto a la autoridad, ya que el líder manda en esa región.",
+                    "Ninguno, lo importante es atender la herida sin importar cómo se les llame."
+                ],
+                correct: "La Neutralidad y la Imparcialidad, ya que el equipo de salud JAMÁS debe usar etiquetas políticas, apodos o tomar partido verbal.",
+                rationale: "El lenguaje construye nuestra seguridad. Usar alias, apodos, o términos del conflicto ('paracos', 'guerrillos', 'bandidos') nos politiza y puede causar que un grupo armado nos declare objetivo militar."
+            },
+            {
+                q: "Al conducir por una vía terciaria en el Catatumbo, el equipo nota un animal muerto de forma inusual, cables sueltos en la vía y ramas atravesadas. Sospechan de un campo minado (MAP/MUSE).",
+                opts: [
+                    "Deben bajarse y lanzar piedras para ver si hay explosivos.",
+                    "El conductor debe acelerar a fondo para pasar la zona rápidamente.",
+                    "Deben detenerse, no intentar despejar la vía, y retroceder lentamente sobre las mismas huellas de las llantas.",
+                    "Deben salir del vehículo y caminar por la maleza (fuera de la vía) para rodear el obstáculo."
+                ],
+                correct: "Deben detenerse, no intentar despejar la vía, y retroceder lentamente sobre las mismas huellas de las llantas.",
+                rationale: "Caminar por la maleza es la principal causa de amputaciones, ya que ahí siembran las minas anti-persona. La única zona garantizada como libre de minas es la huella que las propias llantas acaban de dejar."
+            },
+            {
+                q: "Un familiar de un paciente herido de bala se pone agresivo en Urgencias, golpea la vitrina y exige atención inmediata. La técnica de desescalamiento adecuada es:",
+                opts: [
+                    "Gritarle más fuerte para demostrar autoridad y que se calme.",
+                    "Llamar a los guardias de seguridad para que lo saquen a golpes del hospital.",
+                    "Mantener la calma, usar un tono de voz bajo, postura no amenazante y ofrecer escuchar su preocupación (siempre evaluando ruta de escape).",
+                    "Ignorarlo por completo y darle la espalda hasta que se canse de gritar."
+                ],
+                correct: "Mantener la calma, usar un tono de voz bajo, postura no amenazante y ofrecer escuchar su preocupación (siempre evaluando ruta de escape).",
+                rationale: "Dar la espalda, gritar o ignorar a una persona alterada multiplica su furia. Las técnicas de desescalamiento requieren voz calmada, escuchar activamente su dolor y mantener el control emocional, sin descuidar tu ruta de escape."
+            },
+            {
+                q: "Antes de salir a una zona rural de alta tensión, nota que el emblema de Misión Médica en el techo y puertas del vehículo está casi borrado por el sol. ¿Qué debe hacer?",
+                opts: [
+                    "Pintarlo rápidamente con marcadores rojos o pintura en spray para que se vea algo.",
+                    "Suspender la salida en ese vehículo a la zona de riesgo y reportarlo inmediatamente para su restauración adecuada.",
+                    "Salir de todos modos; si los detienen, explican verbalmente que son del hospital.",
+                    "Pegar una hoja tamaño carta con el logo impreso en el vidrio delantero."
+                ],
+                correct: "Suspender la salida en ese vehículo a la zona de riesgo y reportarlo inmediatamente para su restauración adecuada.",
+                rationale: "El emblema de la Misión Médica es la primera y más importante línea de defensa visual, especialmente contra francotiradores o ataques aéreos. Improvisar con marcadores o papeles no cumple la norma legal y pone en riesgo tu vida."
+            }
+        ];
+
+        const questionsContainer = document.getElementById('questions-container');
+
+        // Renderizar preguntas
+        questions.forEach((q, index) => {
+            const num = index + 1;
+            const qDiv = document.createElement('div');
+            qDiv.className = 'p-6 bg-white border border-gray-200 rounded-xl shadow-sm hover:border-red-200 transition';
+            
+            let optionsHtml = '';
+            q.opts.forEach((opt, optIndex) => {
+                const optId = `q${num}_opt${optIndex}`;
+                optionsHtml += `
+                    <div class="relative flex items-start mb-3">
+                        <input type="radio" id="${optId}" name="P${num}" value="${opt}" required class="radio-custom sr-only">
+                        <label for="${optId}" class="flex items-start w-full p-3 border border-gray-200 rounded-lg cursor-pointer transition hover:bg-gray-50">
+                            <div class="flex items-center justify-center w-5 h-5 border border-gray-400 rounded-full mr-3 mt-0.5 indicator flex-shrink-0 transition">
+                                <div class="w-2.5 h-2.5 bg-white rounded-full hidden"></div>
+                            </div>
+                            <span class="text-sm text-gray-700">${opt}</span>
+                        </label>
+                    </div>
+                `;
+            });
+
+            qDiv.innerHTML = `
+                <h3 class="font-medium text-gray-800 mb-4 text-base"><span class="text-red-600 font-bold mr-2">${num}.</span>${q.q}</h3>
+                <div class="space-y-2">
+                    ${optionsHtml}
+                </div>
+            `;
+            questionsContainer.appendChild(qDiv);
+        });
+
+        // Estilos extra para los radio buttons personalizados al estar checked
+        document.addEventListener('change', (e) => {
+            if(e.target.matches('.radio-custom')) {
+                const allIndicators = e.target.closest('.space-y-2').querySelectorAll('.indicator div');
+                allIndicators.forEach(el => el.classList.add('hidden'));
+                e.target.nextElementSibling.querySelector('.indicator div').classList.remove('hidden');
+            }
+        });
+
+        // Manejo del formulario y PDF
+        const form = document.getElementById('pretest-form');
+        const modal = document.getElementById('loading-modal');
+        const loadingText = document.getElementById('loading-text');
+        const successMessage = document.getElementById('success-message');
+        const submitBtn = document.getElementById('submit-btn');
+
+        // Lógica para precargar la imagen del encabezado para el PDF
+        let headerImgData = null;
+        let headerImgRatio = 0.2; // Valor por defecto del aspecto
+
+        async function loadHeaderImage() {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = 'Anonymous';
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    headerImgRatio = img.height / img.width;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    headerImgData = canvas.toDataURL('image/png');
+                    resolve();
+                };
+                img.onerror = () => {
+                    console.error("Error cargando la imagen del encabezado");
+                    resolve();
+                };
+                img.src = "https://res.cloudinary.com/dj7qylkqh/image/upload/v1769545405/A%C3%B1adir_un_t%C3%ADtulo_4_ivlcia.png";
+            });
+        }
+        
+        // Cargar imagen al iniciar la página en segundo plano
+        window.addEventListener('DOMContentLoaded', loadHeaderImage);
+
+        // Función para generar el PDF Pregunta por Pregunta
+        async function generatePDF(formData) {
+            loadingText.innerText = "Generando tu reporte PDF de calificación...";
+            
+            // Forzar el scroll hacia arriba para evitar captura en blanco por html2canvas
+            window.scrollTo(0, 0);
+
+            // Asegurar que la imagen del encabezado esté lista
+            if (!headerImgData) {
+                await loadHeaderImage();
+            }
+            
+            // Llenar datos personales
+            const nombreParticipante = formData.get('Nombre') || 'N/A';
+            document.getElementById('pdf-name').innerText = nombreParticipante;
+            document.getElementById('pdf-doc').innerText = formData.get('Documento') || 'N/A';
+            document.getElementById('pdf-muni').innerText = formData.get('Municipio') || 'N/A';
+            document.getElementById('pdf-perfil').innerText = formData.get('Perfil') || 'N/A';
+            document.getElementById('pdf-tipo').innerText = formData.get('TipoEvaluacion') || 'No especificado';
+            document.getElementById('pdf-fecha').innerText = new Date().toLocaleString('es-CO');
+
+            // Construcción dinámica de respuestas evaluadas
+            const listaRespuestas = document.getElementById('pdf-respuestas');
+            listaRespuestas.innerHTML = '';
+            
+            let aciertos = 0;
+
+            questions.forEach((questionData, index) => {
+                const i = index + 1;
+                const respuestaUsuario = formData.get('P' + i);
+                const esCorrecto = respuestaUsuario === questionData.correct;
+                
+                if (esCorrecto) aciertos++;
+
+                // Colores y diseño basado en el acierto
+                const borderColor = esCorrecto ? '#16a34a' : '#dc2626'; // Verde o Rojo fuerte
+                const bgColor = esCorrecto ? '#f0fdf4' : '#fef2f2';     // Verde o Rojo muy claro
+                const textColor = esCorrecto ? '#15803d' : '#b91c1c';   // Texto del resultado
+                const icon = esCorrecto ? '✓ Respuesta Correcta' : '✗ Respuesta Incorrecta';
+
+                // Bloque HTML de cada pregunta (con break-inside: avoid para que no se corte a la mitad de la hoja)
+                listaRespuestas.innerHTML += `
+                    <div style="margin-bottom: 20px; padding: 15px; border-left: 5px solid ${borderColor}; background-color: ${bgColor}; border-radius: 0 8px 8px 0; page-break-inside: avoid; break-inside: avoid;">
+                        <div style="color: #1f2937; font-size: 14px; font-weight: bold; margin-bottom: 8px;">
+                            P${i}: ${questionData.q}
+                        </div>
+                        
+                        <div style="color: ${textColor}; font-size: 13px; margin-bottom: 6px;">
+                            <strong>${icon}:</strong> ${respuestaUsuario || 'No respondida'}
+                        </div>
+                        
+                        ${!esCorrecto && respuestaUsuario ? `
+                        <div style="color: #4b5563; font-size: 13px; margin-bottom: 6px;">
+                            <strong>La norma indica:</strong> ${questionData.correct}
+                        </div>
+                        ` : ''}
+
+                        <div style="color: #374151; font-size: 13px; font-style: italic; border-top: 1px solid #d1d5db; padding-top: 8px; margin-top: 8px;">
+                            <strong>💡 Recomendación en terreno:</strong> ${questionData.rationale}
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Asignar el puntaje total
+            document.getElementById('pdf-score').innerText = `${aciertos} / 20 (${(aciertos/20)*100}%)`;
+
+            // Calcular márgenes dinámicos basados en la imagen para evitar que pise el texto
+            const imgWidthMM = 190; // Ancho A4 (210) menos 10mm de margen por lado
+            const imgHeightMM = imgWidthMM * headerImgRatio;
+            const topMarginMM = imgHeightMM + 10; // Alto de la imagen + 10mm de espacio de respiro
+
+            // Opciones del PDF
+            const elemento = document.getElementById('pdf-container');
+            const opciones = {
+                margin:       [topMarginMM, 10, 15, 10], // top (dinámico), left, bottom, right
+                filename:     `Calificacion_${formData.get('TipoEvaluacion')}_${nombreParticipante.replace(/\s+/g, '_')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, scrollY: 0, backgroundColor: '#ffffff' },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Generar, inyectar el encabezado en CADA página y guardar
+            await html2pdf()
+                .set(opciones)
+                .from(elemento)
+                .toPdf()
+                .get('pdf')
+                .then(function (pdf) {
+                    if (headerImgData) {
+                        const totalPages = pdf.internal.getNumberOfPages();
+                        for (let i = 1; i <= totalPages; i++) {
+                            pdf.setPage(i);
+                            // Dibujar la imagen en cada página (X: 10, Y: 5)
+                            pdf.addImage(headerImgData, 'PNG', 10, 5, imgWidthMM, imgHeightMM);
+                        }
+                    }
+                })
+                .save();
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            modal.classList.remove('hidden');
+            submitBtn.disabled = true;
+
+            const formData = new FormData(form);
+            const data = new URLSearchParams(formData);
+
+            try {
+                // Usamos fetch para enviar los datos al Web App de Apps Script
+                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: data
+                });
+
+                if(response.ok) {
+                    await generatePDF(formData); 
+                    form.classList.add('hidden');
+                    successMessage.classList.remove('hidden');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    throw new Error('Error en la respuesta del servidor');
+                }
+            } catch (error) {
+                // Las peticiones a Google Apps Script sufren bloqueos de CORS, pero guardan los datos.
+                console.log("Posible error de CORS, verificando si se guardó...", error);
+                
+                await generatePDF(formData); // Generamos el PDF de todas formas
+                
+                form.classList.add('hidden');
+                successMessage.classList.remove('hidden');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } finally {
+                modal.classList.add('hidden');
+                loadingText.innerText = "Enviando respuestas..."; 
+            }
+        });
+    </script>

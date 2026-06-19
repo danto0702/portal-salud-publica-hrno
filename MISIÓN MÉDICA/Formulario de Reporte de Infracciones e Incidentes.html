@@ -1,0 +1,463 @@
+<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Infracciones e incidentes contra la Misión Médica</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .form-section {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
+
+
+    <div class="container mx-auto p-4 md:p-8">
+
+        
+        
+        
+        <header class="shadow rounded-lg mb-4 overflow-hidden">
+             
+             <img id="banner" src="https://res.cloudinary.com/dj7qylkqh/image/upload/v1769466485/2_aqqngr.png" alt="Banner Institucional" class="w-full h-auto" loading="lazy">
+        </header>
+        
+        
+        
+
+        <div class="text-center mb-8">
+             <h1 class="text-2xl md:text-3xl font-bold text-gray-800">Registro de Infracciones e Incidentes contra la Misión Médica</h1>
+             <p class="text-md text-gray-600">Formulario único para el reporte de infracciones o incidentes</p>
+        </div>
+
+        <main>
+            <form id="reporteForm" class="space-y-8">
+
+                
+                <div class="form-section">
+                    <h2 class="text-xl font-semibold border-b pb-2 mb-6">1. Información del Dilenciamiento</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="quienDiligencia" class="block text-sm font-medium text-gray-700">Quien diligencia (Institución o persona)</label>
+                            <input type="text" id="quienDiligencia" name="quienDiligencia" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                        <div>
+                            <label for="fechaReporte" class="block text-sm font-medium text-gray-700">Fecha del reporte</label>
+                            <input type="date" id="fechaReporte" name="fechaReporte" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                        <div>
+                            <label for="lugarDiligenciamiento" class="block text-sm font-medium text-gray-700">Lugar (diligenciamiento)</label>
+                            <input type="text" id="lugarDiligenciamiento" name="lugarDiligenciamiento" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                        <div>
+                            <label for="municipioDiligenciamiento" class="block text-sm font-medium text-gray-700">Municipio (diligenciamiento)</label>
+                            <input type="text" id="municipioDiligenciamiento" name="municipioDiligenciamiento" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                         <div>
+                            <label for="departamentoDiligenciamiento" class="block text-sm font-medium text-gray-700">Departamento (diligenciamiento)</label>
+                            <input type="text" id="departamentoDiligenciamiento" name="departamentoDiligenciamiento" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div class="form-section">
+                    <h2 class="text-xl font-semibold border-b pb-2 mb-6">2. Información de la Infracción o Incidente</h2>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Tipo de Evento</label>
+                            <div class="flex items-center space-x-4 mt-2">
+                                <label><input type="radio" name="tipoEvento" value="Infracción" required="" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> Infracción</label>
+                                <label><input type="radio" name="tipoEvento" value="Incidente" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> Incidente</label>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="fechaOcurrencia" class="block text-sm font-medium text-gray-700">Fecha de ocurrencia</label>
+                            <input type="date" id="fechaOcurrencia" name="fechaOcurrencia" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                        <div>
+                            <label for="lugarOcurrencia" class="block text-sm font-medium text-gray-700">Lugar (ocurrencia)</label>
+                            <input type="text" id="lugarOcurrencia" name="lugarOcurrencia" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                        <div>
+                            <label for="municipioOcurrencia" class="block text-sm font-medium text-gray-700">Municipio (ocurrencia)</label>
+                            <input type="text" id="municipioOcurrencia" name="municipioOcurrencia" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                         <div>
+                            <label for="departamentoOcurrencia" class="block text-sm font-medium text-gray-700">Departamento (ocurrencia)</label>
+                            <input type="text" id="departamentoOcurrencia" name="departamentoOcurrencia" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                        <div>
+                            <label for="institucionAfectada" class="block text-sm font-medium text-gray-700">Institución afectada</label>
+                            <input type="text" id="institucionAfectada" name="institucionAfectada" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Tipo de Institución</label>
+                            <div class="flex items-center space-x-4 mt-2">
+                                <label><input type="radio" name="tipoInstitucion" value="Publica" required="" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> Pública</label>
+                                <label><input type="radio" name="tipoInstitucion" value="Privada" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> Privada</label>
+                            </div>
+                        </div>
+                        <div>
+                           <label for="detalleInstitucion" class="block text-sm font-medium text-gray-700">Detalle (Hospital, Puesto de salud, etc.)</label>
+                           <input type="text" id="detalleInstitucion" name="detalleInstitucion" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                        <div>
+                           <label for="fuenteInformacion" class="block text-sm font-medium text-gray-700">Fuente de la información</label>
+                           <input type="text" id="fuenteInformacion" name="fuenteInformacion" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2">
+                        </div>
+                     </div>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">¿Instalaciones/transporte señalizados con Emblema Protector?</label>
+                            <div class="flex items-center space-x-4 mt-2">
+                                <label><input type="radio" name="emblema" value="SI" required="" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> SI</label>
+                                <label><input type="radio" name="emblema" value="NO" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> NO</label>
+                                <label><input type="radio" name="emblema" value="NO SABE" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> NO SABE</label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">¿Personal sanitario debidamente identificado?</label>
+                            <div class="flex items-center space-x-4 mt-2">
+                                <label><input type="radio" name="personalIdentificado" value="SI" required="" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> SI</label>
+                                <label><input type="radio" name="personalIdentificado" value="NO" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> NO</label>
+                                <label><input type="radio" name="personalIdentificado" value="NO SABE" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> NO SABE</label>
+                            </div>
+                        </div>
+                    </div>
+                     <div class="mt-6">
+                        <label for="descripcion" class="block text-sm font-medium text-gray-700">Descripción de la infracción o incidente</label>
+                        <textarea id="descripcion" name="descripcion" rows="4" required="" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"></textarea>
+                    </div>
+                </div>
+
+                
+                <div class="form-section">
+                    <h2 class="text-xl font-semibold border-b pb-2 mb-6">3. Información sobre Apoyo o Soporte Recibido</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <div>
+                            <label class="block text-sm font-medium text-gray-700">¿Recibió apoyo inicial la institución o persona afectada?</label>
+                            <div class="flex items-center space-x-4 mt-2">
+                                <label><input type="radio" name="apoyo" value="SI" required="" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> SI</label>
+                                <label><input type="radio" name="apoyo" value="NO" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> NO</label>
+                                <label><input type="radio" name="apoyo" value="NO SABE" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"> NO SABE</label>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="cualApoyo" class="block text-sm font-medium text-gray-700">¿Cuál apoyo recibió?</label>
+                            <input type="text" id="cualApoyo" name="cualApoyo" class="mt-1 block w-full rounded-md border border-gray-400 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2" placeholder="Describa el tipo de apoyo...">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-4">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg focus:outline-none focus:shadow-outline transition duration-150 ease-in-out">
+                        Registrar y Generar PDF
+                    </button>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    
+    <div id="modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 items-center justify-center">
+        <div class="relative mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <div id="modal-icon" class="mx-auto flex items-center justify-center h-12 w-12 rounded-full">
+                    
+                </div>
+                <h3 id="modal-title" class="text-lg leading-6 font-medium text-gray-900"></h3>
+                <div class="mt-2 px-7 py-3">
+                    <p id="modal-message" class="text-sm text-gray-500"></p>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="closeModal" class="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+     
+    <div id="loader-overlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full hidden z-50 items-center justify-center">
+        <div class="flex flex-col items-center">
+            <div class="loader"></div>
+            <p class="text-white mt-4">Procesando, por favor espere...</p>
+        </div>
+    </div>
+
+    
+    <div id="pdf-container" class="hidden">
+        <div id="pdf-content" class="p-8 bg-white relative" style="width: 210mm; font-family: Arial, sans-serif; font-size: 10px; color: #000;">
+            <div id="pdf-radicado" class="absolute top-4 left-4 font-bold text-lg"></div>
+            <div class="text-center mb-4">
+                <p class="text-xs">Resolución Nro. 4481 de 2012, "Por la cual se adopta el Manual de Misión Médica y se establecen normas relacionadas con la señalización y divulgación de su Emblema"</p>
+                <h1 class="text-lg font-bold mt-2">FORMATO DE REPORTE DE INFRACCIONES E INCIDENTES A LA MISIÓN MÉDICA EN COLOMBIA</h1>
+                <p class="text-xs">Antes de diligenciar el formulario, por favor lea el instructivo</p>
+                <div class="mt-2 text-sm">
+                    <span>Infracción: </span><span id="pdf-tipoEvento-infraccion"></span>
+                    <span class="ml-8">Incidente: </span><span id="pdf-tipoEvento-incidente"></span>
+                </div>
+            </div>
+
+            <div class="border-2 border-black p-2 mb-2">
+                <h2 class="font-bold text-center text-sm mb-2 bg-gray-200">INFORMACIÓN DEL DILIGENCIAMIENTO DEL FORMULARIO</h2>
+                <table class="w-full">
+                    <tbody><tr>
+                        <td class="border border-black p-1"><strong>Fecha reporte:</strong> <span id="pdf-fechaReporte"></span></td>
+                        <td class="border border-black p-1" colspan="2"><strong>Quien diligencia:</strong> <span id="pdf-quienDiligencia"></span></td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black p-1"><strong>Lugar:</strong> <span id="pdf-lugarDiligenciamiento"></span></td>
+                        <td class="border border-black p-1"><strong>Municipio:</strong> <span id="pdf-municipioDiligenciamiento"></span></td>
+                        <td class="border border-black p-1"><strong>Departamento:</strong> <span id="pdf-departamentoDiligenciamiento"></span></td>
+                    </tr>
+                </tbody></table>
+            </div>
+            
+            <div class="border-2 border-black p-2 mb-2">
+                <h2 class="font-bold text-center text-sm mb-2 bg-gray-200">INFORMACIÓN SOBRE LA INFRACCIÓN O INCIDENTE</h2>
+                 <table class="w-full">
+                    <tbody><tr>
+                        <td class="border border-black p-1"><strong>Fecha ocurrencia:</strong> <span id="pdf-fechaOcurrencia"></span></td>
+                        <td class="border border-black p-1" colspan="2"><strong>Institución afectada:</strong> <span id="pdf-institucionAfectada"></span></td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black p-1"><strong>Lugar:</strong> <span id="pdf-lugarOcurrencia"></span></td>
+                        <td class="border border-black p-1"><strong>Municipio:</strong> <span id="pdf-municipioOcurrencia"></span></td>
+                        <td class="border border-black p-1"><strong>Departamento:</strong> <span id="pdf-departamentoOcurrencia"></span></td>
+                    </tr>
+                    <tr>
+                         <td class="border border-black p-1" colspan="3">
+                            <strong>Tipo:</strong> 
+                            <span>Pública: </span><span id="pdf-tipoInstitucion-publica"></span>
+                            <span class="ml-4">Privada: </span><span id="pdf-tipoInstitucion-privada"></span>
+                            <span class="ml-4">Detalle: </span><span id="pdf-detalleInstitucion"></span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="border border-black p-1" colspan="3"><strong>Fuente de la información:</strong> <span id="pdf-fuenteInformacion"></span></td>
+                    </tr>
+                    <tr>
+                         <td class="border border-black p-1" colspan="3">
+                             <strong>¿Instalaciones/transporte señalizados?:</strong> 
+                             SI: <span id="pdf-emblema-si"></span> NO: <span id="pdf-emblema-no"></span> NO SABE: <span id="pdf-emblema-nosabe"></span>
+                         </td>
+                    </tr>
+                    <tr>
+                         <td class="border border-black p-1" colspan="3">
+                             <strong>¿Personal sanitario identificado?:</strong> 
+                             SI: <span id="pdf-personalIdentificado-si"></span> NO: <span id="pdf-personalIdentificado-no"></span> NO SABE: <span id="pdf-personalIdentificado-nosabe"></span>
+                         </td>
+                    </tr>
+                 </tbody></table>
+            </div>
+
+            <div class="border-2 border-black p-2 mb-2">
+                <h2 class="font-bold text-center text-sm mb-2 bg-gray-200">DESCRIPCIÓN DE LA INFRACCIÓN O INCIDENTE</h2>
+                <div id="pdf-descripcion" class="p-1 min-h-[100px] whitespace-pre-wrap break-words"></div>
+            </div>
+
+            <div class="border-2 border-black p-2">
+                <h2 class="font-bold text-center text-sm mb-2 bg-gray-200">INFORMACIÓN SOBRE APOYO O SOPORTE RECIBIDO</h2>
+                 <table class="w-full">
+                     <tbody><tr>
+                         <td class="border border-black p-1">
+                             <strong>¿Recibió apoyo?:</strong>
+                             SI: <span id="pdf-apoyo-si"></span> NO: <span id="pdf-apoyo-no"></span> NO SABE: <span id="pdf-apoyo-nosabe"></span>
+                         </td>
+                         <td class="border border-black p-1">
+                             <strong>¿Cuál?:</strong> <span id="pdf-cualApoyo"></span>
+                         </td>
+                     </tr>
+                 </tbody></table>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // ======================================================
+        // CONFIGURACIÓN
+        // ======================================================
+        // 1. REEMPLAZA ESTA URL por la URL de tu Web App de Google Apps Script.
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_cgfMUP5jBzKpMOsgmwiHxDImpOZscVi1cnS99Rtbi4RH43L_636qY3mH18dEm63i/exec';
+        // ======================================================
+
+        const form = document.getElementById('reporteForm');
+        const modal = document.getElementById('modal');
+        const closeModalBtn = document.getElementById('closeModal');
+        const loaderOverlay = document.getElementById('loader-overlay');
+        const { jsPDF } = window.jspdf;
+
+        // Formato de fecha
+        const formatDate = (dateString) => {
+            if (!dateString) return '';
+            const date = new Date(dateString + 'T00:00:00'); // Asegura que se tome la fecha correcta
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        };
+        
+        // Poner fecha actual por defecto en fecha de reporte
+        document.getElementById('fechaReporte').valueAsDate = new Date();
+
+
+        function showModal(type, title, message) {
+            const modalIcon = document.getElementById('modal-icon');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMessage = document.getElementById('modal-message');
+
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+
+            modalIcon.innerHTML = '';
+            if (type === 'success') {
+                modalIcon.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100';
+                modalIcon.innerHTML = `<svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+            } else if (type === 'error') {
+                 modalIcon.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100';
+                 modalIcon.innerHTML = `<svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+            } else { // info
+                 modalIcon.className = 'mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100';
+                 modalIcon.innerHTML = `<svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+            }
+
+            modal.style.display = 'flex';
+        }
+
+        closeModalBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (GOOGLE_SCRIPT_URL === 'URL_DE_TU_GOOGLE_APPS_SCRIPT_AQUI') {
+                showModal('error', 'Configuración Requerida', 'Por favor, sigue las instrucciones en el archivo "instructions.md" para configurar la URL del Google Apps Script.');
+                return;
+            }
+
+            loaderOverlay.style.display = 'flex';
+
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            // Generar número de radicado
+            const timestamp = Date.now();
+            const radicado = `IMMHRNO-${timestamp}`;
+            data.radicado = radicado;
+
+            // Enviar a Google Sheets
+            try {
+                // Se usa 'no-cors' porque las Apps Script simples no manejan preflights de CORS.
+                // Esto significa que no podemos leer la respuesta, pero la solicitud POST se completa.
+                // El script de Google maneja la lógica de guardado de forma independiente.
+                fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    cache: 'no-cache',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    redirect: 'follow',
+                    body: JSON.stringify(data)
+                });
+                
+                // Damos un pequeño respiro para que el POST se envíe antes de bloquear el hilo con el PDF
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // Generar PDF
+                await generatePDF(data);
+
+                showModal('success', '¡Éxito!', `El reporte ha sido registrado con el radicado ${radicado} y el PDF ha sido descargado.`);
+                form.reset();
+                document.getElementById('fechaReporte').valueAsDate = new Date();
+
+            } catch (error) {
+                console.error('Error:', error);
+                showModal('error', 'Error', 'Ocurrió un error al enviar el formulario. Revisa la consola para más detalles y asegúrate que la URL del script sea correcta.');
+            } finally {
+                loaderOverlay.style.display = 'none';
+            }
+        });
+
+        async function generatePDF(data) {
+            // Llenar el contenedor del PDF con los datos del formulario
+            document.getElementById('pdf-radicado').textContent = data.radicado;
+            document.getElementById('pdf-fechaReporte').textContent = formatDate(data.fechaReporte);
+            document.getElementById('pdf-quienDiligencia').textContent = data.quienDiligencia;
+            document.getElementById('pdf-lugarDiligenciamiento').textContent = data.lugarDiligenciamiento;
+            document.getElementById('pdf-municipioDiligenciamiento').textContent = data.municipioDiligenciamiento;
+            document.getElementById('pdf-departamentoDiligenciamiento').textContent = data.departamentoDiligenciamiento;
+            document.getElementById('pdf-tipoEvento-infraccion').textContent = data.tipoEvento === 'Infracción' ? 'X' : '_';
+            document.getElementById('pdf-tipoEvento-incidente').textContent = data.tipoEvento === 'Incidente' ? 'X' : '_';
+            document.getElementById('pdf-fechaOcurrencia').textContent = formatDate(data.fechaOcurrencia);
+            document.getElementById('pdf-institucionAfectada').textContent = data.institucionAfectada;
+            document.getElementById('pdf-lugarOcurrencia').textContent = data.lugarOcurrencia;
+            document.getElementById('pdf-municipioOcurrencia').textContent = data.municipioOcurrencia;
+            document.getElementById('pdf-departamentoOcurrencia').textContent = data.departamentoOcurrencia;
+            document.getElementById('pdf-tipoInstitucion-publica').textContent = data.tipoInstitucion === 'Publica' ? 'X' : '_';
+            document.getElementById('pdf-tipoInstitucion-privada').textContent = data.tipoInstitucion === 'Privada' ? 'X' : '_';
+            document.getElementById('pdf-detalleInstitucion').textContent = data.detalleInstitucion || 'N/A';
+            document.getElementById('pdf-fuenteInformacion').textContent = data.fuenteInformacion;
+            document.getElementById('pdf-emblema-si').textContent = data.emblema === 'SI' ? 'X' : '_';
+            document.getElementById('pdf-emblema-no').textContent = data.emblema === 'NO' ? 'X' : '_';
+            document.getElementById('pdf-emblema-nosabe').textContent = data.emblema === 'NO SABE' ? 'X' : '_';
+            document.getElementById('pdf-personalIdentificado-si').textContent = data.personalIdentificado === 'SI' ? 'X' : '_';
+            document.getElementById('pdf-personalIdentificado-no').textContent = data.personalIdentificado === 'NO' ? 'X' : '_';
+            document.getElementById('pdf-personalIdentificado-nosabe').textContent = data.personalIdentificado === 'NO SABE' ? 'X' : '_';
+            document.getElementById('pdf-descripcion').textContent = data.descripcion;
+            document.getElementById('pdf-apoyo-si').textContent = data.apoyo === 'SI' ? 'X' : '_';
+            document.getElementById('pdf-apoyo-no').textContent = data.apoyo === 'NO' ? 'X' : '_';
+            document.getElementById('pdf-apoyo-nosabe').textContent = data.apoyo === 'NO SABE' ? 'X' : '_';
+            document.getElementById('pdf-cualApoyo').textContent = data.cualApoyo || 'N/A';
+            
+            const pdfContent = document.getElementById('pdf-content');
+            const pdfContainer = document.getElementById('pdf-container');
+            
+            // Mostrar temporalmente el contenedor para que html2canvas lo renderice
+            pdfContainer.classList.remove('hidden');
+            pdfContainer.style.position = 'absolute';
+            pdfContainer.style.left = '-9999px'; // Posicionarlo fuera de la pantalla
+
+            try {
+                const canvas = await html2canvas(pdfContent, { scale: 2 });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                pdf.save(`Reporte-${data.radicado}.pdf`);
+            } catch (error) {
+                console.error("Error generando el PDF:", error);
+                showModal('error', 'Error de PDF', 'No se pudo generar el documento PDF.');
+            } finally {
+                // Ocultar el contenedor de nuevo
+                pdfContainer.classList.add('hidden');
+                pdfContainer.style.position = '';
+                pdfContainer.style.left = '';
+            }
+        }
+    </script>
