@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radicador ESP-116 · ESE HRNO</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#EBF2FA;color:#1e293b;min-height:100vh}
+
+.hdr{background:#0C447C;padding:16px 20px}
+.hdr .inst{font-size:11px;letter-spacing:1.2px;color:#B5D4F4;margin:0 0 3px;text-transform:uppercase;font-weight:500}
+.hdr h1{font-size:18px;font-weight:500;color:#fff;margin:0 0 2px}
+.hdr .sub{font-size:12px;color:#85B7EB;margin:0}
+
+.eco-bar{background:#0f4c81;padding:7px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.12)}
+.eco-back{display:flex;align-items:center;gap:6px;text-decoration:none;color:rgba(255,255,255,0.80);font-size:10.5px;font-weight:700;font-family:'Segoe UI',Arial,sans-serif;letter-spacing:.3px}
+.eco-back:hover{color:#fff}
+.eco-tag{font-size:9.5px;color:rgba(255,255,255,0.50);font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+
+.nav-tabs{background:#fff;border-bottom:0.5px solid #e2e8f0;display:flex}
+.nav-tabs button{padding:12px 20px;border:none;background:none;font-size:14px;font-weight:500;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;font-family:inherit}
+.nav-tabs button.activo{color:#185FA5;border-bottom-color:#185FA5}
+.nav-tabs button:hover:not(.activo){color:#1e293b}
+
+.tab{display:none}.tab.activo{display:block}
+.inner{max-width:900px;margin:0 auto;padding:20px 16px}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+
+.card{background:#fff;border-radius:12px;border:0.5px solid #e2e8f0;overflow:hidden}
+.card-head{padding:13px 18px;border-bottom:0.5px solid #f1f5f9}
+.card-head p{font-size:13px;font-weight:500;color:#64748b;margin:0}
+.card-body{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+
+.fld label{display:block;font-size:11px;font-weight:500;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.fld label .req{color:#ef4444}
+.fld input,.fld select,.fld textarea{width:100%;padding:8px 11px;border:0.5px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:inherit;color:#1e293b;background:#fff;transition:border-color .2s}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:#185FA5;box-shadow:0 0 0 3px rgba(24,95,165,.1)}
+.fld textarea{resize:vertical;min-height:60px}
+
+.btn-asignar{display:block;width:100%;background:#185FA5;color:#fff;border:none;padding:10px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;transition:opacity .2s;margin-top:4px}
+.btn-asignar:hover{opacity:.88}
+.btn-asignar:disabled{opacity:.5;cursor:not-allowed}
+
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:giro .7s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes giro{to{transform:rotate(360deg)}}
+
+.msg-error{background:#fef2f2;border:0.5px solid #fca5a5;color:#dc2626;padding:9px 13px;border-radius:8px;font-size:12px;margin-top:6px;display:none}
+
+.right-col{display:flex;flex-direction:column;gap:12px}
+
+.result-box{background:#f0fdf4;border:0.5px solid #86efac;border-radius:12px;padding:18px;text-align:center;display:none;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.result-box .ri{font-size:26px;color:#15803d;display:block;margin-bottom:6px}
+.result-box .etiq{font-size:11px;font-weight:500;color:#15803d;text-transform:uppercase;letter-spacing:1px;margin:0 0 5px}
+.result-box .num{font-size:21px;font-weight:600;color:#15803d;letter-spacing:.5px;margin:0 0 3px}
+.result-box .reg{font-size:12px;color:#64748b;margin:0 0 12px}
+.result-box .btns{display:flex;gap:8px;justify-content:center}
+.btn-copiar{background:#fff;border:0.5px solid #86efac;color:#15803d;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit}
+.btn-nuevo{background:#15803d;color:#fff;border:none;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit}
+
+.qs{background:#f8fafc;border:0.5px solid #e2e8f0;border-radius:12px;padding:14px}
+.qs-title{font-size:12px;font-weight:500;color:#64748b;margin:0 0 8px}
+.qs-input{width:100%;padding:7px 10px;border:0.5px solid #cbd5e1;border-radius:8px;font-size:12px;font-family:inherit;color:#1e293b;background:#fff;margin-bottom:8px}
+.qs-input:focus{outline:none;border-color:#185FA5}
+.qs-lista{border-top:0.5px solid #e2e8f0;padding-top:8px}
+.qs-item{display:grid;grid-template-columns:36px 1fr;gap:2px 8px;font-size:11px;margin-bottom:7px}
+.qs-item:last-child{margin-bottom:0}
+.qs-no{color:#94a3b8}
+.qs-rad{color:#185FA5;font-weight:500}
+.qs-asu{color:#64748b;grid-column:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qs-vacio{font-size:12px;color:#94a3b8;text-align:center;padding:10px 0}
+
+.search-row{display:flex;gap:10px;margin-bottom:16px}
+.search-row input{flex:1;padding:9px 13px;border:0.5px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:inherit;color:#1e293b}
+.search-row input:focus{outline:none;border-color:#185FA5}
+.btn-refresh{background:#0C447C;color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;font-family:inherit}
+
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#0C447C;color:#fff;padding:9px 11px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+td{padding:9px 11px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+tr:nth-child(even) td{background:#f8fafc}
+tr:hover td{background:#EBF2FA}
+.td-rad{font-weight:600;color:#0C447C;white-space:nowrap}
+.badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:500;background:#dbeafe;color:#1d4ed8}
+.tbl-info{padding:10px 0;color:#94a3b8;font-size:12px}
+.cargando,.vacio{text-align:center;padding:32px;color:#94a3b8;font-size:13px}
+
+@media(max-width:620px){
+  .two-col{grid-template-columns:1fr}
+  .hdr h1{font-size:16px}
+}
+</style>
+</head>
+<body>
+
+<!-- BARRA ECOSISTEMA -->
+<div class="eco-bar">
+  <a href="../index.html" class="eco-back">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    Portal Salud Pública · ESE HRNO
+  </a>
+  <span class="eco-tag">OFICIOS ENVIADOS · ESP-116</span>
+</div>
+
+<div class="hdr">
+  <p class="inst">ESE Hospital Regional Noroccidental · Salud Pública</p>
+  <h1>Sistema de Radicación</h1>
+  <p class="sub">Gestión radicados ESP-116 · 2026</p>
+</div>
+
+<div class="nav-tabs">
+  <button class="activo" onclick="cambiarTab('nuevo',this)">📄 Nuevo radicado</button>
+  <button onclick="cambiarTab('buscar',this)">🔍 Buscar radicado</button>
+</div>
+
+<!-- ── TAB NUEVO ─── -->
+<div id="tab-nuevo" class="tab activo">
+  <div class="inner">
+    <div class="two-col">
+
+      <!-- Izquierda: formulario -->
+      <div class="card">
+        <div class="card-head"><p>Formulario de solicitud</p></div>
+        <div class="card-body">
+          <form id="frmRad" onsubmit="return false">
+
+            <div class="fld">
+              <label>Tipo de documento <span class="req">*</span></label>
+              <select id="tipo" required>
+                <option value="">— Seleccione —</option>
+                <option>Oficio externo</option>
+                <option>Circular</option>
+                <option>Certificación</option>
+                <option>Constancia</option>
+                <option>Acta</option>
+                <option>Comunicación externa</option>
+              </select>
+            </div>
+
+            <div class="fld">
+              <label>Fecha <span class="req">*</span></label>
+              <input type="date" id="fecha" required>
+            </div>
+
+            <div class="fld">
+              <label>Asunto <span class="req">*</span></label>
+              <textarea id="asunto" placeholder="Describa brevemente el asunto del documento…" required></textarea>
+            </div>
+
+            <div class="fld">
+              <label>Dirigido a / Entidad <span class="req">*</span></label>
+              <input type="text" id="dirigidoA" placeholder="Persona o institución destinataria" required>
+            </div>
+
+            <div class="fld">
+              <label>Observaciones <span style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></label>
+              <textarea id="observaciones" placeholder="Información adicional si aplica…" style="min-height:44px"></textarea>
+            </div>
+
+            <button class="btn-asignar" id="btnEnviar" onclick="solicitarRadicado()">
+              Asignar número de radicado
+            </button>
+
+            <div class="msg-error" id="msgError"></div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Derecha: resultado + búsqueda rápida -->
+      <div class="right-col">
+
+        <div class="result-box" id="resultBox">
+          <span class="ri">✅</span>
+          <p class="etiq">Radicado asignado</p>
+          <p class="num" id="resRadicado"></p>
+          <p class="reg" id="resNumero"></p>
+          <div class="btns">
+            <button class="btn-copiar" onclick="copiar()">📋 Copiar</button>
+            <button class="btn-nuevo" onclick="limpiar()">+ Nuevo</button>
+          </div>
+        </div>
+
+        <div class="qs">
+          <p class="qs-title">🔍 Búsqueda rápida</p>
+          <input type="text" class="qs-input" id="qsTermino"
+                 placeholder="Buscar por radicado, asunto, destinatario…"
+                 oninput="filtrarQS()">
+          <div class="qs-lista" id="qsLista">
+            <div class="qs-vacio">Cargando…</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TAB BUSCAR ─── -->
+<div id="tab-buscar" class="tab">
+  <div class="inner">
+    <div class="card" style="padding:20px">
+      <div class="search-row">
+        <input type="text" id="termino"
+               placeholder="Buscar por radicado, asunto, destinatario, tipo o fecha…"
+               oninput="filtrarTabla()">
+        <button class="btn-refresh" onclick="cargarDatos()">↺ Actualizar</button>
+      </div>
+      <div class="tbl-wrap">
+        <div id="contenidoTabla"><div class="cargando">Cargando registros…</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxmK-803QUbEO0Xy5BPEdj2OSFqK6pv_IcgYmE_qnc-fEjv548tI9aJvqZE1-WmATM/exec';
+
+let todos = [];
+
+document.getElementById('fecha').valueAsDate = new Date();
+cargarDatos();
+
+function api(p) {
+  const url = new URL(SCRIPT_URL);
+  Object.entries(p).forEach(function([k,v]){ url.searchParams.set(k,v); });
+  url.searchParams.set('_ts', Date.now());
+  return fetch(url.toString(), { method:'GET', redirect:'follow', cache:'no-store' }).then(function(r){ return r.json(); });
+}
+
+function cambiarTab(tab, btn) {
+  document.querySelectorAll('.tab').forEach(function(el){ el.classList.remove('activo'); });
+  document.querySelectorAll('.nav-tabs button').forEach(function(b){ b.classList.remove('activo'); });
+  document.getElementById('tab-' + tab).classList.add('activo');
+  btn.classList.add('activo');
+}
+
+function solicitarRadicado() {
+  var tipo          = document.getElementById('tipo').value;
+  var fechaRaw      = document.getElementById('fecha').value;
+  var asunto        = document.getElementById('asunto').value.trim();
+  var dirigidoA     = document.getElementById('dirigidoA').value.trim();
+  var observaciones = document.getElementById('observaciones').value.trim();
+
+  if (!tipo || !fechaRaw || !asunto || !dirigidoA) {
+    mostrarError('Por favor complete todos los campos obligatorios.');
+    return;
+  }
+
+  var p = fechaRaw.split('-');
+  var fecha = p[2] + '/' + p[1] + '/' + p[0];
+
+  var btn = document.getElementById('btnEnviar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Asignando radicado…';
+  document.getElementById('msgError').style.display = 'none';
+
+  api({ action:'agregar', fecha:fecha, tipo:tipo, asunto:asunto, dirigidoA:dirigidoA, observaciones:observaciones })
+    .then(function(r) {
+      btn.disabled = false;
+      btn.innerHTML = 'Asignar número de radicado';
+      if (r.exito) {
+        document.getElementById('resRadicado').textContent = r.radicado;
+        document.getElementById('resNumero').textContent = 'Documento No. ' + r.numero + ' registrado en el radicador';
+        document.getElementById('resultBox').style.display = 'block';
+        todos = [];
+        cargarDatos();
+      } else {
+        mostrarError('No se pudo asignar el radicado. Intente de nuevo.');
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false;
+      btn.innerHTML = 'Asignar número de radicado';
+      mostrarError('Error de conexión: ' + e.message);
+    });
+}
+
+function mostrarError(msg) {
+  var el = document.getElementById('msgError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function copiar() {
+  navigator.clipboard.writeText(document.getElementById('resRadicado').textContent).then(function() {
+    var btn = document.querySelector('.btn-copiar');
+    btn.textContent = '✅ Copiado';
+    setTimeout(function(){ btn.textContent = '📋 Copiar'; }, 2000);
+  });
+}
+
+function limpiar() {
+  document.getElementById('frmRad').reset();
+  document.getElementById('fecha').valueAsDate = new Date();
+  document.getElementById('msgError').style.display = 'none';
+  document.getElementById('resultBox').style.display = 'none';
+}
+
+function cargarDatos() {
+  document.getElementById('contenidoTabla').innerHTML = '<div class="cargando">Cargando registros…</div>';
+  api({ action:'listar' })
+    .then(function(data) {
+      todos = data.entradas || [];
+      renderTabla(todos);
+      renderQS(todos);
+    })
+    .catch(function(e) {
+      document.getElementById('contenidoTabla').innerHTML = '<div class="vacio">⚠️ Error: ' + e.message + '</div>';
+      document.getElementById('qsLista').innerHTML = '<div class="qs-vacio">Error al cargar</div>';
+    });
+}
+
+function filtrarTabla() {
+  var t = document.getElementById('termino').value.toLowerCase();
+  renderTabla(t ? todos.filter(function(r){ return (r.radicado+r.asunto+r.dirigidoA+r.tipo+r.fecha).toLowerCase().includes(t); }) : todos);
+}
+
+function filtrarQS() {
+  var t = document.getElementById('qsTermino').value.toLowerCase();
+  renderQS(t ? todos.filter(function(r){ return (r.radicado+r.asunto+r.dirigidoA).toLowerCase().includes(t); }) : todos);
+}
+
+function renderTabla(lista) {
+  if (!lista || !lista.length) {
+    document.getElementById('contenidoTabla').innerHTML = '<div class="vacio">🔍 No se encontraron registros.</div>';
+    return;
+  }
+  var h = '<table><thead><tr><th>No.</th><th>Radicado</th><th>Fecha</th><th>Tipo</th><th>Asunto</th><th>Dirigido a</th></tr></thead><tbody>';
+  lista.forEach(function(r) {
+    h += '<tr><td style="text-align:center">' + r.no + '</td><td class="td-rad">' + r.radicado + '</td><td style="white-space:nowrap">' + r.fecha + '</td><td><span class="badge">' + r.tipo + '</span></td><td>' + r.asunto + '</td><td>' + r.dirigidoA + '</td></tr>';
+  });
+  h += '</tbody></table><div class="tbl-info">' + lista.length + ' registro(s)</div>';
+  document.getElementById('contenidoTabla').innerHTML = h;
+}
+
+function renderQS(lista) {
+  if (!lista || !lista.length) {
+    document.getElementById('qsLista').innerHTML = '<div class="qs-vacio">Sin resultados</div>';
+    return;
+  }
+  var top = lista.slice(0, 5), h = '';
+  top.forEach(function(r) {
+    var asu = r.asunto.length > 46 ? r.asunto.substring(0,46) + '…' : r.asunto;
+    h += '<div class="qs-item"><span class="qs-no">' + r.no + '</span><span class="qs-rad">' + r.radicado + '</span><span class="qs-asu">' + asu + '</span></div>';
+  });
+  if (lista.length > 5) h += '<div class="qs-vacio" style="padding:6px 0 0">' + (lista.length-5) + ' más…</div>';
+  document.getElementById('qsLista').innerHTML = h;
+}
+</script>
+</body>
+</html>
