@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Certificados de Cumplimiento EBS · HRNO</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../libs/jspdf.umd.min.js"></script>
+<script src="../libs/jszip.min.js"></script>
+<script src="../libs/xlsx.full.min.js"></script>
+<script src="certeb_assets.js"></script>
+<style>
+:root{
+  --primary:#0f4c81; --primary2:#1565c0; --green:#059669; --red:#e94560;
+  --purple:#7c1d6f; --amber:#ffb432; --bg:#eef2f6; --surface:#ffffff;
+  --border:#d9e1ea; --text:#0c1b33; --text2:#5b6b80; --text3:#28374d; --r:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+button{font-family:inherit;cursor:pointer}
+a{color:var(--primary2)}
+.hidden{display:none!important}
+
+/* ── Gate ── */
+#gate{position:fixed;inset:0;background:linear-gradient(135deg,#0f4c81,#0c1b33);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+#gate .box{background:var(--surface);border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.35);padding:34px 30px;width:100%;max-width:400px;text-align:center}
+#gate .lock{width:64px;height:64px;margin:0 auto 14px;background:rgba(15,76,129,.10);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:30px}
+#gate h1{font-size:18px;color:var(--primary);margin-bottom:4px}
+#gate p{font-size:12.5px;color:var(--text2);margin-bottom:18px}
+#gate input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;text-align:center;letter-spacing:2px}
+#gate input:focus{outline:none;border-color:var(--primary2);box-shadow:0 0 0 3px rgba(21,101,192,.12)}
+#gate button{width:100%;margin-top:12px;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px}
+#gate .err{color:var(--red);font-size:12px;margin-top:10px;min-height:16px;font-weight:600}
+
+/* ── Header ── */
+.header{background:var(--surface);border-bottom:3px solid var(--primary);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:200;box-shadow:0 2px 12px rgba(15,76,129,.10);gap:12px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.logo-icon{width:38px;height:38px;background:linear-gradient(135deg,var(--primary),var(--primary2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.brand h1{font-size:15px;color:var(--primary);line-height:1.1}
+.brand span{font-size:11px;color:var(--text2)}
+.header .actions{display:flex;gap:8px;align-items:center}
+.pill{background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:7px 13px;font-size:12px;font-weight:600;color:var(--text3);display:flex;align-items:center;gap:6px}
+.pill.back{text-decoration:none}
+
+/* ── Tabs ── */
+.tabs{background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;display:flex;gap:2px;position:sticky;top:60px;z-index:150;overflow-x:auto}
+.tab{padding:13px 15px;font-size:13px;font-weight:600;color:var(--text2);border:none;background:none;border-bottom:3px solid transparent;white-space:nowrap}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tab .adm{font-size:9px;background:var(--amber);color:#5a3b00;border-radius:4px;padding:1px 4px;margin-left:4px;vertical-align:middle}
+
+.wrap{max-width:1120px;margin:0 auto;padding:20px 16px 60px}
+.panel{display:none}
+.panel.active{display:block}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:0 1px 4px rgba(15,76,129,.06);margin-bottom:16px;overflow:hidden}
+.card-h{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.card-h h2{font-size:14.5px;color:var(--primary)}
+.card-h .sub{font-size:11.5px;color:var(--text2);font-weight:500}
+.card-b{padding:18px}
+
+label{display:block;font-size:11.5px;font-weight:700;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:.02em}
+input[type=text],input[type=number],input[type=date],input[type=password],select,textarea{
+  width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:9px;font-size:13.5px;font-family:inherit;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary2);box-shadow:0 0 0 3px rgba(21,101,192,.12)}
+textarea{resize:vertical;min-height:70px;line-height:1.45}
+.field{margin-bottom:14px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr}}
+
+.btn{padding:10px 16px;border:none;border-radius:9px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:7px}
+.btn-primary{background:var(--primary);color:#fff;box-shadow:0 3px 10px rgba(15,76,129,.25)}
+.btn-green{background:var(--green);color:#fff}
+.btn-ghost{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
+.btn-sm{padding:6px 11px;font-size:12px;border-radius:8px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;padding:9px 10px;background:#f4f7fb;color:var(--text3);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.02em;border-bottom:1px solid var(--border);position:sticky;top:0}
+td{padding:8px 10px;border-bottom:1px solid #eef2f6;vertical-align:middle}
+tr:hover td{background:#fafcfe}
+.tbl-scroll{overflow:auto;max-height:60vh;border:1px solid var(--border);border-radius:10px}
+.badge{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px}
+.b-dan{background:rgba(15,76,129,.12);color:var(--primary)}
+.b-mel{background:rgba(124,29,111,.12);color:var(--purple)}
+.b-role{background:rgba(5,150,105,.10);color:var(--green)}
+.muted{color:var(--text2)}
+.mono{font-variant-numeric:tabular-nums}
+
+.chip-row{display:flex;flex-wrap:wrap;gap:8px}
+.chk{display:flex;align-items:center;gap:7px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:13px;font-weight:600;cursor:pointer}
+.chk input{width:auto}
+.chk.on{background:rgba(15,76,129,.08);border-color:var(--primary2);color:var(--primary)}
+
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.filters .field{margin:0;min-width:150px}
+
+.hint{background:#fff8e8;border:1px solid #ffe3a1;border-radius:9px;padding:10px 13px;font-size:12px;color:#7a5a00;margin-top:8px}
+.hint.info{background:#eef6ff;border-color:#c5ddf7;color:#154a7a}
+
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(12,27,51,.55);display:none;align-items:center;justify-content:center;z-index:400;padding:16px}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border-radius:16px;box-shadow:0 24px 60px rgba(12,27,51,.35);width:100%;max-width:600px;max-height:92vh;overflow:auto}
+.modal-h{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--surface)}
+.modal-h h3{font-size:15px;color:var(--primary)}
+.modal-close{background:none;border:none;font-size:24px;color:var(--text2);line-height:1;width:30px;height:30px}
+.modal-b{padding:20px}
+.modal-f{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:var(--surface)}
+
+.toast-wrap{position:fixed;bottom:20px;right:20px;z-index:900;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--surface);border-left:4px solid var(--primary);border-radius:10px;box-shadow:0 10px 30px rgba(12,27,51,.22);padding:12px 16px;font-size:12.5px;font-weight:600;color:var(--text3);min-width:230px;max-width:360px;animation:slidein .25s ease}
+.toast.ok{border-left-color:var(--green)}.toast.err{border-left-color:var(--red)}.toast.warn{border-left-color:var(--amber)}
+@keyframes slidein{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+@media(max-width:760px){.kpis{grid-template-columns:1fr 1fr}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:14px}
+.kpi .n{font-size:22px;font-weight:800;color:var(--primary);line-height:1}
+.kpi .l{font-size:11px;color:var(--text2);margin-top:5px;font-weight:600}
+
+.previewbox{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#525659;min-height:300px}
+.previewbox iframe{width:100%;height:520px;border:none;display:block}
+.progress{height:8px;background:var(--bg);border-radius:6px;overflow:hidden;margin-top:8px}
+.progress > i{display:block;height:100%;background:var(--green);width:0;transition:width .2s}
+.small{font-size:11.5px;color:var(--text2)}
+.sig-prev{max-height:60px;border:1px solid var(--border);border-radius:8px;background:#fff;padding:4px}
+</style>
+</head>
+<body>
+
+<!-- ══ GATE ══ -->
+<div id="gate">
+  <div class="box">
+    <div class="lock">🔒</div>
+    <h1>Certificados de Cumplimiento EBS</h1>
+    <p>Módulo protegido · ESE Hospital Regional Noroccidental</p>
+    <input id="gatePass" type="password" placeholder="Clave del módulo" autocomplete="off"
+           onkeydown="if(event.key==='Enter')unlock()">
+    <button onclick="unlock()">Ingresar</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app" class="hidden">
+  <div class="header">
+    <div class="brand">
+      <div class="logo-icon">📜</div>
+      <div>
+        <h1>Certificados de Cumplimiento EBS</h1>
+        <span>Equipos Básicos de Salud · Res. 0272/2026</span>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="pill back" href="../index.html">← Portal</a>
+      <button class="pill" onclick="lockAgain()">🔒 Bloquear</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="generar" onclick="showTab('generar')">Generar</button>
+    <button class="tab" data-tab="masivo" onclick="showTab('masivo')">Generación masiva</button>
+    <button class="tab" data-tab="contratistas" onclick="showTab('contratistas')">Contratistas</button>
+    <button class="tab" data-tab="ebs" onclick="showTab('ebs')">EBS / Territorios</button>
+    <button class="tab" data-tab="periodos" onclick="showTab('periodos')">Cuentas</button>
+    <button class="tab" data-tab="emitidos" onclick="showTab('emitidos')">Emitidos</button>
+    <button class="tab" data-tab="config" onclick="showTab('config')">Configuración</button>
+  </div>
+
+  <div class="wrap">
+
+    <!-- ── GENERAR ── -->
+    <div class="panel active" id="p-generar">
+      <div class="card">
+        <div class="card-h"><h2>Certificado individual</h2><span class="sub">Selecciona el contratista y el periodo a certificar</span></div>
+        <div class="card-b">
+          <div class="grid g2">
+            <div class="field">
+              <label>Buscar contratista (nombre, cédula o contrato)</label>
+              <input type="text" id="genSearch" placeholder="Ej. Yoan, 1094…, 0258" oninput="renderGenResults()">
+              <div id="genResults" style="margin-top:8px;max-height:230px;overflow:auto"></div>
+            </div>
+            <div class="field">
+              <label>Contratista seleccionado</label>
+              <div id="genSelected" class="card" style="margin:0;padding:14px;min-height:120px">
+                <span class="muted">Ninguno seleccionado.</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="genForm" class="hidden">
+            <hr style="border:none;border-top:1px solid var(--border);margin:8px 0 16px">
+            <div class="grid g3">
+              <div class="field">
+                <label>Cuenta(s) a certificar</label>
+                <div id="genPeriodos" class="chip-row"></div>
+              </div>
+              <div class="field">
+                <label>% Ejecución</label>
+                <input type="number" id="genPct" value="100" min="0" max="100" step="1" oninput="calcGen()">
+              </div>
+              <div class="field">
+                <label>Transporte (por periodo)</label>
+                <input type="number" id="genTransporte" value="0" min="0" step="1000" oninput="calcGen()">
+              </div>
+            </div>
+            <div class="grid g3">
+              <div class="field">
+                <label>Radicado</label>
+                <input type="text" id="genRadicado" readonly class="mono">
+                <div class="small">Consecutivo automático (editable en Configuración).</div>
+              </div>
+              <div class="field">
+                <label>Fecha de expedición</label>
+                <input type="date" id="genFecha">
+              </div>
+              <div class="field">
+                <label>Valor total del certificado</label>
+                <input type="text" id="genTotal" readonly class="mono" style="font-weight:800;color:var(--primary)">
+              </div>
+            </div>
+            <div id="genWarn"></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+              <button class="btn btn-ghost" onclick="previewGen()">👁 Vista previa</button>
+              <button class="btn btn-green" onclick="downloadGen()">⬇ Descargar y registrar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" id="genPreviewCard" style="display:none">
+        <div class="card-h"><h2>Vista previa</h2><span class="sub">No consume radicado hasta descargar</span></div>
+        <div class="card-b"><div class="previewbox"><iframe id="genPreviewFrame"></iframe></div></div>
+      </div>
+    </div>
+
+    <!-- ── MASIVO ── -->
+    <div class="panel" id="p-masivo">
+      <div class="card">
+        <div class="card-h"><h2>Generación masiva por EBS</h2><span class="sub">Genera todos los certificados firmados en un ZIP, divididos por número de EBS</span></div>
+        <div class="card-b">
+          <div class="filters" style="margin-bottom:14px">
+            <div class="field"><label>Municipio</label>
+              <select id="mMun" onchange="renderMasivoEbs()"><option value="">Todos</option></select></div>
+            <div class="field"><label>Coordinador</label>
+              <select id="mCoord" onchange="renderMasivoEbs()"><option value="">Todos</option><option value="DANILO">Danilo</option><option value="MELISA">Melisa</option></select></div>
+            <div class="field"><label>% Ejecución</label><input type="number" id="mPct" value="100" min="0" max="100"></div>
+          </div>
+          <div class="field">
+            <label>Cuenta(s) a certificar</label>
+            <div id="mPeriodos" class="chip-row"></div>
+          </div>
+          <div class="field">
+            <label>Equipos Básicos a incluir</label>
+            <div id="mEbsList"></div>
+          </div>
+          <div class="hint info">Cada certificado consume un radicado consecutivo. El ZIP agrupa los PDF en carpetas <b>EBS-001</b>, <b>EBS-002</b>… con la firma y el sello aplicados.</div>
+          <div id="mProgress" class="hidden"><div class="progress"><i id="mBar"></i></div><div class="small" id="mStatus" style="margin-top:6px"></div></div>
+          <div style="margin-top:14px">
+            <button class="btn btn-primary" id="mBtn" onclick="runMasivo()">⚙ Generar ZIP de certificados</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CONTRATISTAS ── -->
+    <div class="panel" id="p-contratistas">
+      <div class="kpis" id="ctKpis"></div>
+      <div class="card">
+        <div class="card-h">
+          <h2>Base de datos de contratistas</h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="exportContratistas()">⬇ Exportar Excel</button>
+            <button class="btn btn-primary btn-sm" onclick="openContratista()">+ Nuevo</button>
+          </div>
+        </div>
+        <div class="card-b">
+          <div class="filters" style="margin-bottom:12px">
+            <div class="field"><label>Buscar</label><input type="text" id="ctSearch" placeholder="Nombre, cédula, contrato…" oninput="renderContratistas()"></div>
+            <div class="field"><label>Municipio</label><select id="ctMun" onchange="renderContratistas()"><option value="">Todos</option></select></div>
+            <div class="field"><label>EBS</label><select id="ctEbs" onchange="renderContratistas()"><option value="">Todos</option></select></div>
+            <div class="field"><label>Rol</label><select id="ctRol" onchange="renderContratistas()"><option value="">Todos</option></select></div>
+          </div>
+          <div class="tbl-scroll">
+            <table><thead><tr>
+              <th>Contrato</th><th>Contratista</th><th>Rol</th><th>Mun</th><th>EBS</th><th>V. mensual</th><th>V. total</th><th></th>
+            </tr></thead><tbody id="ctBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EBS ── -->
+    <div class="panel" id="p-ebs">
+      <div class="card">
+        <div class="card-h"><h2>Equipos Básicos · Territorios, jefes y gestores</h2><span class="sub">Ajusta el territorio, el enfermero/a jefe, el gestor comunitario y el coordinador que firma</span></div>
+        <div class="card-b">
+          <div class="hint">El <b>enfermero/a jefe</b> se pre-cargó desde el objeto contractual. El <b>gestor comunitario</b> y el <b>territorio</b> se eligen aquí (el sistema no los vincula automáticamente al número de EBS).</div>
+          <div class="tbl-scroll" style="margin-top:12px">
+            <table><thead><tr>
+              <th>Mun</th><th>EBS</th><th>Territorio</th><th>Enfermero/a jefe</th><th>Gestor comunitario</th><th>Coord.</th><th></th>
+            </tr></thead><tbody id="ebsBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CUENTAS ── -->
+    <div class="panel" id="p-periodos">
+      <div class="card">
+        <div class="card-h"><h2>Cuentas de certificación</h2><span class="sub">Meses calendario contados desde el acta de inicio de cada contrato</span></div>
+        <div class="card-b">
+          <div class="hint info">Las <b>cuentas se calculan por contrato</b>, por <b>mes calendario</b>: la Cuenta 1 arranca en la <b>fecha de acta de inicio</b> (columna FECHA ACTAINICIO) y termina <b>un día antes de cumplir el mes</b> (ej. 10/07/2026 → 09/08/2026); la Cuenta 2 el siguiente mes, y así hasta el fin del contrato (tiempo de ejecución). Por eso cada cuenta puede tener 28, 30 o 31 días. La última cuenta se recorta a la fecha final del contrato. El valor de cada cuenta es el <b>valor mensual</b> del contratista × % ejecución.</div>
+          <div class="card" style="margin-top:14px"><div class="card-b">
+            <div class="small" style="font-weight:700;margin-bottom:8px">Vista previa de cuentas (ejemplos de la base de datos)</div>
+            <div class="tbl-scroll">
+              <table><thead><tr><th>Contratista</th><th>Contrato</th><th>Acta inicio</th><th>Días</th><th>Nº cuentas</th><th>Detalle</th></tr></thead>
+              <tbody id="cuentasPrev"></tbody></table>
+            </div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EMITIDOS ── -->
+    <div class="panel" id="p-emitidos">
+      <div class="kpis" id="emKpis"></div>
+      <div class="card">
+        <div class="card-h"><h2>Certificados emitidos</h2><button class="btn btn-ghost btn-sm" onclick="exportEmitidos()">⬇ Exportar Excel</button></div>
+        <div class="card-b">
+          <div class="filters" style="margin-bottom:12px">
+            <div class="field"><label>Buscar</label><input type="text" id="emSearch" placeholder="Radicado, nombre, contrato…" oninput="renderEmitidos()"></div>
+          </div>
+          <div class="tbl-scroll">
+            <table><thead><tr><th>Radicado</th><th>Contratista</th><th>Contrato</th><th>Cuentas</th><th>Total</th><th>Coord.</th><th>Emitido</th><th>Acciones</th></tr></thead>
+            <tbody id="emBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CONFIG ── -->
+    <div class="panel" id="p-config">
+      <div class="card">
+        <div class="card-h"><h2>Radicador</h2><span class="sub">Numeración consecutiva de los certificados</span></div>
+        <div class="card-b"><div class="grid g4">
+          <div class="field"><label>Prefijo</label><input type="text" id="cfgPref"></div>
+          <div class="field"><label>Próximo consecutivo</label><input type="number" id="cfgCons" min="1"></div>
+          <div class="field"><label>Sufijo (año)</label><input type="text" id="cfgSuf"></div>
+          <div class="field"><label>Dígitos</label><input type="number" id="cfgPad" min="1" max="8"></div>
+        </div>
+        <div class="small">Ejemplo del próximo radicado: <b id="cfgEjemplo" class="mono"></b></div>
+        <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="saveRadicador()">Guardar radicador</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h2>Valores mensuales base por rol</h2><span class="sub">Editable; se aplica a nuevos cálculos</span></div>
+        <div class="card-b"><div id="cfgValores" class="grid g3"></div>
+          <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="saveValores()">Guardar valores base</button>
+          <div class="hint">Cambiar un valor base <b>no</b> reescribe el valor mensual ya guardado en cada contratista. Usa el botón "Recalcular" para propagarlo.</div>
+          <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="recalcValores()">↻ Recalcular valor mensual de todos los contratistas</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h2>Coordinadores y firmas</h2><span class="sub">Nombre, cargo, jurisdicción y firma virtual</span></div>
+        <div class="card-b" id="cfgCoords"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h2>Seguridad</h2></div>
+        <div class="card-b">
+          <div class="hint info">La clave del módulo se define en el código del archivo (<span class="mono">CFG.CLAVE</span>), igual que los demás módulos del portal. Clave actual por defecto: <b class="mono">HRNO.ebs2026</b> — cámbiala editando el archivo.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modales -->
+<div class="modal-bg" id="mdContratista"><div class="modal">
+  <div class="modal-h"><h3 id="mdCtTitle">Contratista</h3><button class="modal-close" onclick="closeModal('mdContratista')">×</button></div>
+  <div class="modal-b">
+    <input type="hidden" id="fCtId">
+    <div class="grid g2">
+      <div class="field"><label>Código de contrato</label><input type="text" id="fCtCodigo"></div>
+      <div class="field"><label>Cédula</label><input type="text" id="fCtCedula"></div>
+    </div>
+    <div class="field"><label>Nombre completo</label><input type="text" id="fCtNombre"></div>
+    <div class="grid g3">
+      <div class="field"><label>Rol</label><input type="text" id="fCtRol" list="rolesList"></div>
+      <div class="field"><label>Municipio</label><input type="text" id="fCtMun" list="munsList"></div>
+      <div class="field"><label>EBS Nº</label><input type="text" id="fCtEbs" placeholder="001"></div>
+    </div>
+    <div class="field"><label>Objeto contractual</label><textarea id="fCtObjeto"></textarea></div>
+    <div class="grid g3">
+      <div class="field"><label>Valor total</label><input type="number" id="fCtVtotal"></div>
+      <div class="field"><label>Valor mensual</label><input type="number" id="fCtVmes"></div>
+      <div class="field"><label>Transporte</label><input type="number" id="fCtTransp" value="0"></div>
+    </div>
+    <div class="grid g3">
+      <div class="field"><label>Tiempo ejec. (días)</label><input type="number" id="fCtTiempo"></div>
+      <div class="field"><label>Acta de inicio</label><input type="date" id="fCtActa"></div>
+      <div class="field"><label>Territorio (si es gestor)</label><input type="text" id="fCtTerr"></div>
+    </div>
+    <label class="chk" style="display:inline-flex"><input type="checkbox" id="fCtActivo" checked> Activo</label>
+  </div>
+  <div class="modal-f">
+    <button class="btn btn-ghost" id="fCtDel" onclick="delContratista()">Eliminar</button>
+    <button class="btn btn-ghost" onclick="closeModal('mdContratista')">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveContratista()">Guardar</button>
+  </div>
+</div></div>
+
+<div class="modal-bg" id="mdEbs"><div class="modal">
+  <div class="modal-h"><h3 id="mdEbsTitle">EBS</h3><button class="modal-close" onclick="closeModal('mdEbs')">×</button></div>
+  <div class="modal-b">
+    <input type="hidden" id="fEbsId">
+    <div class="grid g2">
+      <div class="field"><label>Municipio</label><input type="text" id="fEbsMun" readonly></div>
+      <div class="field"><label>EBS Nº</label><input type="text" id="fEbsNum" readonly></div>
+    </div>
+    <div class="field"><label>Territorio</label><input type="text" id="fEbsTerr" list="terrList" placeholder="Ej. CAPITANLARGO"></div>
+    <div class="field"><label>Enfermero/a jefe</label><input type="text" id="fEbsJefe"></div>
+    <div class="field"><label>Gestor comunitario</label>
+      <select id="fEbsGestor"></select>
+      <div class="small">Lista de gestores del Excel con su territorio. También puedes escribir uno libre en el campo de abajo.</div>
+      <input type="text" id="fEbsGestorLibre" placeholder="(opcional) escribir gestor manualmente" style="margin-top:6px">
+    </div>
+    <div class="field"><label>Coordinador que firma</label>
+      <select id="fEbsCoord"><option value="DANILO">Danilo Torrado (Ábrego – El Carmen)</option><option value="MELISA">Melisa Barrero (Convención – Teorama)</option></select>
+    </div>
+  </div>
+  <div class="modal-f">
+    <button class="btn btn-ghost" onclick="closeModal('mdEbs')">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveEbs()">Guardar</button>
+  </div>
+</div></div>
+
+<div class="modal-bg" id="mdCorregir"><div class="modal" style="max-width:760px">
+  <div class="modal-h"><h3 id="mdCorrTitle">Corregir certificado</h3><button class="modal-close" onclick="closeModal('mdCorregir')">×</button></div>
+  <div class="modal-b">
+    <div class="hint info">Ajusta lo que necesites y descarga el certificado corregido. Conserva el mismo radicado y actualiza el registro. Los cambios aquí <b>no</b> modifican la base de datos de contratistas.</div>
+    <div class="grid g3" style="margin-top:14px">
+      <div class="field"><label>Radicado</label><input type="text" id="corrRadicado" class="mono"></div>
+      <div class="field"><label>Fecha de expedición</label><input type="date" id="corrFecha"></div>
+      <div class="field"><label>Coordinador que firma</label><select id="corrCoord"><option value="DANILO">Danilo Torrado</option><option value="MELISA">Melisa Barrero</option></select></div>
+    </div>
+    <div class="grid g3">
+      <div class="field"><label>Nombre</label><input type="text" id="corrNombre"></div>
+      <div class="field"><label>Cédula</label><input type="text" id="corrCedula"></div>
+      <div class="field"><label>Rol</label><input type="text" id="corrRol" list="rolesList"></div>
+    </div>
+    <div class="field"><label>Objeto contractual</label><textarea id="corrObjeto"></textarea></div>
+    <div class="grid g3">
+      <div class="field"><label>Territorio</label><input type="text" id="corrTerr"></div>
+      <div class="field"><label>Enfermero/a jefe</label><input type="text" id="corrJefe"></div>
+      <div class="field"><label>Gestor comunitario</label><input type="text" id="corrGestor"></div>
+    </div>
+    <label>Cuentas certificadas</label>
+    <div class="tbl-scroll" style="max-height:none;margin-top:5px"><table><thead><tr>
+      <th>Cuenta</th><th>Desde</th><th>Hasta</th><th>Valor base</th><th>% Ejec</th><th>Transporte</th><th>Total</th><th></th>
+    </tr></thead><tbody id="corrCuentas"></tbody></table></div>
+    <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="addCorrCuenta()">+ Agregar cuenta</button>
+    <div style="text-align:right;margin-top:8px;font-weight:800;color:var(--primary)">Total certificado: <span id="corrTotal" class="mono">$ 0</span></div>
+  </div>
+  <div class="modal-f">
+    <button class="btn btn-ghost" onclick="closeModal('mdCorregir')">Cancelar</button>
+    <button class="btn btn-green" onclick="saveCorregir()">✓ Guardar y descargar corregido</button>
+  </div>
+</div></div>
+
+<datalist id="rolesList"></datalist>
+<datalist id="munsList"></datalist>
+<datalist id="terrList"></datalist>
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   CONFIGURACIÓN
+   ══════════════════════════════════════════════════════════════ */
+const CFG = {
+  SUPA_URL: 'https://kukauvbqosizlxrapmim.supabase.co',
+  SUPA_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1a2F1dmJxb3Npemx4cmFwbWltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4ODMzNTUsImV4cCI6MjA5NzQ1OTM1NX0.1ajCazK2YEb_DU14R96dQI5qU-ClwR0t7WHMYKWqOIU',
+  CLAVE: 'HRNO.ebs2026'   // ← cambiar aquí la clave del módulo
+};
+const supa = window.supabase.createClient(CFG.SUPA_URL, CFG.SUPA_KEY);
+const { jsPDF } = window.jspdf;
+const A = window.CERTEB_ASSETS;
+
+/* ── Estado ── */
+const ST = {
+  contratistas:[], ebs:[], periodos:[], emitidos:[],
+  radicador:{prefijo:'ESP-116-',consecutivo:1,sufijo:'-2026',pad:4},
+  valores:{}, coordinadores:{}, transporteDefault:0,
+  diasPorCuenta:30,
+  genSel:null
+};
+
+const MUN_DISPLAY = {'ABREGO':'Ábrego','EL CARMEN':'El Carmen','CONVENCION':'Convención','TEORAMA':'Teorama'};
+const ROL_DISPLAY = {'AUXILIAR DE ENFERMERIA':'AUXILIAR DE ENFERMERÍA','PSICOLOGO':'PSICÓLOGO','MEDICO GENERAL':'MÉDICO GENERAL','ODONTOLOGO':'ODONTÓLOGO','ENFERMERA PROFESIONAL':'ENFERMERA PROFESIONAL','GESTOR COMUNITARIO':'GESTOR COMUNITARIO'};
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+/* ══════════════════════════════════════════════════════════════
+   UTILIDADES
+   ══════════════════════════════════════════════════════════════ */
+function $(id){return document.getElementById(id)}
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function money(n){ if(n==null||isNaN(n))return '$ 0'; return '$ '+Math.round(n).toLocaleString('es-CO'); }
+function munDisp(m){ return MUN_DISPLAY[m] || (m? m.charAt(0)+m.slice(1).toLowerCase() : ''); }
+function rolDisp(r){ return ROL_DISPLAY[r] || r || ''; }
+function toast(msg,type){ const t=document.createElement('div'); t.className='toast '+(type||''); t.textContent=msg; $('toasts').appendChild(t); setTimeout(()=>t.remove(),3600); }
+function radicadoStr(n){ return CFG_pref()+String(n).padStart(ST.radicador.pad||4,'0')+CFG_suf(); }
+function CFG_pref(){return ST.radicador.prefijo||''} function CFG_suf(){return ST.radicador.sufijo||''}
+function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function parseISO(s){ if(!s)return null; const p=String(s).slice(0,10).split('-'); if(p.length<3)return null; return new Date(+p[0],+p[1]-1,+p[2]); }
+function fmtISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function addMonths(d,n){ const y=d.getFullYear(), m=d.getMonth(), day=d.getDate();
+  const t=new Date(y,m+n,1); const last=new Date(t.getFullYear(),t.getMonth()+1,0).getDate();
+  t.setDate(Math.min(day,last)); return t; }
+function fechaLarga(iso){ const d=parseISO(iso)||new Date(); return 'a los '+d.getDate()+' días del mes de '+MESES[d.getMonth()]+' de '+d.getFullYear(); }
+
+/* ══════════════════════════════════════════════════════════════
+   GATE
+   ══════════════════════════════════════════════════════════════ */
+function unlock(){
+  if($('gatePass').value===CFG.CLAVE){
+    sessionStorage.setItem('certeb_unlock','1');
+    $('gate').classList.add('hidden'); $('app').classList.remove('hidden');
+    boot();
+  } else { $('gateErr').textContent='Clave incorrecta'; $('gatePass').select(); }
+}
+function lockAgain(){ sessionStorage.removeItem('certeb_unlock'); location.reload(); }
+if(sessionStorage.getItem('certeb_unlock')==='1'){ $('gate').classList.add('hidden'); $('app').classList.remove('hidden'); window.addEventListener('DOMContentLoaded',boot); }
+else { window.addEventListener('DOMContentLoaded',()=>$('gatePass').focus()); }
+
+/* ══════════════════════════════════════════════════════════════
+   CARGA DE DATOS
+   ══════════════════════════════════════════════════════════════ */
+async function boot(){
+  try{
+    const [c,e,p,em,cfg] = await Promise.all([
+      supa.from('certeb_contratistas').select('*').order('municipio').order('ebs_num').order('nombre'),
+      supa.from('certeb_ebs').select('*').order('municipio').order('ebs_num'),
+      supa.from('certeb_periodos').select('*').order('orden'),
+      supa.from('certeb_emitidos').select('*').order('fecha_emision',{ascending:false}).limit(2000),
+      supa.from('certeb_config').select('*')
+    ]);
+    ST.contratistas=c.data||[]; ST.ebs=e.data||[]; ST.periodos=p.data||[]; ST.emitidos=em.data||[];
+    (cfg.data||[]).forEach(row=>{
+      if(row.clave==='radicador') ST.radicador=Object.assign(ST.radicador,row.valor);
+      if(row.clave==='valores_base') ST.valores=row.valor||{};
+      if(row.clave==='coordinadores') ST.coordinadores=row.valor||{};
+      if(row.clave==='transporte_default') ST.transporteDefault=(row.valor&&row.valor.valor)||0;
+      if(row.clave==='cuentas') ST.diasPorCuenta=(row.valor&&row.valor.dias)||30;
+    });
+    initFilters();
+    renderAll();
+    toast('Datos cargados: '+ST.contratistas.length+' contratistas','ok');
+  }catch(err){ console.error(err); toast('Error cargando datos: '+err.message,'err'); }
+}
+
+function initFilters(){
+  const muns=[...new Set(ST.contratistas.map(c=>c.municipio).filter(Boolean))].sort();
+  const roles=[...new Set(ST.contratistas.map(c=>c.rol).filter(Boolean))].sort();
+  const ebsn=[...new Set(ST.contratistas.map(c=>c.ebs_num).filter(Boolean))].sort();
+  const terrs=[...new Set(ST.contratistas.map(c=>c.territorio).filter(Boolean))].sort();
+  fillSel('ctMun',muns,munDisp); fillSel('ctRol',roles,rolDisp); fillSel('ctEbs',ebsn);
+  fillSel('mMun',muns,munDisp);
+  $('rolesList').innerHTML=roles.map(r=>`<option value="${esc(r)}">`).join('');
+  $('munsList').innerHTML=muns.map(r=>`<option value="${esc(r)}">`).join('');
+  $('terrList').innerHTML=terrs.map(r=>`<option value="${esc(r)}">`).join('');
+}
+function fillSel(id,arr,disp){ const s=$(id); const first=s.querySelector('option'); s.innerHTML=''; s.appendChild(first); arr.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=disp?disp(v):v; s.appendChild(o); }); }
+
+function renderAll(){
+  renderGenPeriodos(); renderGenResults();
+  renderMasivoPeriodos(); renderMasivoEbs();
+  renderContratistas(); renderEbs(); renderCuentasCfg(); renderEmitidos(); renderConfig();
+}
+
+/* ── Tabs ── */
+function showTab(t){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===t));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  $('p-'+t).classList.add('active');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HELPERS DE NEGOCIO
+   ══════════════════════════════════════════════════════════════ */
+function ebsCfgFor(c){
+  return ST.ebs.find(e=>e.municipio===c.municipio && e.ebs_num===c.ebs_num) || null;
+}
+function coordFor(c){
+  const cf=ebsCfgFor(c);
+  const key=(cf&&cf.coordinador)|| (['ABREGO','EL CARMEN'].includes(c.municipio)?'DANILO':'MELISA');
+  return { key, ...(ST.coordinadores[key]||{}) };
+}
+// Genera las cuentas de un contrato: MESES CALENDARIO contados desde la FECHA DE
+// ACTA DE INICIO. Cada cuenta va del día del acta hasta UN DÍA ANTES de cumplir el
+// mes (ej. 10/07 → 09/08). Así respeta meses de 28/30/31 días. La última cuenta se
+// recorta al fin del contrato (acta + tiempo de ejecución).
+function cuentasDe(c){
+  const acta=parseISO(c.acta_inicio); if(!acta) return [];
+  const dur=+c.tiempo_ejec || 150;
+  const finMax=addDays(acta,dur-1);
+  const arr=[]; let k=1;
+  while(k<=60){
+    const ini=addMonths(acta,k-1);
+    if(ini>finMax) break;
+    let fin=addDays(addMonths(acta,k),-1);
+    if(fin>finMax) fin=finMax;
+    arr.push({num:k, ini, fin, dias:Math.round((fin-ini)/86400000)+1});
+    k++;
+  }
+  return arr;
+}
+function maxCuentas(){ return Math.max(1,...ST.contratistas.map(c=>cuentasDe(c).length)); }
+
+/* ══════════════════════════════════════════════════════════════
+   GENERAR — individual
+   ══════════════════════════════════════════════════════════════ */
+function renderGenResults(){
+  const q=($('genSearch').value||'').toLowerCase().trim();
+  let list=ST.contratistas.filter(c=>c.activo!==false);
+  if(q) list=list.filter(c=>((c.nombre||'')+' '+(c.cedula||'')+' '+(c.codigo_contrato||'')).toLowerCase().includes(q));
+  list=list.slice(0,40);
+  $('genResults').innerHTML = list.length? list.map(c=>`
+    <div class="chk" style="justify-content:space-between;margin-bottom:5px" onclick="selectGen('${c.id}')">
+      <span><b>${esc(c.nombre)}</b> <span class="small">· ${esc(rolDisp(c.rol))}</span></span>
+      <span class="small mono">${esc(c.codigo_contrato||'')} · EBS ${esc(c.ebs_num||'--')}</span>
+    </div>`).join('') : '<span class="muted small">Sin resultados.</span>';
+}
+function selectGen(id){
+  const c=ST.contratistas.find(x=>x.id===id); if(!c)return;
+  ST.genSel=c;
+  const cf=ebsCfgFor(c), co=coordFor(c);
+  $('genSelected').innerHTML=`
+    <div style="font-weight:800;font-size:15px;color:var(--primary)">${esc(c.nombre)}</div>
+    <div class="small">C.C. ${esc(c.cedula||'—')} · Contrato ${esc(c.codigo_contrato||'—')}-${esc((ST.radicador.sufijo||'-2026').replace('-',''))}</div>
+    <div style="margin:8px 0"><span class="badge b-role">${esc(rolDisp(c.rol))}</span>
+      <span class="badge ${co.key==='DANILO'?'b-dan':'b-mel'}">${co.key==='DANILO'?'Danilo':'Melisa'}</span></div>
+    <div class="small">Mun: <b>${esc(munDisp(c.municipio))}</b> · EBS <b>${esc(c.ebs_num||'—')}</b> · Territorio: <b>${esc(cf&&cf.territorio||'⚠ sin definir')}</b></div>
+    <div class="small">Jefe: ${esc(cf&&cf.jefe_nombre||'⚠')} · Gestor: ${esc(cf&&cf.gestor_nombre||'⚠')}</div>
+    <div class="small" style="margin-top:6px">Valor mensual: <b>${money(c.valor_mensual)}</b></div>`;
+  $('genForm').classList.remove('hidden');
+  $('genTransporte').value = c.transporte || ST.transporteDefault || 0;
+  $('genRadicado').value = radicadoStr(ST.radicador.consecutivo);
+  // periodos aplicables
+  renderGenPeriodos();
+  // default fecha = hoy
+  $('genFecha').value = todayISO();
+  $('genPreviewCard').style.display='none';
+  calcGen();
+}
+function renderGenPeriodos(){
+  const box=$('genPeriodos'); if(!box)return;
+  const c=ST.genSel;
+  if(!c){ box.innerHTML='<span class="muted small">Selecciona un contratista.</span>'; return; }
+  const cuentas=cuentasDe(c);
+  if(!cuentas.length){ box.innerHTML='<span class="muted small" style="color:var(--red)">⚠ Falta el acta de inicio del contrato (pestaña Contratistas).</span>'; return; }
+  box.innerHTML=cuentas.map(q=>`<label class="chk"><input type="checkbox" value="${q.num}" onchange="onGenPerChange(this)"> Cuenta ${q.num}<span class="small"> (${fmtISO(q.ini)} → ${fmtISO(q.fin)}, ${q.dias} días)</span></label>`).join('');
+}
+function onGenPerChange(el){ el.closest('.chk').classList.toggle('on',el.checked); setGenFechaFromPer(); calcGen(); }
+function selectedGenPeriodos(){
+  const c=ST.genSel; if(!c) return [];
+  const cuentas=cuentasDe(c);
+  return [...$('genPeriodos').querySelectorAll('input:checked')].map(i=>cuentas.find(q=>q.num==i.value)).filter(Boolean);
+}
+function setGenFechaFromPer(){
+  const sel=selectedGenPeriodos(); if(!sel.length)return;
+  $('genFecha').value=fmtISO(sel[sel.length-1].fin);
+}
+function calcGen(){
+  const c=ST.genSel; if(!c)return;
+  const pct=+($('genPct').value||0), tr=+($('genTransporte').value||0);
+  const sel=selectedGenPeriodos();
+  let total=0;
+  sel.forEach(()=>{ total += (c.valor_mensual||0)*pct/100 + tr; });
+  $('genTotal').value=money(total);
+  const cf=ebsCfgFor(c);
+  let warn='';
+  if(!cf||!cf.territorio) warn+='<div class="hint">⚠ Falta definir el <b>territorio</b> de este EBS (pestaña EBS/Territorios).</div>';
+  if(!cf||!cf.gestor_nombre) warn+='<div class="hint">⚠ Falta el <b>gestor comunitario</b> de este EBS.</div>';
+  if(!cf||!cf.jefe_nombre) warn+='<div class="hint">⚠ Falta el <b>enfermero/a jefe</b> de este EBS.</div>';
+  $('genWarn').innerHTML=warn;
+}
+async function previewGen(){
+  const doc=buildDocGen(); if(!doc)return;
+  $('genPreviewCard').style.display='block';
+  $('genPreviewFrame').src=doc.output('datauristring');
+  $('genPreviewCard').scrollIntoView({behavior:'smooth'});
+}
+function buildDocGen(){
+  const c=ST.genSel; if(!c){toast('Selecciona un contratista','warn');return null;}
+  const sel=selectedGenPeriodos(); if(!sel.length){toast('Selecciona al menos una cuenta','warn');return null;}
+  const pct=+($('genPct').value||0), tr=+($('genTransporte').value||0);
+  const rad=radicadoStr(ST.radicador.consecutivo);
+  const rows=sel.map(q=>({
+    etiqueta:'Cuenta '+q.num, cuenta:q.num,
+    ini: fmtISO(q.ini), fin: fmtISO(q.fin),
+    base:c.valor_mensual||0, pct, valor:(c.valor_mensual||0)*pct/100, transporte:tr,
+    total:(c.valor_mensual||0)*pct/100+tr }));
+  return buildCert(c, rad, rows, $('genFecha').value);
+}
+async function downloadGen(){
+  const c=ST.genSel; const doc=buildDocGen(); if(!doc)return;
+  const rad=radicadoStr(ST.radicador.consecutivo);
+  const sel=selectedGenPeriodos(); const pct=+($('genPct').value||0), tr=+($('genTransporte').value||0);
+  const fname='Certificado_'+rad.replace(/[^\w-]/g,'')+'_'+(c.nombre||'').replace(/\s+/g,'_')+'.pdf';
+  doc.save(fname);
+  // registrar
+  const co=coordFor(c), cf=ebsCfgFor(c)||{};
+  const fexp=$('genFecha').value;
+  const recs=sel.map(q=>({radicado:rad,contratista_id:c.id,codigo_contrato:c.codigo_contrato,cedula:c.cedula,nombre:c.nombre,rol:c.rol,municipio:c.municipio,ebs_num:c.ebs_num,
+    periodo_etiqueta:'Cuenta '+q.num+' ('+fmtISO(q.ini)+' a '+fmtISO(q.fin)+')',cuenta_num:q.num,fecha_ini:fmtISO(q.ini),fecha_fin:fmtISO(q.fin),fecha_exp:fexp,
+    objeto:c.objeto,territorio:cf.territorio,jefe_nombre:cf.jefe_nombre,gestor_nombre:cf.gestor_nombre,
+    valor_base:c.valor_mensual,pct_ejec:pct,transporte:tr,total:(c.valor_mensual||0)*pct/100+tr,coordinador:co.key,emitido_por:'modulo'}));
+  await supa.from('certeb_emitidos').insert(recs);
+  await bumpRadicador(1);
+  ST.emitidos.unshift(...recs); renderEmitidos();
+  $('genRadicado').value=radicadoStr(ST.radicador.consecutivo);
+  toast('Certificado '+rad+' generado y registrado','ok');
+}
+async function bumpRadicador(n){
+  ST.radicador.consecutivo = (ST.radicador.consecutivo||1)+n;
+  await supa.from('certeb_config').upsert({clave:'radicador',valor:ST.radicador},{onConflict:'clave'});
+  renderConfig();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CONSTRUCCIÓN DEL PDF — fiel al formato MA-GTH-CC-04
+   ══════════════════════════════════════════════════════════════ */
+function buildCert(c, radicado, rows, fechaExpISO, opts){
+  opts=opts||{};
+  const doc=new jsPDF({unit:'pt',format:'letter'}); // 612 x 792
+  const L=73, R=73, PW=612, CW=PW-L-R;
+  const co=opts.co||coordFor(c), cf=opts.cf||ebsCfgFor(c)||{};
+  let y=33;
+
+  // Encabezado institucional
+  try{ doc.addImage(A.encabezado.data,'JPEG',L,y,CW,CW*A.encabezado.h/A.encabezado.w); }catch(e){}
+  y = 33 + CW*A.encabezado.h/A.encabezado.w + 22;
+
+  // Radicado
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text(radicado, L, y); y+=26;
+
+  // Título
+  doc.setFont('helvetica','bold'); doc.setFontSize(11.5);
+  doc.text('LA COORDINACIÓN DE EQUIPOS BÁSICOS DE SALUD', PW/2, y, {align:'center'}); y+=15;
+  doc.text('('+(co.jurisdiccion||'')+')', PW/2, y, {align:'center'}); y+=26;
+  doc.text('HACE CONSTAR:', PW/2, y, {align:'center'}); y+=22;
+
+  // Cuerpo
+  doc.setFont('helvetica','normal'); doc.setFontSize(10.5);
+  const contratoNo=(c.codigo_contrato||'')+ (ST.radicador.sufijo||'-2026');
+  const objeto=(c.objeto||'').trim();
+  const p1='Que, '+(c.nombre||'').toUpperCase()+', identificado(a) con C.C. No. '+fmtCedula(c.cedula)+
+    ', con contrato de orden de prestación de servicios No. '+contratoNo+
+    ', quien fue contratado(a) como '+rolDisp(c.rol)+' y cuyo objeto contractual es: '+objeto;
+  y=justif(doc,p1,L,y,CW,14);
+  y+=8;
+
+  // Tabla de valores
+  y=drawTabla(doc,L,y,CW,rows);
+  y+=16;
+
+  // Párrafo gestor/enfermero
+  doc.setFont('helvetica','normal'); doc.setFontSize(10.5);
+  const terr=cf.territorio||'________________';
+  const gestor=cf.gestor_nombre||'________________';
+  const jefe=cf.jefe_nombre||'________________';
+  const p2='Que, revisado la constancia del Gestor Comunitario '+gestor+' y la del/la Enfermero/a Profesional '+jefe+
+    ', realizó actividades en el municipio de '+munDisp(c.municipio).toUpperCase()+' territorio '+terr+
+    ', según el detalle de los periodos y valores relacionados en la(s) tabla(s) anterior(es).';
+  y=justif(doc,p2,L,y,CW,14); y+=10;
+
+  const ciudad=munDisp(c.municipio);
+  const p3='Se expide la presente a solicitud del/la interesado(a) en '+ciudad+', '+fechaLarga(fechaExpISO)+', para efectos de cobro.';
+  y=justif(doc,p3,L,y,CW,14); y+=14;
+
+  doc.text('Con atención y compromiso institucional,', L, y); y+=16;
+
+  // Firma + sello
+  y=drawFirma(doc,L,y,co,radicado,fechaExpISO);
+
+  // Pie de página (anclado al fondo de la página)
+  const pieW=CW, pieH=pieW*A.pie.h/A.pie.w;
+  try{ doc.addImage(A.pie.data,'JPEG',L,792-12-pieH,pieW,pieH); }catch(e){}
+
+  return doc;
+}
+function fmtCedula(s){ s=(s||'').replace(/\D/g,''); return s? Number(s).toLocaleString('es-CO'):'____________'; }
+function justif(doc,txt,x,y,w,lh){
+  // Pasar el texto completo (sin pre-dividir) para que jsPDF ajuste y JUSTIFIQUE
+  // cada renglón al ancho w, dejando la última línea sin estirar.
+  const lines=doc.splitTextToSize(txt,w);
+  const fs=doc.getFontSize();
+  doc.setLineHeightFactor(lh/fs);
+  doc.text(txt, x, y, {maxWidth:w, align:'justify'});
+  doc.setLineHeightFactor(1.15);
+  return y + lines.length*lh;
+}
+function drawTabla(doc,x,y,w,rows){
+  const cols=[0.30,0.16,0.10,0.16,0.14,0.14]; // Período, V.Base, %Ejec, Valor, Transp, Total
+  const widths=cols.map(f=>f*w);
+  const heads=['PERÍODO','VALOR BASE','% EJEC','VALOR','TRANSPORTE','TOTAL'];
+  const rh=20;
+  function cellX(i){ let s=x; for(let k=0;k<i;k++)s+=widths[k]; return s; }
+  // header
+  doc.setFillColor(244,247,251); doc.rect(x,y,w,rh,'F');
+  doc.setDrawColor(180,195,210); doc.setLineWidth(0.6);
+  doc.setFont('helvetica','bold'); doc.setFontSize(8.2); doc.setTextColor(40,55,77);
+  heads.forEach((h,i)=>{ doc.rect(cellX(i),y,widths[i],rh); doc.text(h, cellX(i)+widths[i]/2, y+13, {align:'center'}); });
+  y+=rh;
+  // rows
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.6); doc.setTextColor(20,30,45);
+  let tot=0;
+  rows.forEach(r=>{
+    const cells=[r.etiqueta||('Cuenta '+(r.cuenta||'')), money(r.base), (r.pct||0)+'%', money(r.valor), money(r.transporte), money(r.total)];
+    doc.rect(x,y,w,rh);
+    cells.forEach((cv,i)=>{ doc.rect(cellX(i),y,widths[i],rh);
+      const al=i===0?'left':'center'; const tx=i===0?cellX(0)+5:cellX(i)+widths[i]/2;
+      doc.text(String(cv),tx,y+13,{align:al}); });
+    tot+=r.total; y+=rh;
+    if(r.ini){ /* nota de fechas bajo período */ }
+  });
+  // total pagado
+  doc.setFont('helvetica','bold'); doc.setFontSize(8.6);
+  doc.rect(x,y,w-widths[5],rh); doc.text('TOTAL PAGADO', cellX(0)+5, y+13);
+  doc.rect(cellX(5),y,widths[5],rh); doc.text(money(tot), cellX(5)+widths[5]/2, y+13, {align:'center'});
+  y+=rh;
+  // nota de fechas
+  doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(90,107,128);
+  rows.forEach(r=>{ if(r.ini){ doc.text('Cuenta '+(r.cuenta||'')+' ('+r.ini+' a '+r.fin+')', x, y+10); y+=11; } });
+  doc.setTextColor(20,30,45);
+  return y;
+}
+function drawFirma(doc,x,y,co,radicado,fechaISO){
+  const PW=612, R=73;
+  // sello / marca de agua — a la derecha, alineado con el inicio del bloque de firma
+  const stampW=190, stampH=56, stampX=PW-R-stampW, stampY=y-10;
+  if(typeof doc.GState==='function'){ doc.setGState(new doc.GState({opacity:0.5})); }
+  doc.setDrawColor(15,76,129); doc.setLineWidth(1); doc.roundedRect(stampX,stampY,stampW,stampH,4,4);
+  doc.setTextColor(15,76,129); doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
+  doc.text('FIRMA DIGITAL — VÁLIDA SIN FÍSICA', stampX+8, stampY+13);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.text((co.nombre||''), stampX+8, stampY+24);
+  doc.text('Fecha: '+(fechaISO||todayISO()), stampX+8, stampY+34);
+  doc.text('Objeto: Certificado de cumplimiento', stampX+8, stampY+43);
+  doc.text('Radicado: '+radicado, stampX+8, stampY+51);
+  if(typeof doc.GState==='function'){ doc.setGState(new doc.GState({opacity:1})); }
+  doc.setTextColor(20,30,45);
+  // firma imagen (izquierda)
+  const firma = (co.firma) ? co.firma : (co.key==='DANILO'? A.firmaDanilo.data : null);
+  const fw=132, fh=firma? fw*(A.firmaDanilo.h/A.firmaDanilo.w):0;
+  const sigY=y+4;
+  if(firma){ try{ doc.addImage(firma,'JPEG',x,sigY,fw,fh);}catch(e){} }
+  // nombre y cargo — directamente bajo la firma (como en el formato original)
+  y = sigY + fh + 6;
+  doc.setDrawColor(20,30,45);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10.5);
+  doc.text((co.nombre||'').toUpperCase(), x, y); y+=12;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  doc.text(co.cargo||'', x, y); y+=13;
+  return y;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MASIVO
+   ══════════════════════════════════════════════════════════════ */
+function renderMasivoPeriodos(){
+  const maxN=maxCuentas();
+  let html='';
+  for(let k=1;k<=maxN;k++) html+=`<label class="chk"><input type="checkbox" value="${k}" onchange="this.closest('.chk').classList.toggle('on',this.checked)"> Cuenta ${k}</label>`;
+  $('mPeriodos').innerHTML=html || '<span class="muted small">Sin cuentas.</span>';
+}
+function renderMasivoEbs(){
+  const mun=$('mMun').value, coord=$('mCoord').value;
+  let ebs=ST.ebs.slice();
+  if(mun) ebs=ebs.filter(e=>e.municipio===mun);
+  if(coord) ebs=ebs.filter(e=>(e.coordinador||'')===coord);
+  $('mEbsList').innerHTML = ebs.length? ebs.map(e=>{
+    const n=ST.contratistas.filter(c=>c.activo!==false && c.municipio===e.municipio && c.ebs_num===e.ebs_num).length;
+    const falta = !e.territorio || !e.gestor_nombre || !e.jefe_nombre;
+    return `<label class="chk on" style="margin:0 8px 8px 0;display:inline-flex">
+      <input type="checkbox" class="mEbsChk" value="${e.id}" checked>
+      EBS ${esc(e.ebs_num)} · ${esc(munDisp(e.municipio))} <span class="small">(${n} contr.)</span>
+      ${falta?'<span class="small" style="color:var(--red)">⚠ datos incompletos</span>':''}
+    </label>`;
+  }).join('') : '<span class="muted small">Sin EBS para el filtro.</span>';
+}
+async function runMasivo(){
+  const cuentaNums=[...$('mPeriodos').querySelectorAll('input:checked')].map(i=>+i.value);
+  if(!cuentaNums.length){ toast('Selecciona al menos una cuenta','warn'); return; }
+  const ebsIds=[...document.querySelectorAll('.mEbsChk:checked')].map(i=>i.value);
+  if(!ebsIds.length){ toast('Selecciona al menos un EBS','warn'); return; }
+  const pct=+($('mPct').value||100);
+  const ebsSel=ST.ebs.filter(e=>ebsIds.includes(e.id));
+  // contratistas incluidos (con EBS, activos)
+  let jobs=[];
+  ebsSel.forEach(e=>{
+    const members=ST.contratistas.filter(c=>c.activo!==false && c.municipio===e.municipio && c.ebs_num===e.ebs_num);
+    members.forEach(c=>jobs.push({c,e}));
+  });
+  if(!jobs.length){ toast('No hay contratistas para generar','warn'); return; }
+
+  $('mBtn').disabled=true; $('mProgress').classList.remove('hidden');
+  const zip=new JSZip();
+  let radN=ST.radicador.consecutivo;
+  const recs=[]; let saltados=0;
+  for(let i=0;i<jobs.length;i++){
+    const {c,e}=jobs[i];
+    const tr=c.transporte||ST.transporteDefault||0;
+    // cuentas de ESTE contrato que coinciden con las seleccionadas (30 días desde su acta)
+    const cuentas=cuentasDe(c).filter(q=>cuentaNums.includes(q.num));
+    if(!cuentas.length){ saltados++; continue; }
+    const rad=radicadoStr(radN);
+    const rows=cuentas.map(q=>({etiqueta:'Cuenta '+q.num,cuenta:q.num,ini:fmtISO(q.ini),fin:fmtISO(q.fin),
+      base:c.valor_mensual||0,pct,valor:(c.valor_mensual||0)*pct/100,transporte:tr,total:(c.valor_mensual||0)*pct/100+tr}));
+    const doc=buildCert(c,rad,rows,fmtISO(cuentas[cuentas.length-1].fin));
+    const folder='EBS-'+(e.ebs_num||'000')+'_'+munDisp(e.municipio).replace(/\s+/g,'');
+    const fname=folder+'/'+rad.replace(/[^\w-]/g,'')+'_'+(c.nombre||'').replace(/\s+/g,'_')+'.pdf';
+    zip.file(fname, doc.output('blob'));
+    const co=coordFor(c); const fexp=fmtISO(cuentas[cuentas.length-1].fin);
+    rows.forEach(r=>recs.push({radicado:rad,contratista_id:c.id,codigo_contrato:c.codigo_contrato,cedula:c.cedula,nombre:c.nombre,rol:c.rol,municipio:c.municipio,ebs_num:c.ebs_num,
+      periodo_etiqueta:r.etiqueta+' ('+r.ini+' a '+r.fin+')',cuenta_num:r.cuenta,fecha_ini:r.ini,fecha_fin:r.fin,fecha_exp:fexp,
+      objeto:c.objeto,territorio:e.territorio,jefe_nombre:e.jefe_nombre,gestor_nombre:e.gestor_nombre,
+      valor_base:c.valor_mensual,pct_ejec:pct,transporte:tr,total:r.total,coordinador:co.key,emitido_por:'masivo'}));
+    radN++;
+    const pc=Math.round((i+1)/jobs.length*100);
+    $('mBar').style.width=pc+'%'; $('mStatus').textContent=`Generando ${i+1}/${jobs.length} · ${c.nombre}`;
+    if(i%5===0) await new Promise(r=>setTimeout(r,0));
+  }
+  $('mStatus').textContent='Comprimiendo ZIP…';
+  const blob=await zip.generateAsync({type:'blob'},md=>{ $('mBar').style.width=Math.round(md.percent)+'%'; });
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download='Certificados_EBS_'+todayISO()+'.zip'; a.click(); URL.revokeObjectURL(url);
+  // registrar + actualizar radicador
+  if(recs.length) await supa.from('certeb_emitidos').insert(recs);
+  const consumed=radN-ST.radicador.consecutivo;
+  await bumpRadicador(consumed);
+  ST.emitidos.unshift(...recs); renderEmitidos();
+  $('mStatus').textContent=`Listo: ${consumed} certificados generados${saltados?', '+saltados+' contratistas sin cuenta aplicable (sin acta o cuenta fuera de contrato)':''}.`;
+  $('mBtn').disabled=false;
+  toast('ZIP generado: '+consumed+' certificados','ok');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CONTRATISTAS
+   ══════════════════════════════════════════════════════════════ */
+function renderContratistas(){
+  const q=($('ctSearch').value||'').toLowerCase().trim();
+  const fm=$('ctMun').value, fe=$('ctEbs').value, fr=$('ctRol').value;
+  let list=ST.contratistas.slice();
+  if(fm)list=list.filter(c=>c.municipio===fm);
+  if(fe)list=list.filter(c=>c.ebs_num===fe);
+  if(fr)list=list.filter(c=>c.rol===fr);
+  if(q)list=list.filter(c=>((c.nombre||'')+' '+(c.cedula||'')+' '+(c.codigo_contrato||'')).toLowerCase().includes(q));
+  $('ctBody').innerHTML=list.map(c=>`<tr>
+    <td class="mono">${esc(c.codigo_contrato||'')}</td>
+    <td><b>${esc(c.nombre)}</b><div class="small">C.C. ${esc(c.cedula||'')}</div></td>
+    <td><span class="badge b-role">${esc(rolDisp(c.rol))}</span></td>
+    <td>${esc(munDisp(c.municipio))}</td>
+    <td>${esc(c.ebs_num||'—')}</td>
+    <td class="mono">${money(c.valor_mensual)}</td>
+    <td class="mono">${money(c.valor_total)}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="openContratista('${c.id}')">Editar</button></td>
+  </tr>`).join('') || '<tr><td colspan="8" class="muted" style="text-align:center;padding:20px">Sin resultados.</td></tr>';
+  // KPIs
+  const total=ST.contratistas.length, act=ST.contratistas.filter(c=>c.activo!==false).length;
+  const conEbs=ST.contratistas.filter(c=>c.ebs_num).length;
+  const suma=ST.contratistas.reduce((s,c)=>s+(+c.valor_mensual||0),0);
+  $('ctKpis').innerHTML=`
+    <div class="kpi"><div class="n">${total}</div><div class="l">Contratistas</div></div>
+    <div class="kpi"><div class="n">${conEbs}</div><div class="l">Con EBS asignado</div></div>
+    <div class="kpi"><div class="n">${act}</div><div class="l">Activos</div></div>
+    <div class="kpi"><div class="n" style="font-size:16px">${money(suma)}</div><div class="l">Suma valor mensual</div></div>`;
+}
+function openContratista(id){
+  const c=id?ST.contratistas.find(x=>x.id===id):null;
+  $('mdCtTitle').textContent=c?'Editar contratista':'Nuevo contratista';
+  $('fCtId').value=c?c.id:''; $('fCtCodigo').value=c?c.codigo_contrato||'':''; $('fCtCedula').value=c?c.cedula||'':'';
+  $('fCtNombre').value=c?c.nombre||'':''; $('fCtRol').value=c?c.rol||'':''; $('fCtMun').value=c?c.municipio||'':'';
+  $('fCtEbs').value=c?c.ebs_num||'':''; $('fCtObjeto').value=c?c.objeto||'':''; $('fCtVtotal').value=c?c.valor_total||'':'';
+  $('fCtVmes').value=c?c.valor_mensual||'':''; $('fCtTransp').value=c?c.transporte||0:0; $('fCtTiempo').value=c?c.tiempo_ejec||'':'';
+  $('fCtActa').value=c&&c.acta_inicio?c.acta_inicio.slice(0,10):''; $('fCtTerr').value=c?c.territorio||'':'';
+  $('fCtActivo').checked=c?c.activo!==false:true;
+  $('fCtDel').style.display=c?'inline-flex':'none';
+  openModal('mdContratista');
+}
+async function saveContratista(){
+  const id=$('fCtId').value;
+  const rec={codigo_contrato:$('fCtCodigo').value.trim(),cedula:$('fCtCedula').value.trim(),nombre:$('fCtNombre').value.trim(),
+    rol:$('fCtRol').value.trim().toUpperCase(),municipio:$('fCtMun').value.trim().toUpperCase(),ebs_num:$('fCtEbs').value.trim()||null,
+    objeto:$('fCtObjeto').value.trim(),valor_total:+$('fCtVtotal').value||null,valor_mensual:+$('fCtVmes').value||null,
+    transporte:+$('fCtTransp').value||0,tiempo_ejec:+$('fCtTiempo').value||null,acta_inicio:$('fCtActa').value||null,
+    territorio:$('fCtTerr').value.trim()||null,activo:$('fCtActivo').checked,updated_at:new Date().toISOString()};
+  if(!rec.nombre){toast('El nombre es obligatorio','warn');return;}
+  let res;
+  if(id){ res=await supa.from('certeb_contratistas').update(rec).eq('id',id).select().single(); }
+  else { res=await supa.from('certeb_contratistas').insert(rec).select().single(); }
+  if(res.error){toast('Error: '+res.error.message,'err');return;}
+  if(id){ const i=ST.contratistas.findIndex(x=>x.id===id); ST.contratistas[i]=res.data; }
+  else ST.contratistas.push(res.data);
+  closeModal('mdContratista'); initFilters(); renderContratistas(); renderGenResults();
+  toast('Contratista guardado','ok');
+}
+async function delContratista(){
+  const id=$('fCtId').value; if(!id)return;
+  if(!confirm('¿Eliminar este contratista de la base de datos?'))return;
+  const res=await supa.from('certeb_contratistas').delete().eq('id',id);
+  if(res.error){toast('Error: '+res.error.message,'err');return;}
+  ST.contratistas=ST.contratistas.filter(x=>x.id!==id);
+  closeModal('mdContratista'); renderContratistas(); renderGenResults();
+  toast('Contratista eliminado','ok');
+}
+function exportContratistas(){
+  const rows=ST.contratistas.map(c=>({Contrato:c.codigo_contrato,Cedula:c.cedula,Nombre:c.nombre,Rol:c.rol,Municipio:c.municipio,EBS:c.ebs_num,Territorio:c.territorio,ValorMensual:c.valor_mensual,ValorTotal:c.valor_total,TiempoDias:c.tiempo_ejec,ActaInicio:c.acta_inicio,Objeto:c.objeto}));
+  const ws=XLSX.utils.json_to_sheet(rows); const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Contratistas'); XLSX.writeFile(wb,'Contratistas_EBS_'+todayISO()+'.xlsx');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   EBS / TERRITORIOS
+   ══════════════════════════════════════════════════════════════ */
+function renderEbs(){
+  $('ebsBody').innerHTML=ST.ebs.map(e=>{
+    const falta=!e.territorio||!e.gestor_nombre||!e.jefe_nombre;
+    return `<tr>
+      <td>${esc(munDisp(e.municipio))}</td>
+      <td><b>${esc(e.ebs_num)}</b></td>
+      <td>${e.territorio?esc(e.territorio):'<span style="color:var(--red)">⚠ definir</span>'}</td>
+      <td>${e.jefe_nombre?esc(e.jefe_nombre):'<span style="color:var(--red)">⚠</span>'}</td>
+      <td>${e.gestor_nombre?esc(e.gestor_nombre):'<span style="color:var(--red)">⚠</span>'}</td>
+      <td><span class="badge ${e.coordinador==='MELISA'?'b-mel':'b-dan'}">${e.coordinador==='MELISA'?'Melisa':'Danilo'}</span></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openEbs('${e.id}')">Editar</button></td>
+    </tr>`; }).join('');
+}
+function gestoresList(){ return ST.contratistas.filter(c=>c.rol==='GESTOR COMUNITARIO'); }
+function openEbs(id){
+  const e=ST.ebs.find(x=>x.id===id); if(!e)return;
+  $('fEbsId').value=e.id; $('fEbsMun').value=munDisp(e.municipio); $('fEbsNum').value=e.ebs_num;
+  $('mdEbsTitle').textContent='EBS '+e.ebs_num+' · '+munDisp(e.municipio);
+  $('fEbsTerr').value=e.territorio||''; $('fEbsJefe').value=e.jefe_nombre||'';
+  const gs=gestoresList();
+  $('fEbsGestor').innerHTML='<option value="">— Selecciona un gestor —</option>'+gs.map(g=>`<option value="${esc(g.nombre)}" data-terr="${esc(g.territorio||'')}" ${g.nombre===e.gestor_nombre?'selected':''}>${esc(g.nombre)}${g.territorio?' · '+esc(g.territorio):''}</option>`).join('');
+  $('fEbsGestor').onchange=function(){ const o=this.selectedOptions[0]; if(o&&o.dataset.terr && !$('fEbsTerr').value) $('fEbsTerr').value=o.dataset.terr; };
+  $('fEbsGestorLibre').value='';
+  $('fEbsCoord').value=e.coordinador||'DANILO';
+  openModal('mdEbs');
+}
+async function saveEbs(){
+  const id=$('fEbsId').value;
+  const gestor = $('fEbsGestorLibre').value.trim() || $('fEbsGestor').value || null;
+  const rec={territorio:$('fEbsTerr').value.trim()||null, jefe_nombre:$('fEbsJefe').value.trim()||null,
+    gestor_nombre:gestor, coordinador:$('fEbsCoord').value, updated_at:new Date().toISOString()};
+  const res=await supa.from('certeb_ebs').update(rec).eq('id',id).select().single();
+  if(res.error){toast('Error: '+res.error.message,'err');return;}
+  const i=ST.ebs.findIndex(x=>x.id===id); ST.ebs[i]=res.data;
+  closeModal('mdEbs'); renderEbs(); renderMasivoEbs();
+  toast('EBS actualizado','ok');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CUENTAS (config)
+   ══════════════════════════════════════════════════════════════ */
+function renderCuentasCfg(){
+  // vista previa: primeros contratistas con acta
+  const ejemplos=ST.contratistas.filter(c=>c.acta_inicio && c.ebs_num).slice(0,12);
+  $('cuentasPrev').innerHTML=ejemplos.map(c=>{
+    const q=cuentasDe(c);
+    const det=q.map(x=>'C'+x.num+': '+fmtISO(x.ini).slice(5)+'→'+fmtISO(x.fin).slice(5)).join(' · ');
+    return `<tr><td>${esc(c.nombre)}</td><td class="mono">${esc(c.codigo_contrato||'')}</td>
+      <td class="mono">${esc((c.acta_inicio||'').slice(0,10))}</td><td>${esc(c.tiempo_ejec||'')}</td>
+      <td><b>${q.length}</b></td><td class="small">${det}</td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:16px">Sin contratistas con acta de inicio.</td></tr>';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   EMITIDOS
+   ══════════════════════════════════════════════════════════════ */
+// Agrupa las filas de emitidos por radicado → un certificado por radicado
+function emitidosAgrupados(){
+  const map=new Map();
+  ST.emitidos.forEach(e=>{
+    const k=e.radicado||'(sin)';
+    if(!map.has(k)) map.set(k,{radicado:k, filas:[], nombre:e.nombre, cedula:e.cedula, codigo_contrato:e.codigo_contrato,
+      rol:e.rol, municipio:e.municipio, ebs_num:e.ebs_num, coordinador:e.coordinador, contratista_id:e.contratista_id,
+      objeto:e.objeto, territorio:e.territorio, jefe_nombre:e.jefe_nombre, gestor_nombre:e.gestor_nombre,
+      fecha_exp:e.fecha_exp, fecha_emision:e.fecha_emision, corregido_en:e.corregido_en});
+    const g=map.get(k); g.filas.push(e);
+    if(e.corregido_en) g.corregido_en=e.corregido_en;
+  });
+  return [...map.values()];
+}
+function renderEmitidos(){
+  const q=($('emSearch').value||'').toLowerCase().trim();
+  let list=emitidosAgrupados();
+  if(q)list=list.filter(g=>((g.radicado||'')+' '+(g.nombre||'')+' '+(g.codigo_contrato||'')).toLowerCase().includes(q));
+  list.sort((a,b)=>String(b.fecha_emision||'').localeCompare(String(a.fecha_emision||'')));
+  $('emBody').innerHTML=list.slice(0,500).map(g=>{
+    const total=g.filas.reduce((s,f)=>s+(+f.total||0),0);
+    const cuentas=g.filas.map(f=>f.cuenta_num?('C'+f.cuenta_num):(f.periodo_etiqueta||'')).join(', ');
+    return `<tr>
+      <td class="mono">${esc(g.radicado)}${g.corregido_en?' <span class="badge" style="background:#fff3cd;color:#8a5a00">corregido</span>':''}</td>
+      <td>${esc(g.nombre)}</td><td class="mono">${esc(g.codigo_contrato||'')}</td>
+      <td class="small">${esc(cuentas)}</td><td class="mono">${money(total)}</td>
+      <td><span class="badge ${g.coordinador==='MELISA'?'b-mel':'b-dan'}">${g.coordinador==='MELISA'?'Melisa':'Danilo'}</span></td>
+      <td class="small">${g.fecha_emision?new Date(g.fecha_emision).toLocaleDateString('es-CO'):''}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="descargarEmitido('${esc(g.radicado)}')" title="Volver a descargar">⬇</button>
+        <button class="btn btn-primary btn-sm" onclick="openCorregir('${esc(g.radicado)}')" title="Corregir y descargar">✎ Corregir</button>
+      </td></tr>`;
+  }).join('') || '<tr><td colspan="8" class="muted" style="text-align:center;padding:20px">Sin certificados emitidos.</td></tr>';
+  const sum=ST.emitidos.reduce((s,e)=>s+(+e.total||0),0);
+  $('emKpis').innerHTML=`
+    <div class="kpi"><div class="n">${new Set(ST.emitidos.map(e=>e.radicado)).size}</div><div class="l">Certificados emitidos</div></div>
+    <div class="kpi"><div class="n">${ST.emitidos.length}</div><div class="l">Cuentas certificadas</div></div>
+    <div class="kpi"><div class="n">${new Set(ST.emitidos.map(e=>e.cedula)).size}</div><div class="l">Contratistas</div></div>
+    <div class="kpi"><div class="n" style="font-size:16px">${money(sum)}</div><div class="l">Valor certificado</div></div>`;
+}
+// Reconstruye el objeto {c, opts, rows, fechaExp} de un certificado emitido para regenerar el PDF
+function reconstruirCert(g){
+  const cAct = g.contratista_id ? ST.contratistas.find(x=>x.id===g.contratista_id) : null;
+  const c = {
+    id:g.contratista_id, codigo_contrato:g.codigo_contrato, cedula:g.cedula, nombre:g.nombre,
+    rol:g.rol, municipio:g.municipio, ebs_num:g.ebs_num,
+    objeto: g.objeto || (cAct&&cAct.objeto) || ''
+  };
+  const co = { key:g.coordinador, ...(ST.coordinadores[g.coordinador]||{}) };
+  const cf = { territorio:g.territorio, jefe_nombre:g.jefe_nombre, gestor_nombre:g.gestor_nombre };
+  // si faltan datos de contexto (emitidos antiguos), tomar los actuales del EBS
+  if((!cf.territorio||!cf.jefe_nombre||!cf.gestor_nombre) && cAct){
+    const cfAct=ebsCfgFor(cAct)||{};
+    cf.territorio=cf.territorio||cfAct.territorio; cf.jefe_nombre=cf.jefe_nombre||cfAct.jefe_nombre; cf.gestor_nombre=cf.gestor_nombre||cfAct.gestor_nombre;
+  }
+  const filas=g.filas.slice().sort((a,b)=>(a.cuenta_num||0)-(b.cuenta_num||0));
+  const rows=filas.map((f,idx)=>({
+    etiqueta:'Cuenta '+(f.cuenta_num||idx+1), cuenta:(f.cuenta_num||idx+1),
+    ini:f.fecha_ini||'', fin:f.fecha_fin||'',
+    base:+f.valor_base||0, pct:(f.pct_ejec==null?100:+f.pct_ejec),
+    valor:(+f.valor_base||0)*((f.pct_ejec==null?100:+f.pct_ejec)/100),
+    transporte:+f.transporte||0, total:+f.total|| ((+f.valor_base||0)*((f.pct_ejec==null?100:+f.pct_ejec)/100)+(+f.transporte||0))
+  }));
+  const fechaExp=g.fecha_exp || (filas.length&&filas[filas.length-1].fecha_fin) || todayISO();
+  return {c, co, cf, rows, fechaExp};
+}
+function descargarEmitido(radicado){
+  const g=emitidosAgrupados().find(x=>x.radicado===radicado); if(!g){toast('No encontrado','err');return;}
+  const {c,co,cf,rows,fechaExp}=reconstruirCert(g);
+  const doc=buildCert(c, radicado, rows, fechaExp, {co,cf});
+  doc.save('Certificado_'+radicado.replace(/[^\w-]/g,'')+'_'+(c.nombre||'').replace(/\s+/g,'_')+'.pdf');
+  toast('Certificado '+radicado+' descargado','ok');
+}
+
+/* ── Corrección de un certificado emitido ── */
+function corrRow(d){
+  d=d||{};
+  return `<tr class="corrRow">
+    <td><input type="text" class="cc-num" value="${esc(d.cuenta||'')}" style="width:56px;padding:6px"></td>
+    <td><input type="date" class="cc-ini" value="${d.ini||''}" style="padding:6px"></td>
+    <td><input type="date" class="cc-fin" value="${d.fin||''}" style="padding:6px"></td>
+    <td><input type="number" class="cc-base" value="${d.base||0}" oninput="corrRecalc()" style="width:100px;padding:6px"></td>
+    <td><input type="number" class="cc-pct" value="${d.pct==null?100:d.pct}" oninput="corrRecalc()" style="width:64px;padding:6px"></td>
+    <td><input type="number" class="cc-tr" value="${d.transporte||0}" oninput="corrRecalc()" style="width:90px;padding:6px"></td>
+    <td class="cc-total mono">$ 0</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="this.closest('tr').remove();corrRecalc()" title="Quitar">✕</button></td>
+  </tr>`;
+}
+function addCorrCuenta(d){ $('corrCuentas').insertAdjacentHTML('beforeend', corrRow(d)); corrRecalc(); }
+function corrRecalc(){
+  let tot=0;
+  $('corrCuentas').querySelectorAll('.corrRow').forEach(tr=>{
+    const base=+tr.querySelector('.cc-base').value||0, pct=+tr.querySelector('.cc-pct').value||0, trp=+tr.querySelector('.cc-tr').value||0;
+    const t=base*pct/100+trp; tr.querySelector('.cc-total').textContent=money(t); tot+=t;
+  });
+  $('corrTotal').textContent=money(tot);
+}
+function openCorregir(radicado){
+  const g=emitidosAgrupados().find(x=>x.radicado===radicado); if(!g){toast('No encontrado','err');return;}
+  const {c,co,cf,rows,fechaExp}=reconstruirCert(g);
+  ST.corrOrig={radicado, fecha_emision:g.fecha_emision, ids:g.filas.map(f=>f.id).filter(Boolean),
+    contratista_id:g.contratista_id, ebs_num:g.ebs_num, municipio:g.municipio, codigo_contrato:g.codigo_contrato};
+  $('mdCorrTitle').textContent='Corregir certificado '+radicado;
+  $('corrRadicado').value=radicado;
+  $('corrFecha').value=fechaExp?String(fechaExp).slice(0,10):todayISO();
+  $('corrCoord').value=co.key||'DANILO';
+  $('corrNombre').value=c.nombre||''; $('corrCedula').value=c.cedula||''; $('corrRol').value=c.rol||'';
+  $('corrObjeto').value=c.objeto||'';
+  $('corrTerr').value=cf.territorio||''; $('corrJefe').value=cf.jefe_nombre||''; $('corrGestor').value=cf.gestor_nombre||'';
+  $('corrCuentas').innerHTML='';
+  rows.forEach(r=>addCorrCuenta({cuenta:r.cuenta, ini:r.ini, fin:r.fin, base:r.base, pct:r.pct, transporte:r.transporte}));
+  if(!rows.length) addCorrCuenta({cuenta:1});
+  corrRecalc();
+  openModal('mdCorregir');
+}
+async function saveCorregir(){
+  const o=ST.corrOrig; if(!o){return;}
+  const nuevoRad=$('corrRadicado').value.trim()||o.radicado;
+  const coKey=$('corrCoord').value;
+  const c={ id:o.contratista_id, codigo_contrato:o.codigo_contrato, cedula:$('corrCedula').value.trim(), nombre:$('corrNombre').value.trim(),
+    rol:$('corrRol').value.trim(), municipio:o.municipio, ebs_num:o.ebs_num, objeto:$('corrObjeto').value.trim() };
+  const co={ key:coKey, ...(ST.coordinadores[coKey]||{}) };
+  const cf={ territorio:$('corrTerr').value.trim()||null, jefe_nombre:$('corrJefe').value.trim()||null, gestor_nombre:$('corrGestor').value.trim()||null };
+  const fechaExp=$('corrFecha').value||todayISO();
+  const cuentas=[...$('corrCuentas').querySelectorAll('.corrRow')].map(tr=>({
+    cuenta:+tr.querySelector('.cc-num').value||null, ini:tr.querySelector('.cc-ini').value||null, fin:tr.querySelector('.cc-fin').value||null,
+    base:+tr.querySelector('.cc-base').value||0, pct:+tr.querySelector('.cc-pct').value||0, transporte:+tr.querySelector('.cc-tr').value||0
+  }));
+  if(!cuentas.length){toast('Agrega al menos una cuenta','warn');return;}
+  if(!c.nombre){toast('El nombre es obligatorio','warn');return;}
+  const rows=cuentas.map(q=>({etiqueta:'Cuenta '+(q.cuenta||''),cuenta:q.cuenta,ini:q.ini||'',fin:q.fin||'',
+    base:q.base,pct:q.pct,valor:q.base*q.pct/100,transporte:q.transporte,total:q.base*q.pct/100+q.transporte}));
+  const doc=buildCert(c, nuevoRad, rows, fechaExp, {co,cf});
+  doc.save('Certificado_'+nuevoRad.replace(/[^\w-]/g,'')+'_'+(c.nombre||'').replace(/\s+/g,'_')+'_corregido.pdf');
+  const nowISO=new Date().toISOString();
+  const recs=cuentas.map(q=>({radicado:nuevoRad,contratista_id:c.id||null,codigo_contrato:c.codigo_contrato,cedula:c.cedula,nombre:c.nombre,rol:c.rol,municipio:c.municipio,ebs_num:c.ebs_num,
+    periodo_etiqueta:'Cuenta '+(q.cuenta||'')+' ('+(q.ini||'')+' a '+(q.fin||'')+')',cuenta_num:q.cuenta,fecha_ini:q.ini,fecha_fin:q.fin,fecha_exp:fechaExp,
+    objeto:c.objeto,territorio:cf.territorio,jefe_nombre:cf.jefe_nombre,gestor_nombre:cf.gestor_nombre,
+    valor_base:q.base,pct_ejec:q.pct,transporte:q.transporte,total:q.base*q.pct/100+q.transporte,coordinador:coKey,emitido_por:'correccion',
+    fecha_emision:o.fecha_emision||nowISO, corregido_en:nowISO}));
+  if(o.ids&&o.ids.length){ await supa.from('certeb_emitidos').delete().in('id', o.ids); }
+  else { await supa.from('certeb_emitidos').delete().eq('radicado', o.radicado); }
+  const ins=await supa.from('certeb_emitidos').insert(recs).select();
+  if(ins.error){toast('Error guardando: '+ins.error.message,'err'); await boot(); return;}
+  ST.emitidos=ST.emitidos.filter(e=> !(o.ids||[]).includes(e.id) && e.radicado!==o.radicado);
+  ST.emitidos.unshift(...(ins.data||recs));
+  closeModal('mdCorregir'); renderEmitidos();
+  toast('Certificado '+nuevoRad+' corregido y descargado','ok');
+}
+function exportEmitidos(){
+  const rows=ST.emitidos.map(e=>({Radicado:e.radicado,Nombre:e.nombre,Cedula:e.cedula,Contrato:e.codigo_contrato,Rol:e.rol,Municipio:e.municipio,EBS:e.ebs_num,Periodo:e.periodo_etiqueta,ValorBase:e.valor_base,PctEjec:e.pct_ejec,Transporte:e.transporte,Total:e.total,Coordinador:e.coordinador,Emitido:e.fecha_emision}));
+  const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Emitidos');XLSX.writeFile(wb,'Certificados_Emitidos_'+todayISO()+'.xlsx');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CONFIG
+   ══════════════════════════════════════════════════════════════ */
+function renderConfig(){
+  $('cfgPref').value=ST.radicador.prefijo||''; $('cfgCons').value=ST.radicador.consecutivo||1;
+  $('cfgSuf').value=ST.radicador.sufijo||''; $('cfgPad').value=ST.radicador.pad||4;
+  $('cfgEjemplo').textContent=radicadoStr(ST.radicador.consecutivo);
+  // valores base
+  const roles=Object.keys(ST.valores).length?Object.keys(ST.valores):['AUXILIAR DE ENFERMERIA','GESTOR COMUNITARIO','ENFERMERA PROFESIONAL','PSICOLOGO','ODONTOLOGO','MEDICO GENERAL'];
+  $('cfgValores').innerHTML=roles.map(r=>`<div class="field"><label>${esc(rolDisp(r))}</label><input type="number" data-rol="${esc(r)}" value="${ST.valores[r]||0}"></div>`).join('');
+  // coordinadores
+  $('cfgCoords').innerHTML=['DANILO','MELISA'].map(k=>{
+    const co=ST.coordinadores[k]||{};
+    const firma=co.firma||(k==='DANILO'&&A?A.firmaDanilo.data:'');
+    return `<div class="card" style="margin-bottom:12px"><div class="card-b">
+      <div class="grid g3">
+        <div class="field"><label>Clave</label><input type="text" value="${esc(k)}" readonly></div>
+        <div class="field"><label>Nombre</label><input type="text" id="co_${k}_nombre" value="${esc(co.nombre||'')}"></div>
+        <div class="field"><label>Jurisdicción</label><input type="text" id="co_${k}_juris" value="${esc(co.jurisdiccion||'')}"></div>
+      </div>
+      <div class="field"><label>Cargo</label><input type="text" id="co_${k}_cargo" value="${esc(co.cargo||'')}"></div>
+      <div class="grid g2" style="align-items:end">
+        <div class="field"><label>Firma virtual (imagen)</label><input type="file" accept="image/*" onchange="uploadFirma('${k}',this)"></div>
+        <div class="field"><label>Vista previa firma</label>${firma?`<img class="sig-prev" src="${firma}">`:'<span class="muted small">Sin firma cargada'+(k==='MELISA'?' — súbela para firmar Convención/Teorama':'')+'</span>'}</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveCoord('${k}')">Guardar ${k==='DANILO'?'Danilo':'Melisa'}</button>
+    </div></div>`;
+  }).join('');
+}
+async function saveRadicador(){
+  ST.radicador={prefijo:$('cfgPref').value,consecutivo:+$('cfgCons').value||1,sufijo:$('cfgSuf').value,pad:+$('cfgPad').value||4};
+  await supa.from('certeb_config').upsert({clave:'radicador',valor:ST.radicador},{onConflict:'clave'});
+  renderConfig(); toast('Radicador guardado','ok');
+}
+async function saveValores(){
+  const v={}; $('cfgValores').querySelectorAll('input').forEach(i=>v[i.dataset.rol]=+i.value||0);
+  ST.valores=v; await supa.from('certeb_config').upsert({clave:'valores_base',valor:v},{onConflict:'clave'});
+  toast('Valores base guardados','ok');
+}
+async function recalcValores(){
+  if(!confirm('¿Recalcular el valor mensual de TODOS los contratistas según los valores base por rol? Sobrescribe los valores mensuales actuales.'))return;
+  const updates=ST.contratistas.filter(c=>ST.valores[c.rol]!=null).map(c=>({id:c.id,valor_mensual:ST.valores[c.rol]}));
+  for(const u of updates){ await supa.from('certeb_contratistas').update({valor_mensual:u.valor_mensual}).eq('id',u.id); const c=ST.contratistas.find(x=>x.id===u.id); if(c)c.valor_mensual=u.valor_mensual; }
+  renderContratistas(); toast('Recalculados '+updates.length+' contratistas','ok');
+}
+async function saveCoord(k){
+  const co=Object.assign({},ST.coordinadores[k]||{},{
+    nombre:$('co_'+k+'_nombre').value,cargo:$('co_'+k+'_cargo').value,jurisdiccion:$('co_'+k+'_juris').value});
+  ST.coordinadores[k]=co;
+  await supa.from('certeb_config').upsert({clave:'coordinadores',valor:ST.coordinadores},{onConflict:'clave'});
+  toast('Coordinador '+k+' guardado','ok');
+}
+function uploadFirma(k,input){
+  const f=input.files[0]; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=async()=>{
+    ST.coordinadores[k]=Object.assign({},ST.coordinadores[k]||{},{firma:rd.result});
+    await supa.from('certeb_config').upsert({clave:'coordinadores',valor:ST.coordinadores},{onConflict:'clave'});
+    renderConfig(); toast('Firma de '+k+' cargada','ok');
+  };
+  rd.readAsDataURL(f);
+}
+
+/* ── Modales ── */
+function openModal(id){$(id).classList.add('open')}
+function closeModal(id){$(id).classList.remove('open')}
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
+</script>
+</body>
+</html>
