@@ -565,8 +565,10 @@ let entidad=load(LS.ent,{});
 let store=load(LS.data,{2:[],3:[],4:[],5:[],6:[],7:[]});
 [2,3,4,5,6,7].forEach(t=>{ if(!Array.isArray(store[t])) store[t]=[]; });
 const DEFAULT_URL='https://script.google.com/macros/s/AKfycbzY0TV2zP1TGibldZoe9TQB8ocqdJl07I7EL9DVia1FhzPRYRhd78DfiaXUesidExaX6w/exec';
-let config=load(LS.cfg,{url:DEFAULT_URL,token:'',autoSync:true});
+const ADMIN_MASTER='SPhrno.2026';   // contraseña genérica institucional del módulo administrador (siempre válida)
+let config=load(LS.cfg,{url:DEFAULT_URL,token:'',autoSync:true,adminPass:ADMIN_MASTER});
 if(config.autoSync===undefined) config.autoSync=true;
+if(config.adminPass===undefined){ config.adminPass=ADMIN_MASTER; save(LS.cfg,config); }   // por defecto en equipos nuevos
 if(!config.url){ config.url=DEFAULT_URL; save(LS.cfg,config); }  // URL de Google Sheets predeterminada
 let edit={2:-1,3:-1,4:-1,5:-1,6:-1,7:-1};
 let supervisor=load(LS.sup,{tipoIdSuperv:'CC',numIdSuperv:'',nomSuperv:''});   // supervisor único para todos los contratos (Tipo 3)
@@ -1455,15 +1457,14 @@ function bulkAsignarRubro(){
 /* ---- Contraseña admin ---- */
 function adminUnlock(){
   const v=document.getElementById('adm_pass_in').value;
-  if(v===(config.adminPass||'')){ adminOK=true; renderAdmin(); } else toast('Contraseña incorrecta','err');
+  if(v===(config.adminPass||'') || v===ADMIN_MASTER){ adminOK=true; renderAdmin(); } else toast('Contraseña incorrecta','err');
 }
 function guardarAdminPass(){
   const p=document.getElementById('adm_pass_set').value;
   const q=(document.getElementById('adm_rec_q').value||'').trim();
   const a=(document.getElementById('adm_rec_a').value||'').trim();
-  if(p && (!q || !a)){ toast('Para poner contraseña, define también la pregunta y la respuesta de recuperación (por si la olvidas).','err'); return; }
   config.adminPass=p; config.recoveryQ=q; config.recoveryA=a;
-  save(LS.cfg,config); toast(p?'Contraseña y recuperación guardadas':'Contraseña eliminada (módulo abierto)','ok');
+  save(LS.cfg,config); toast(p?'Contraseña guardada':'Contraseña eliminada (módulo abierto). La genérica institucional sigue funcionando.','ok');
 }
 function adminReset(){
   const a=document.getElementById('adm_rec_in'); if(!a) return;
@@ -1524,7 +1525,7 @@ function renderAdmin(){
         ${config.recoveryA?`<label style="font-size:11px;color:var(--text3);font-weight:600">${esc(config.recoveryQ||'Pregunta de recuperación')}</label>
           <div style="display:flex;gap:8px;margin-top:6px"><input id="adm_rec_in" placeholder="Tu respuesta" onkeydown="if(event.key==='Enter')adminReset()"><button class="btn btn-ghost" onclick="adminReset()">Restablecer</button></div>
           <div class="hint" style="margin-top:6px">Si la respuesta es correcta, se borra la contraseña y el módulo queda abierto.</div>`
-        :`<div class="section-note" style="border-left-color:var(--yellow)">No hay pregunta de recuperación configurada. Restablece desde la consola del navegador (F12): <code>{const c=JSON.parse(localStorage.ser124_config||'{}');delete c.adminPass;localStorage.ser124_config=JSON.stringify(c);location.reload();}</code></div>`}
+        :`<div class="section-note" style="border-left-color:var(--yellow)">No hay pregunta de recuperación configurada. Puedes ingresar con la <b>contraseña genérica institucional</b> (consúltala con la Coordinación de Salud Pública) y luego definir la tuya aquí.</div>`}
       </div></div></div>`;
     return;
   }
