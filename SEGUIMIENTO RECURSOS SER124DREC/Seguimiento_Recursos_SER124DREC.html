@@ -1459,7 +1459,18 @@ function adminUnlock(){
 }
 function guardarAdminPass(){
   const p=document.getElementById('adm_pass_set').value;
-  config.adminPass=p; save(LS.cfg,config); toast(p?'Contraseña de administrador guardada':'Contraseña eliminada (módulo abierto)','ok');
+  const q=(document.getElementById('adm_rec_q').value||'').trim();
+  const a=(document.getElementById('adm_rec_a').value||'').trim();
+  if(p && (!q || !a)){ toast('Para poner contraseña, define también la pregunta y la respuesta de recuperación (por si la olvidas).','err'); return; }
+  config.adminPass=p; config.recoveryQ=q; config.recoveryA=a;
+  save(LS.cfg,config); toast(p?'Contraseña y recuperación guardadas':'Contraseña eliminada (módulo abierto)','ok');
+}
+function adminReset(){
+  const a=document.getElementById('adm_rec_in'); if(!a) return;
+  if(config.recoveryA && up(a.value)===up(config.recoveryA)){
+    config.adminPass=''; save(LS.cfg,config); adminOK=true; renderAdmin();
+    toast('Contraseña restablecida. El módulo quedó abierto; define una nueva si quieres.','ok');
+  }else toast('Respuesta de recuperación incorrecta','err');
 }
 /* ---- Filtro de períodos ---- */
 function periodosDisponibles(){ const s=new Set(); ORDER.forEach(t=>store[t].forEach(r=>{ if(r.periodo) s.add(r.periodo); })); return [...s].sort(); }
@@ -1507,6 +1518,13 @@ function renderAdmin(){
       <div style="max-width:280px;margin:0 auto;display:flex;gap:8px">
         <input id="adm_pass_in" type="password" placeholder="Contraseña" onkeydown="if(event.key==='Enter')adminUnlock()">
         <button class="btn btn-primary" onclick="adminUnlock()">Entrar</button>
+      </div>
+      <div style="margin-top:14px"><a href="#" onclick="const b=document.getElementById('adm_rec_box');b.hidden=!b.hidden;return false" style="font-size:11.5px;color:var(--primary2);font-weight:600;text-decoration:none">¿Olvidaste la contraseña?</a></div>
+      <div id="adm_rec_box" hidden style="max-width:340px;margin:12px auto 0;text-align:left">
+        ${config.recoveryA?`<label style="font-size:11px;color:var(--text3);font-weight:600">${esc(config.recoveryQ||'Pregunta de recuperación')}</label>
+          <div style="display:flex;gap:8px;margin-top:6px"><input id="adm_rec_in" placeholder="Tu respuesta" onkeydown="if(event.key==='Enter')adminReset()"><button class="btn btn-ghost" onclick="adminReset()">Restablecer</button></div>
+          <div class="hint" style="margin-top:6px">Si la respuesta es correcta, se borra la contraseña y el módulo queda abierto.</div>`
+        :`<div class="section-note" style="border-left-color:var(--yellow)">No hay pregunta de recuperación configurada. Restablece desde la consola del navegador (F12): <code>{const c=JSON.parse(localStorage.ser124_config||'{}');delete c.adminPass;localStorage.ser124_config=JSON.stringify(c);location.reload();}</code></div>`}
       </div></div></div>`;
     return;
   }
@@ -1574,11 +1592,15 @@ function renderAdmin(){
 
   <div class="card">
     <div class="card-head"><div class="ttl"><span class="card-ico" style="background:var(--text3)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
-    <div><h3>Contraseña del administrador</h3><div class="sub">Opcional. Vacía = módulo abierto.</div></div></div></div>
-    <div class="card-body"><div class="btn-row">
-      <input id="adm_pass_set" type="text" value="${esc(config.adminPass||'')}" placeholder="Sin contraseña" style="max-width:240px">
-      <button class="btn btn-primary" onclick="guardarAdminPass()">Guardar contraseña</button>
-    </div></div>
+    <div><h3>Contraseña del administrador</h3><div class="sub">Opcional. Vacía = módulo abierto. Con contraseña, configura también la recuperación.</div></div></div></div>
+    <div class="card-body">
+      <div class="grid g2">
+        <div class="field"><label>Contraseña <span class="max">vacía = sin bloqueo</span></label><input id="adm_pass_set" type="text" value="${esc(config.adminPass||'')}" placeholder="Sin contraseña"></div>
+        <div class="field"><label>Pregunta de recuperación</label><input id="adm_rec_q" value="${esc(config.recoveryQ||'')}" placeholder="Ej: ¿En qué municipio inició EBS?"></div>
+        <div class="field col-2"><label>Respuesta de recuperación</label><input id="adm_rec_a" value="${esc(config.recoveryA||'')}" placeholder="Se pedirá si olvidas la contraseña (no distingue mayúsculas ni tildes)"></div>
+      </div>
+      <div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" onclick="guardarAdminPass()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/></svg> Guardar contraseña y recuperación</button></div>
+    </div>
   </div>`;
   renderInformePreview();
 }
