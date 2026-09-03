@@ -1406,7 +1406,8 @@ function mergeRegistros(incoming){
 }
 function normalizarEntrante(t,raw){
   const s=SCHEMA[t];
-  const rec={ uid:raw.uid||'', estado:(raw.estado==='CARGADO'?'CARGADO':'BORRADOR'), periodo:raw.periodo||'',
+  // Google Sheets puede devolver 'periodo' como fecha con hora/zona (2026-07-31T05:00:00Z); se normaliza a AAAA-MM-DD
+  const rec={ uid:raw.uid||'', estado:(raw.estado==='CARGADO'?'CARGADO':'BORRADOR'), periodo:normFecha(raw.periodo),
     updatedAt:raw.updatedAt||nowISO(), idRecurso:up(raw.idRecurso), nit:normNum(raw.nit), indicador:up(raw.indicador)||'I' };
   if(!['I','A','E','NA'].includes(rec.indicador)) rec.indicador='I';
   s.fields.forEach(f=>{
