@@ -544,7 +544,7 @@ function normFecha(v){
 function fmtDec(v){ const n=normDec(v); if(n==='') return ''; const f=parseFloat(n); return isNaN(f)?'':String(f); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function money(n){ return '$'+(n||0).toLocaleString('es-CO'); }
-function save(k,v){ localStorage.setItem(k,JSON.stringify(v)); flashSaved(); }
+function save(k,v){ if(k===LS.data){ dedupInline(); v=store; } try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} flashSaved(); }  // garantiza store sin duplicados
 function load(k,def){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){ return def; } }
 let savedTmr; function flashSaved(){ const p=document.getElementById('savePill'); p.style.opacity='1'; clearTimeout(savedTmr); savedTmr=setTimeout(()=>p.style.opacity='.55',900); }
 
@@ -601,6 +601,21 @@ function keyNorm(v){ return String(v==null?'':v).toUpperCase().replace(/[^A-Z0-9
 function recordKey(t,r){ return [t, ...SCHEMA[t].key.map(k=>keyNorm(r[k])), monthEnd(normFecha(r.periodo||''))].join('¬'); }
 // clave para DETECTAR duplicados: separa las anulaciones (E) del resto, porque una E corrige a la original (no es un duplicado)
 function dupKey(t,r){ return recordKey(t,r)+'¬'+(r.indicador==='E'?'E':'X'); }
+// GARANTÍA: colapsa cualquier duplicado en memoria (conserva CARGADO o el más reciente). Las anulaciones E se conservan (clave aparte).
+function dedupInline(){
+  ORDER.forEach(t=>{
+    if(!Array.isArray(store[t])) return;
+    const seen={}, keep=[];
+    store[t].forEach(r=>{
+      const k=dupKey(t,r);
+      if(seen[k]===undefined){ seen[k]=keep.length; keep.push(r); }
+      else{ const i=seen[k], cur=keep[i];
+        const win=(esCargado(r)&&!esCargado(cur))?r:(!esCargado(r)&&esCargado(cur))?cur:(String(r.updatedAt||'')>=String(cur.updatedAt||'')?r:cur);
+        if(win===r){ if(!esCargado(cur)&&cur.rubro&&!win.rubro) win.rubro=cur.rubro; } keep[i]=win; }
+    });
+    store[t]=keep;
+  });
+}
 // cuenta registros duplicados (misma clave del anexo + período, mismo tipo de acción)
 function contarDuplicados(){ let n=0; ORDER.forEach(t=>{ const seen=new Set(); store[t].forEach(r=>{ const k=dupKey(t,r); if(seen.has(k)) n++; else seen.add(k); }); }); return n; }
 function eliminarDuplicados(){
@@ -1753,6 +1768,7 @@ function generarDocx(){
 /* ══════════════════════ INIT ══════════════════════ */
 ORDER.forEach(t=>buildDetailPanel(t));
 migrarRegistros();
+save(LS.data,store);   // consolida (dedup) el estado local al abrir
 pintarEntidad(); pintarConfig(); pintarSync(); pintarSupervisor(); pintarUndoPlano();
 ORDER.forEach(t=>{ renderTable(t); toggleCond(t); });
 updateAll();
