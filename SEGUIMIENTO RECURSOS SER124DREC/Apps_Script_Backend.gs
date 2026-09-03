@@ -36,6 +36,15 @@ const CAMPOS = {
 const HOJA = { 2:'INCORPORACION', 3:'CONTRATOS', 4:'POLIZAS', 5:'SEGUIMIENTO', 6:'REINT_RECURSOS', 7:'REINT_RENDIM' };
 const CTRL = ['uid','estado','periodo','updatedAt'];           // columnas de control (antes de los campos)
 const H_ENVIOS = ['FechaHora','NombreArchivo','Periodo','TipoIdEntidad','NumIdEntidad','IDRecurso','NITBeneficiaria','FechaIni','FechaFin','TotalCargados'];
+// Clave del anexo por tipo (para detectar duplicados). Debe coincidir con SCHEMA[t].key del aplicativo.
+const KEY = {
+  2: ['idRecurso','nit','tipoActo','numActo','fecha'],
+  3: ['idRecurso','nit','tipoActo','numActo'],
+  4: ['idRecurso','nit','tipoActo','numActo','numPoliza'],
+  5: ['idRecurso','nit','tipoActo','numActo','tipoActa','noActa','fecha'],
+  6: ['idRecurso','nit','tipoActo','numActo','fecha'],
+  7: ['idRecurso','nit','tipoActo','numActo','fecha']
+};
 
 function doGet(e)  { return json({ ok:true, msg:'API SER124DREC activa', metodo:'GET' }); }
 
@@ -46,9 +55,10 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (TOKEN && body.token !== TOKEN) return json({ ok:false, error:'Token invalido' });
     switch (body.action) {
-      case 'ping':          return json({ ok:true, msg:'pong', version:'2.0' });
+      case 'ping':          return json({ ok:true, msg:'pong', version:'2.1' });
       case 'push':          return pushRegistros(body);
       case 'pull':          return pullRegistros(body);
+      case 'dedup':         return dedupHoja(body);
       case 'guardarEnvio':  return guardarEnvio(body);
       default:              return json({ ok:false, error:'Accion no reconocida: ' + body.action });
     }
@@ -116,6 +126,45 @@ function pullRegistros(body) {
     });
   });
   return json({ ok:true, registros: out });
+}
+
+// Elimina filas duplicadas en cada hoja de tipo (misma clave del anexo + periodo + tipo de accion),
+// conservando una fila por grupo: prefiere estado CARGADO y, si no, la de updatedAt mas reciente.
+function dedupHoja(body) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  var removed = 0, porTipo = {};
+  Object.keys(HOJA).forEach(function(t){
+    const sh = ss.getSheetByName(HOJA[t]); if (!sh) return;
+    const last = sh.getLastRow(); if (last < 3) return;   // encabezado + <2 filas: nada que deduplicar
+    const headers = headersDe(t);
+    const width = headers.length;
+    const col = {}; headers.forEach(function(h,i){ col[h] = i; });
+    const vals = sh.getRange(2, 1, last-1, width).getValues();
+    const keyFields = KEY[t] || ['idRecurso','nit'];
+    const seen = {}, keep = [];
+    vals.forEach(function(row){
+      if (!String(row[0]).trim()) return;   // sin uid: se descarta
+      const periodo = row[col['periodo']];
+      const indicador = row[col['indicador']];
+      const kparts = keyFields.map(function(f){ return String(row[col[f]] != null ? row[col[f]] : '').toUpperCase(); });
+      const key = t + '|' + kparts.join('~') + '|' + (periodo||'') + '|' + (indicador === 'E' ? 'E' : 'X');
+      if (seen[key] === undefined) { seen[key] = keep.length; keep.push(row); }
+      else {
+        const idx = seen[key], cur = keep[idx];
+        const rowCargado = String(row[col['estado']]) === 'CARGADO';
+        const curCargado = String(cur[col['estado']]) === 'CARGADO';
+        const rowUpd = String(row[col['updatedAt']] || ''), curUpd = String(cur[col['updatedAt']] || '');
+        const win = (rowCargado && !curCargado) ? row : (!rowCargado && curCargado) ? cur : (rowUpd >= curUpd ? row : cur);
+        keep[idx] = win; removed++;
+      }
+    });
+    if (keep.length < vals.length) {
+      sh.getRange(2, 1, vals.length, width).clearContent();
+      if (keep.length) sh.getRange(2, 1, keep.length, width).setValues(keep);
+      porTipo[HOJA[t]] = vals.length - keep.length;
+    }
+  });
+  return json({ ok:true, removed: removed, detalle: porTipo });
 }
 
 // Bitácora de cargas confirmadas

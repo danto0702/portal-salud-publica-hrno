@@ -651,6 +651,23 @@ function crearAnulacionesDuplicados(){
       toast(`${n} anulación(es) creadas en borrador (indicador E)${omit?', '+omit+' ya existían':''}. Revísalas y genera el .TXT correctivo.`,'ok');
     });
 }
+// Deduplica también la hoja de Google Sheets (backend Apps Script v2.1)
+async function deduplicarHoja(){
+  if(!config.url){ toast('Configura la URL de Google Sheets en Ajustes','err'); go('ajustes'); return; }
+  confirmModal('Deduplicar hoja de Google Sheets',
+    'Se eliminarán las filas duplicadas en la hoja (conservando una por registro: CARGADO o la más reciente) y se descargarán los datos ya depurados. ¿Continuar?',
+    async ()=>{
+      const btn=document.getElementById('btnDedupHoja'), orig=btn?btn.innerHTML:'';
+      if(btn){ btn.disabled=true; btn.innerHTML=spin('Deduplicando…'); }
+      try{
+        const res=await postSheet({action:'dedup'});
+        if(res&&res.ok){ await syncPull(true); renderAdmin(); toast('Hoja deduplicada: '+(res.removed||0)+' fila(s) eliminadas','ok'); }
+        else if(res&&/no reconocida/i.test(JSON.stringify(res))){ toast('El backend de la hoja está desactualizado. Vuelve a desplegar el Apps Script (nueva versión).','err'); }
+        else toast('El script respondió: '+JSON.stringify(res).slice(0,120),'info');
+      }catch(e){ toast('Error al deduplicar la hoja: '+e.message,'err'); }
+      finally{ if(btn){ btn.disabled=false; btn.innerHTML=orig; } }
+    });
+}
 
 /* ══════════════════════ NAVEGACIÓN ══════════════════════ */
 function go(tab){
@@ -1634,8 +1651,9 @@ function renderAdmin(){
       <div class="btn-row">
         <button class="btn btn-ghost" onclick="eliminarDuplicados()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1M15 9l-4 4-2-2"/></svg> Eliminar duplicados (borradores)</button>
         <button class="btn btn-danger" onclick="crearAnulacionesDuplicados()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg> Anular duplicados cargados</button>
+        <button class="btn btn-ghost" id="btnDedupHoja" onclick="deduplicarHoja()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/><path d="M14 9l-4 4-2-2"/></svg> Deduplicar hoja (nube)</button>
       </div>
-      <div class="section-note" style="margin-top:12px"><b>Eliminar duplicados:</b> consolida los borradores repetidos (conserva el CARGADO o el más reciente). <b>Anular duplicados cargados:</b> toma las copias sobrantes de los registros ya cargados y crea borradores con indicador <b>E (Anular)</b> para generar el archivo correctivo de PISIS; no modifica los cargados.</div>
+      <div class="section-note" style="margin-top:12px"><b>Eliminar duplicados:</b> consolida los borradores repetidos (conserva el CARGADO o el más reciente). <b>Anular duplicados cargados:</b> toma las copias sobrantes de los registros ya cargados y crea borradores con indicador <b>E (Anular)</b> para generar el archivo correctivo de PISIS; no modifica los cargados. <b>Deduplicar hoja (nube):</b> elimina las filas duplicadas directamente en Google Sheets (requiere el backend actualizado).</div>
     </div>
   </div>
 
