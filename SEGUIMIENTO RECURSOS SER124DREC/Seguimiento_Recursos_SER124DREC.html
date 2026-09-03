@@ -570,7 +570,7 @@ let config=load(LS.cfg,{url:DEFAULT_URL,token:'',autoSync:true,adminPass:ADMIN_M
 if(config.autoSync===undefined) config.autoSync=true;
 if(config.adminPass===undefined){ config.adminPass=ADMIN_MASTER; save(LS.cfg,config); }   // por defecto en equipos nuevos
 if(!config.url){ config.url=DEFAULT_URL; save(LS.cfg,config); }  // URL de Google Sheets predeterminada
-let edit={2:-1,3:-1,4:-1,5:-1,6:-1,7:-1};
+let edit={2:null,3:null,4:null,5:null,6:null,7:null};   // uid del registro en edición por tipo (null = ninguno)
 let supervisor=load(LS.sup,{tipoIdSuperv:'CC',numIdSuperv:'',nomSuperv:''});   // supervisor único para todos los contratos (Tipo 3)
 let rubros=load(LS.rub,[]);   // [{id,nombre,asignado}] rubros presupuestales de la resolución (módulo admin)
 let adminOK=false;            // sesión del módulo administrador desbloqueada en esta visita
@@ -894,15 +894,17 @@ function addRecord(t){
   const errs=validateRecord(t,r);
   if(errs.length){ toast('Faltan datos: '+errs.slice(0,4).join(', ')+(errs.length>4?'…':''),'err'); return; }
   r.periodo=entidad.fechaFin||'';
+  const editUid=edit[t];
+  const editPos=editUid?store[t].findIndex(x=>x.uid===editUid):-1;
   const key=dupKey(t,r);
   // no se permite duplicar: misma clave del anexo + período + tipo de acción (una anulación E no choca con la original)
-  const dupIdx=store[t].findIndex((x,i)=>i!==edit[t] && dupKey(t,x)===key);
+  const dupIdx=store[t].findIndex(x=> x.uid!==editUid && dupKey(t,x)===key);
   if(dupIdx>=0){ const st=esCargado(store[t][dupIdx])?'CARGADO':'en borrador'; toast(`Ya existe un registro (${st}) con esa misma información en este período. No se permite duplicarlo.`,'err'); go('t'+t); return; }
-  if(edit[t]>=0){
-    const prev=store[t][edit[t]];
+  if(editPos>=0){
+    const prev=store[t][editPos];
     if(esCargado(prev)){ toast('Ese registro está CARGADO y no se puede editar.','err'); return; }
     r.uid=prev.uid; r.estado='BORRADOR'; r.updatedAt=nowISO();
-    store[t][edit[t]]=r; toast('Registro actualizado','ok'); cancelEdit(t,true);
+    store[t][editPos]=r; toast('Registro actualizado','ok'); cancelEdit(t,true);
   }else{
     r.uid=genUid(); r.estado='BORRADOR'; r.updatedAt=nowISO();
     store[t].push(r); toast('Registro Tipo '+t+' agregado','ok');
@@ -926,14 +928,14 @@ function editRecord(t,i){
   s.fields.forEach(f=>{const el=document.getElementById(`f${t}_${f.k}`); if(el)el.value=r[f.k]||'';});
   if(t===3){ const el=document.getElementById('f3_rubro'); if(el) el.value=r.rubro||''; }
   toggleCond(t);
-  edit[t]=i;
+  edit[t]=r.uid;
   document.getElementById(`ft_${t}`).textContent=`Editando registro #${i+1} — ${s.name} (Tipo ${t})`;
   document.getElementById(`fadd_${t}`).innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Guardar cambios';
   document.getElementById(`fcancel_${t}`).style.display='inline-flex';
   go('t'+t);
 }
 function cancelEdit(t,silent){
-  edit[t]=-1;
+  edit[t]=null;
   const s=SCHEMA[t];
   document.getElementById(`ft_${t}`).textContent=`Agregar registro — ${s.name} (Tipo ${t})`;
   document.getElementById(`fadd_${t}`).innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Agregar registro';
@@ -1359,17 +1361,28 @@ async function syncPull(silent){
 // Fusiona registros entrantes por uid: gana CARGADO; si no, gana el más reciente (updatedAt)
 function mergeRegistros(incoming){
   let added=0, updated=0;
-  const idx={}; ORDER.forEach(t=>{ idx[t]={}; store[t].forEach((r,i)=>{ if(r.uid) idx[t][r.uid]=i; }); });
+  const byUid={}, byKey={};
+  ORDER.forEach(t=>{ byUid[t]={}; byKey[t]={};
+    store[t].forEach((r,i)=>{ if(r.uid) byUid[t][r.uid]=i; const k=dupKey(t,r); if(byKey[t][k]===undefined) byKey[t][k]=i; });
+  });
   incoming.forEach(raw=>{
     const t=parseInt(raw.tipo,10); if(!SCHEMA[t]) return;
     const rec=normalizarEntrante(t,raw);
     if(!rec.uid) rec.uid=genUid();
-    const pos=idx[t][rec.uid];
-    if(pos===undefined){ store[t].push(rec); idx[t][rec.uid]=store[t].length-1; added++; }
-    else{
+    // empareja por uid; si no, por identidad lógica (clave del anexo + período) para no duplicar con distinto uid
+    let pos=byUid[t][rec.uid];
+    if(pos===undefined) pos=byKey[t][dupKey(t,rec)];
+    if(pos===undefined){
+      store[t].push(rec); const ni=store[t].length-1;
+      byUid[t][rec.uid]=ni; byKey[t][dupKey(t,rec)]=ni; added++;
+    }else{
       const cur=store[t][pos];
       const gana = esCargado(rec) || (!esCargado(cur) && String(rec.updatedAt||'')>=String(cur.updatedAt||''));
-      if(gana){ store[t][pos]=rec; updated++; }
+      if(gana){
+        rec.uid=cur.uid||rec.uid;                          // conserva un uid estable
+        if(t===3 && !rec.rubro) rec.rubro=cur.rubro||'';   // no perder el rubro (metadato local, no viaja en la hoja)
+        store[t][pos]=rec; byUid[t][rec.uid]=pos; updated++;
+      }
     }
   });
   return {added,updated};
