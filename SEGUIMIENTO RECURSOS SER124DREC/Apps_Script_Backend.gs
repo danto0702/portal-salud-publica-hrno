@@ -55,7 +55,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (TOKEN && body.token !== TOKEN) return json({ ok:false, error:'Token invalido' });
     switch (body.action) {
-      case 'ping':          return json({ ok:true, msg:'pong', version:'2.1' });
+      case 'ping':          return json({ ok:true, msg:'pong', version:'2.2' });
       case 'push':          return pushRegistros(body);
       case 'pull':          return pullRegistros(body);
       case 'dedup':         return dedupHoja(body);
@@ -71,6 +71,20 @@ function doPost(e) {
 
 // Cabecera completa de la hoja de un tipo
 function headersDe(t){ return CTRL.concat(CAMPOS[t]); }
+
+// Normalizacion para deduplicar (igual que el aplicativo): sin guiones/espacios, periodo a fin de mes
+function keyNormG(v){ return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function fechaTxtG(v){
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  var m = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/.exec(String(v == null ? '' : v));
+  return m ? (m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2)) : String(v == null ? '' : v);
+}
+function monthEndG(v){
+  var s = fechaTxtG(v), m = /^(\d{4})-(\d{2})/.exec(s);
+  if (!m) return s;
+  var d = new Date(parseInt(m[1],10), parseInt(m[2],10), 0).getDate();
+  return m[1] + '-' + m[2] + '-' + ('0' + d).slice(-2);
+}
 
 // Inserta/actualiza registros por uid en su hoja de tipo
 function pushRegistros(body) {
@@ -144,10 +158,10 @@ function dedupHoja(body) {
     const seen = {}, keep = [];
     vals.forEach(function(row){
       if (!String(row[0]).trim()) return;   // sin uid: se descarta
-      const periodo = row[col['periodo']];
-      const indicador = row[col['indicador']];
-      const kparts = keyFields.map(function(f){ return String(row[col[f]] != null ? row[col[f]] : '').toUpperCase(); });
-      const key = t + '|' + kparts.join('~') + '|' + (periodo||'') + '|' + (indicador === 'E' ? 'E' : 'X');
+      const periodo = monthEndG(row[col['periodo']]);
+      const indicador = String(row[col['indicador']]);
+      const kparts = keyFields.map(function(f){ return keyNormG(row[col[f]]); });
+      const key = t + '|' + kparts.join('~') + '|' + periodo + '|' + (indicador === 'E' ? 'E' : 'X');
       if (seen[key] === undefined) { seen[key] = keep.length; keep.push(row); }
       else {
         const idx = seen[key], cur = keep[idx];

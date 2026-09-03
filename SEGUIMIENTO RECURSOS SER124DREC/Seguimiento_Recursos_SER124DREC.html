@@ -585,6 +585,8 @@ function migrarRegistros(){
     if(!r.uid){ r.uid=genUid(); cambio=true; }
     if(!r.estado){ r.estado='BORRADOR'; cambio=true; }
     if(r.periodo===undefined){ r.periodo=entidad.fechaFin||''; cambio=true; }
+    const me=monthEnd(normFecha(r.periodo||''));
+    if(me && me!==r.periodo){ r.periodo=me; cambio=true; }   // fecha de corte = último día del mes
     if(!r.updatedAt){ r.updatedAt=nowISO(); cambio=true; }
   }));
   if(cambio) save(LS.data,store);
@@ -593,8 +595,10 @@ const esCargado=r=>r&&r.estado==='CARGADO';
 function activos(t){ return store[t].filter(r=>!esCargado(r)); }          // los que se generan
 function totalActivos(){ return ORDER.reduce((a,t)=>a+activos(t).length,0); }
 function totalCargados(){ return ORDER.reduce((a,t)=>a+store[t].filter(esCargado).length,0); }
-// clave anti-duplicados: tipo + clave del anexo + periodo (fecha de corte)
-function recordKey(t,r){ return [t, ...SCHEMA[t].key.map(k=>String(r[k]||'').toUpperCase()), r.periodo||''].join('¬'); }
+// clave anti-duplicados: tipo + clave del anexo (normalizada) + periodo a fin de mes
+function monthEnd(f){ const m=/^(\d{4})-(\d{2})/.exec(String(f||'')); if(!m) return String(f||''); return `${m[1]}-${m[2]}-${String(new Date(+m[1],+m[2],0).getDate()).padStart(2,'0')}`; }
+function keyNorm(v){ return String(v==null?'':v).toUpperCase().replace(/[^A-Z0-9]/g,''); }   // sin guiones/espacios/puntos
+function recordKey(t,r){ return [t, ...SCHEMA[t].key.map(k=>keyNorm(r[k])), monthEnd(normFecha(r.periodo||''))].join('¬'); }
 // clave para DETECTAR duplicados: separa las anulaciones (E) del resto, porque una E corrige a la original (no es un duplicado)
 function dupKey(t,r){ return recordKey(t,r)+'¬'+(r.indicador==='E'?'E':'X'); }
 // cuenta registros duplicados (misma clave del anexo + período, mismo tipo de acción)
@@ -910,7 +914,7 @@ function addRecord(t){
   const r=readForm(t);
   const errs=validateRecord(t,r);
   if(errs.length){ toast('Faltan datos: '+errs.slice(0,4).join(', ')+(errs.length>4?'…':''),'err'); return; }
-  r.periodo=entidad.fechaFin||'';
+  r.periodo=monthEnd(entidad.fechaFin||'');
   const editUid=edit[t];
   const editPos=editUid?store[t].findIndex(x=>x.uid===editUid):-1;
   const key=dupKey(t,r);
@@ -1407,7 +1411,7 @@ function mergeRegistros(incoming){
 function normalizarEntrante(t,raw){
   const s=SCHEMA[t];
   // Google Sheets puede devolver 'periodo' como fecha con hora/zona (2026-07-31T05:00:00Z); se normaliza a AAAA-MM-DD
-  const rec={ uid:raw.uid||'', estado:(raw.estado==='CARGADO'?'CARGADO':'BORRADOR'), periodo:normFecha(raw.periodo),
+  const rec={ uid:raw.uid||'', estado:(raw.estado==='CARGADO'?'CARGADO':'BORRADOR'), periodo:monthEnd(normFecha(raw.periodo)),
     updatedAt:raw.updatedAt||nowISO(), idRecurso:up(raw.idRecurso), nit:normNum(raw.nit), indicador:up(raw.indicador)||'I' };
   if(!['I','A','E','NA'].includes(rec.indicador)) rec.indicador='I';
   s.fields.forEach(f=>{
@@ -1650,7 +1654,7 @@ function renderAdmin(){
     <div><h3>Mantenimiento de datos</h3><div class="sub">${(()=>{const n=contarDuplicados();const c=duplicadosCargados().total;return (n?`Se detectaron <b style="color:var(--yellow)">${n}</b> duplicado(s). `:'Sin duplicados en borrador. ')+(c?`Duplicados entre cargados: <b style="color:var(--red)">${c}</b>.`:'Sin duplicados entre cargados.');})()}</div></div></div></div>
     <div class="card-body">
       <div class="btn-row">
-        <button class="btn btn-ghost" onclick="eliminarDuplicados()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1M15 9l-4 4-2-2"/></svg> Eliminar duplicados (borradores)</button>
+        <button class="btn btn-ghost" onclick="eliminarDuplicados()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1M15 9l-4 4-2-2"/></svg> Consolidar / eliminar duplicados</button>
         <button class="btn btn-danger" onclick="crearAnulacionesDuplicados()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg> Anular duplicados cargados</button>
         <button class="btn btn-ghost" id="btnDedupHoja" onclick="deduplicarHoja()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/><path d="M14 9l-4 4-2-2"/></svg> Deduplicar hoja (nube)</button>
       </div>
