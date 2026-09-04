@@ -701,10 +701,19 @@ function eliminarAnulaciones(){
   confirmModal('Eliminar anulaciones E',
     `Se eliminarán ${n} anulación(es) con indicador E (borradores), en el aplicativo y en la nube. Los registros originales (I) no se tocan. ¿Continuar?`,
     async ()=>{
+      // 1) borrar PRIMERO en la nube y verificar; si no, la sincronización las vuelve a traer
+      if(config.url){
+        let res=null; try{ res=await postSheet({action:'borrarUids', uids}); }catch(e){}
+        if(!res || !res.ok){
+          if(res && /no reconocida/i.test(JSON.stringify(res))) toast('El backend de la hoja está desactualizado (sin "borrarUids"). Republica el Apps Script (nueva versión) y reintenta.','err');
+          else toast('No se pudo borrar en la nube; no borré localmente para evitar que reaparezcan. Reintenta.','err');
+          return;
+        }
+      }
+      // 2) ahora sí, borrar localmente
       ORDER.forEach(t=>{ store[t]=store[t].filter(r=>r.indicador!=='E'); });
       save(LS.data,store); ORDER.forEach(t=>renderTable(t)); updateAll(); renderAdmin();
-      await borrarEnNube(uids);
-      toast(`${n} anulación(es) E eliminadas`,'ok');
+      toast(`${n} anulación(es) E eliminadas${config.url?' (app y nube)':''}`,'ok');
     });
 }
 
@@ -1560,7 +1569,7 @@ function bulkAsignarRubro(){
   const rid=document.getElementById('adm_bulk_rubro').value;
   const soloVacios=document.getElementById('adm_bulk_vacios').checked;
   if(!rid){ toast('Elige un rubro para asignar','err'); return; }
-  let n=0; store[3].forEach(r=>{ if(esCargado(r))return; if(soloVacios && r.rubro) return; r.rubro=rid; r.updatedAt=nowISO(); n++; });
+  let n=0; store[3].forEach(r=>{ if(soloVacios && r.rubro) return; r.rubro=rid; r.updatedAt=nowISO(); n++; });   // incluye CARGADOS (el rubro es metadato del informe)
   save(LS.data,store); renderAdmin(); renderTable(3);
   toast(`Rubro asignado a ${n} contrato(s)`,'ok');
 }
@@ -1673,7 +1682,7 @@ function renderAdmin(){
       </div>
       <div class="tbl-wrap" style="max-height:320px;overflow-y:auto"><table><thead><tr><th>N° contrato</th><th>Contratista</th><th>Valor</th><th>Rubro</th></tr></thead><tbody>
       ${contratos.length?contratos.map(r=>`<tr><td>${esc(r.numActo||'')}</td><td>${esc((r.nomContratista||'').slice(0,30))}</td><td class="num">${fmtMoney(r.valor)}</td>
-        <td><select onchange="asignarRubroContrato('${r.uid}',this.value)" ${esCargado(r)?'disabled':''}>${rubroOptions(r.rubro||'')}</select></td></tr>`).join(''):'<tr><td colspan="4" class="t-empty">No hay contratos cargados.</td></tr>'}
+        <td><select onchange="asignarRubroContrato('${r.uid}',this.value)">${rubroOptions(r.rubro||'')}</select>${esCargado(r)?' <span class="tag CARGADO" style="font-size:9px">CARGADO</span>':''}</td></tr>`).join(''):'<tr><td colspan="4" class="t-empty">No hay contratos cargados.</td></tr>'}
       </tbody></table></div>
     </div>
   </div>
