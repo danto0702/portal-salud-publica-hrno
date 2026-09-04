@@ -598,7 +598,16 @@ function totalCargados(){ return ORDER.reduce((a,t)=>a+store[t].filter(esCargado
 // clave anti-duplicados: tipo + clave del anexo (normalizada) + periodo a fin de mes
 function monthEnd(f){ const m=/^(\d{4})-(\d{2})/.exec(String(f||'')); if(!m) return String(f||''); return `${m[1]}-${m[2]}-${String(new Date(+m[1],+m[2],0).getDate()).padStart(2,'0')}`; }
 function keyNorm(v){ return String(v==null?'':v).toUpperCase().replace(/[^A-Z0-9]/g,''); }   // sin guiones/espacios/puntos
-function recordKey(t,r){ return [t, ...SCHEMA[t].key.map(k=>keyNorm(r[k])), monthEnd(normFecha(r.periodo||''))].join('¬'); }
+// ¿el período forma parte de la identidad? No para incorporación/contratos/pólizas (van una vez); sí para seguimiento/reintegros (mensuales)
+const PERIODO_EN_CLAVE={2:false,3:false,4:false,5:true,6:true,7:true};
+function recordKey(t,r){ const per=PERIODO_EN_CLAVE[t]?monthEnd(normFecha(r.periodo||'')):''; return [t, ...SCHEMA[t].key.map(k=>keyNorm(r[k])), per].join('¬'); }
+// Gana: CARGADO, luego el período más reciente, luego el updatedAt más reciente
+function ganador(a,b){
+  if(esCargado(a)&&!esCargado(b)) return a;
+  if(!esCargado(a)&&esCargado(b)) return b;
+  const pa=String(a.periodo||''), pb=String(b.periodo||''); if(pa!==pb) return pa>pb?a:b;
+  return String(a.updatedAt||'')>=String(b.updatedAt||'')?a:b;
+}
 // clave para DETECTAR duplicados: separa las anulaciones (E) del resto, porque una E corrige a la original (no es un duplicado)
 function dupKey(t,r){ return recordKey(t,r)+'¬'+(r.indicador==='E'?'E':'X'); }
 // GARANTÍA: colapsa cualquier duplicado en memoria (conserva CARGADO o el más reciente). Las anulaciones E se conservan (clave aparte).
@@ -609,9 +618,9 @@ function dedupInline(){
     store[t].forEach(r=>{
       const k=dupKey(t,r);
       if(seen[k]===undefined){ seen[k]=keep.length; keep.push(r); }
-      else{ const i=seen[k], cur=keep[i];
-        const win=(esCargado(r)&&!esCargado(cur))?r:(!esCargado(r)&&esCargado(cur))?cur:(String(r.updatedAt||'')>=String(cur.updatedAt||'')?r:cur);
-        if(win===r){ if(!esCargado(cur)&&cur.rubro&&!win.rubro) win.rubro=cur.rubro; } keep[i]=win; }
+      else{ const i=seen[k], cur=keep[i]; const win=ganador(r,cur);
+        if(!win.rubro && cur.rubro) win.rubro=cur.rubro;   // conservar el rubro
+        keep[i]=win; }
     });
     store[t]=keep;
   });
@@ -624,18 +633,9 @@ function eliminarDuplicados(){
   confirmModal('Eliminar duplicados',
     `Se encontraron ${n} registro(s) duplicado(s) (misma clave del anexo + período). Se conservará uno por grupo (prefiriendo el CARGADO o el más reciente) y se eliminarán los demás. ¿Continuar?`,
     ()=>{
-      let removed=0;
-      ORDER.forEach(t=>{
-        const seen={}, keep=[];
-        store[t].forEach(r=>{
-          const k=dupKey(t,r);
-          if(seen[k]===undefined){ seen[k]=keep.length; keep.push(r); }
-          else{ const idx=seen[k], cur=keep[idx];
-            const win=(esCargado(r)&&!esCargado(cur))?r:(!esCargado(r)&&esCargado(cur))?cur:(String(r.updatedAt||'')>=String(cur.updatedAt||'')?r:cur);
-            keep[idx]=win; removed++; }
-        });
-        store[t]=keep;
-      });
+      const antes=ORDER.reduce((a,t)=>a+store[t].length,0);
+      dedupInline();
+      const removed=antes-ORDER.reduce((a,t)=>a+store[t].length,0);
       save(LS.data,store); ORDER.forEach(t=>renderTable(t)); updateAll();
       toast(`${removed} duplicado(s) eliminado(s)`,'ok');
     });
@@ -1442,10 +1442,9 @@ function mergeRegistros(incoming){
       byUid[t][rec.uid]=ni; byKey[t][dupKey(t,rec)]=ni; added++;
     }else{
       const cur=store[t][pos];
-      const gana = esCargado(rec) || (!esCargado(cur) && String(rec.updatedAt||'')>=String(cur.updatedAt||''));
-      if(gana){
+      if(ganador(rec,cur)===rec){
         rec.uid=cur.uid||rec.uid;                          // conserva un uid estable
-        if(t===3 && !rec.rubro) rec.rubro=cur.rubro||'';   // no perder el rubro (metadato local, no viaja en la hoja)
+        if(!rec.rubro) rec.rubro=cur.rubro||'';            // no perder el rubro (metadato local, no viaja en la hoja)
         store[t][pos]=rec; byUid[t][rec.uid]=pos; updated++;
       }
     }

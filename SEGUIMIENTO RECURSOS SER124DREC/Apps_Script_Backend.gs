@@ -45,6 +45,8 @@ const KEY = {
   6: ['idRecurso','nit','tipoActo','numActo','fecha'],
   7: ['idRecurso','nit','tipoActo','numActo','fecha']
 };
+// ¿el período forma parte de la identidad? No para incorporación/contratos/pólizas; sí para seguimiento/reintegros
+const PERKEY = { 2:false, 3:false, 4:false, 5:true, 6:true, 7:true };
 
 function doGet(e)  { return json({ ok:true, msg:'API SER124DREC activa', metodo:'GET' }); }
 
@@ -55,7 +57,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (TOKEN && body.token !== TOKEN) return json({ ok:false, error:'Token invalido' });
     switch (body.action) {
-      case 'ping':          return json({ ok:true, msg:'pong', version:'2.3' });
+      case 'ping':          return json({ ok:true, msg:'pong', version:'2.4' });
       case 'push':          return pushRegistros(body);
       case 'pull':          return pullRegistros(body);
       case 'dedup':         return dedupHoja(body);
@@ -159,17 +161,22 @@ function dedupHoja(body) {
     const seen = {}, keep = [];
     vals.forEach(function(row){
       if (!String(row[0]).trim()) return;   // sin uid: se descarta
-      const periodo = monthEndG(row[col['periodo']]);
+      const periodo = PERKEY[t] ? monthEndG(row[col['periodo']]) : '';
       const indicador = String(row[col['indicador']]);
       const kparts = keyFields.map(function(f){ return keyNormG(row[col[f]]); });
       const key = t + '|' + kparts.join('~') + '|' + periodo + '|' + (indicador === 'E' ? 'E' : 'X');
       if (seen[key] === undefined) { seen[key] = keep.length; keep.push(row); }
       else {
         const idx = seen[key], cur = keep[idx];
-        const rowCargado = String(row[col['estado']]) === 'CARGADO';
-        const curCargado = String(cur[col['estado']]) === 'CARGADO';
-        const rowUpd = String(row[col['updatedAt']] || ''), curUpd = String(cur[col['updatedAt']] || '');
-        const win = (rowCargado && !curCargado) ? row : (!rowCargado && curCargado) ? cur : (rowUpd >= curUpd ? row : cur);
+        const rc = String(row[col['estado']]) === 'CARGADO', cc = String(cur[col['estado']]) === 'CARGADO';
+        var win;
+        if (rc && !cc) win = row;
+        else if (!rc && cc) win = cur;
+        else {
+          var rp = monthEndG(row[col['periodo']]), cp = monthEndG(cur[col['periodo']]);
+          if (rp !== cp) win = rp > cp ? row : cur;
+          else win = String(row[col['updatedAt']] || '') >= String(cur[col['updatedAt']] || '') ? row : cur;
+        }
         keep[idx] = win; removed++;
       }
     });
