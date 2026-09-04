@@ -55,10 +55,11 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (TOKEN && body.token !== TOKEN) return json({ ok:false, error:'Token invalido' });
     switch (body.action) {
-      case 'ping':          return json({ ok:true, msg:'pong', version:'2.2' });
+      case 'ping':          return json({ ok:true, msg:'pong', version:'2.3' });
       case 'push':          return pushRegistros(body);
       case 'pull':          return pullRegistros(body);
       case 'dedup':         return dedupHoja(body);
+      case 'borrarUids':    return borrarUids(body);
       case 'guardarEnvio':  return guardarEnvio(body);
       default:              return json({ ok:false, error:'Accion no reconocida: ' + body.action });
     }
@@ -179,6 +180,25 @@ function dedupHoja(body) {
     }
   });
   return json({ ok:true, removed: removed, detalle: porTipo });
+}
+
+// Elimina de todas las hojas de tipo las filas cuyo uid esté en la lista (borrado sincronizado)
+function borrarUids(body) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const set = {}; (body.uids || []).forEach(function(u){ set[String(u)] = true; });
+  var removed = 0;
+  Object.keys(HOJA).forEach(function(t){
+    const sh = ss.getSheetByName(HOJA[t]); if (!sh) return;
+    const last = sh.getLastRow(); if (last < 2) return;
+    const width = headersDe(t).length;
+    const vals = sh.getRange(2, 1, last-1, width).getValues();
+    const keep = vals.filter(function(row){ if (set[String(row[0])]) { removed++; return false; } return true; });
+    if (keep.length < vals.length) {
+      sh.getRange(2, 1, vals.length, width).clearContent();
+      if (keep.length) sh.getRange(2, 1, keep.length, width).setValues(keep);
+    }
+  });
+  return json({ ok:true, removed: removed });
 }
 
 // Bitácora de cargas confirmadas

@@ -687,6 +687,26 @@ async function deduplicarHoja(){
       finally{ if(btn){ btn.disabled=false; btn.innerHTML=orig; } }
     });
 }
+// Borra en la hoja las filas por uid (mantiene la nube en sincronía con los borrados locales)
+async function borrarEnNube(uids){
+  if(!config.url || !uids || !uids.length) return;
+  try{ const res=await postSheet({action:'borrarUids', uids}); if(res&&/no reconocida/i.test(JSON.stringify(res))) toast('Se borró localmente. Para borrar también en la nube, republica el Apps Script (nueva versión).','info'); }
+  catch(e){ toast('Se borró localmente, pero falló el borrado en la nube: '+e.message,'err'); }
+}
+// Elimina TODAS las anulaciones E (borradores), en el aplicativo y en la nube. No toca los originales I.
+function eliminarAnulaciones(){
+  const uids=[]; let n=0;
+  ORDER.forEach(t=> store[t].forEach(r=>{ if(r.indicador==='E'){ if(r.uid) uids.push(r.uid); n++; } }));
+  if(!n){ toast('No hay anulaciones E','info'); return; }
+  confirmModal('Eliminar anulaciones E',
+    `Se eliminarán ${n} anulación(es) con indicador E (borradores), en el aplicativo y en la nube. Los registros originales (I) no se tocan. ¿Continuar?`,
+    async ()=>{
+      ORDER.forEach(t=>{ store[t]=store[t].filter(r=>r.indicador!=='E'); });
+      save(LS.data,store); ORDER.forEach(t=>renderTable(t)); updateAll(); renderAdmin();
+      await borrarEnNube(uids);
+      toast(`${n} anulación(es) E eliminadas`,'ok');
+    });
+}
 
 /* ══════════════════════ NAVEGACIÓN ══════════════════════ */
 function go(tab){
@@ -979,16 +999,25 @@ function cancelEdit(t,silent){
   if(!silent) clearForm(t);
 }
 function delRecord(t,i){
-  if(esCargado(store[t][i])){ toast('Registro CARGADO: bloqueado para eliminación.','err'); return; }
+  const rec=store[t][i]; if(!rec) return;
+  if(esCargado(rec)){ toast('Registro CARGADO: bloqueado para eliminación.','err'); return; }
+  const uid=rec.uid;
   confirmModal('Eliminar registro','¿Eliminar el registro #'+(i+1)+' del Tipo '+t+'?',()=>{
-    store[t].splice(i,1); save(LS.data,store); renderTable(t); updateAll(); toast('Registro eliminado','info');
+    const idx=uid?store[t].findIndex(x=>x.uid===uid):i;
+    if(idx>=0) store[t].splice(idx,1);
+    save(LS.data,store); renderTable(t); updateAll();
+    if(uid) borrarEnNube([uid]);
+    toast('Registro eliminado','info');
   });
 }
 function clearAll(t){
   const borr=store[t].filter(r=>!esCargado(r)).length;
   if(!borr){ toast('No hay registros en borrador para vaciar','info'); return; }
   confirmModal('Vaciar borradores','Se eliminarán los '+borr+' registros en BORRADOR del Tipo '+t+' (los CARGADOS se conservan). ¿Continuar?',()=>{
-    store[t]=store[t].filter(esCargado); save(LS.data,store); renderTable(t); updateAll(); toast('Borradores eliminados','info');
+    const uids=store[t].filter(r=>!esCargado(r)).map(r=>r.uid).filter(Boolean);
+    store[t]=store[t].filter(esCargado); save(LS.data,store); renderTable(t); updateAll();
+    borrarEnNube(uids);
+    toast('Borradores eliminados','info');
   });
 }
 function renderTable(t){
@@ -1672,6 +1701,7 @@ function renderAdmin(){
         <button class="btn btn-ghost" onclick="eliminarDuplicados()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1M15 9l-4 4-2-2"/></svg> Consolidar / eliminar duplicados</button>
         <button class="btn btn-danger" onclick="crearAnulacionesDuplicados()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg> Anular duplicados cargados</button>
         <button class="btn btn-ghost" id="btnDedupHoja" onclick="deduplicarHoja()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/><path d="M14 9l-4 4-2-2"/></svg> Deduplicar hoja (nube)</button>
+        <button class="btn btn-danger" onclick="eliminarAnulaciones()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg> Eliminar anulaciones E (${(()=>{let n=0;ORDER.forEach(t=>store[t].forEach(r=>{if(r.indicador==='E')n++;}));return n;})()})</button>
       </div>
       <div class="section-note" style="margin-top:12px"><b>Eliminar duplicados:</b> consolida los borradores repetidos (conserva el CARGADO o el más reciente). <b>Anular duplicados cargados:</b> toma las copias sobrantes de los registros ya cargados y crea borradores con indicador <b>E (Anular)</b> para generar el archivo correctivo de PISIS; no modifica los cargados. <b>Deduplicar hoja (nube):</b> elimina las filas duplicadas directamente en Google Sheets (requiere el backend actualizado).</div>
     </div>
