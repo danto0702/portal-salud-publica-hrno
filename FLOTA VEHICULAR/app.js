@@ -90,8 +90,14 @@ function fechaHora(iso) {
   const d = new Date(iso.endsWith('Z') || iso.includes('+') ? iso : iso.replace(' ', 'T') + 'Z');
   return d.toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
-/** Ancho por debajo del cual la matriz de 14 columnas deja de ser usable. */
+/** Ancho por debajo del cual la matriz de 14 columnas queda incómoda. */
 const angosta = () => window.innerWidth < 700;
+/**
+ * Pantalla táctil. Cambia las instrucciones que se dan en pantalla —tocar en
+ * vez de arrastrar— y desactiva el pintado por arrastre, que con el dedo sería
+ * el mismo gesto que desplazar la lista.
+ */
+const tactil = () => window.matchMedia?.('(pointer: coarse)').matches === true;
 const par = (clave, pordefecto) => parametros[clave] ?? pordefecto;
 
 const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -1424,7 +1430,19 @@ async function guardarEvento() {
 let itinDesde = null, itinDatos = [], predeterminados = [];
 /** vehiculo_id -> { dias, con_salida, primera, ultima } de TODA la operación. */
 let totalesItin = new Map();
-let itinDias = Number(localStorage.getItem('flota_itin_dias')) || 14;
+// En el celular dos semanas obligan a un desplazamiento lateral largo: se
+// arranca en una. Si el usuario escoge otro período, manda el suyo.
+let itinDias = Number(localStorage.getItem('flota_itin_dias')) || (angosta() ? 7 : 14);
+
+/**
+ * Cómo se presenta el itinerario en el celular: 'matriz' es la misma tabla
+ * del escritorio, desplazable de lado; 'dia' es un día a la vez con todos los
+ * vehículos en vertical. Las dos editan igual. En pantalla ancha siempre es la
+ * matriz, que cabe entera.
+ */
+let modoItin = localStorage.getItem('flota_itin_modo') || 'matriz';
+/** Día que se está viendo en el modo 'dia'. */
+let itinDiaSel = null;
 
 async function verItinerario() {
   if (!itinDesde) {
@@ -1497,6 +1515,9 @@ async function verItinerario() {
       <div><h1>Itinerario</h1>
         <p>Programación de vehículos y conductores. Cada cambio queda registrado con su autor.</p></div>
       <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+        ${angosta() ? `<button class="btn sec sm" onclick="cambiarModoItin()"
+          title="Cambiar entre la matriz y la vista por día">${
+            modoItin === 'dia' ? 'Ver matriz' : 'Ver por día'}</button>` : ''}
         <button class="btn sec sm" onclick="moverItin(-itinDias)">←</button>
         <button class="btn sec sm" onclick="itinDesde=null;verItinerario()">Hoy</button>
         <button class="btn sec sm" onclick="moverItin(itinDias)">→</button>
@@ -1519,15 +1540,16 @@ async function verItinerario() {
       </div>
     </div>
 
-    ${predeterminados.length && !angosta() ? `
+    ${predeterminados.length ? `
       <div class="card" style="padding:.6rem .8rem;margin-bottom:.85rem">
-        <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+        <div class="pincel-fila" style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
           <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)">
             Pincel</span>
           ${predeterminados.slice(0, 10).map(p => `<button class="pred-chip pincel-chip"
             data-id="${p.id}" onclick="activarPincel(${p.id})">${esc(p.nombre)}</button>`).join('')}
           <span style="font-size:.72rem;color:var(--muted)">
-            Escoja uno y arrastre sobre los días para programarlos</span>
+            ${tactil() ? 'Escoja uno y toque los días para programarlos'
+                       : 'Escoja uno y arrastre sobre los días para programarlos'}</span>
         </div>
       </div>` : ''}
 
@@ -1538,11 +1560,11 @@ async function verItinerario() {
           ? '<button class="btn" onclick="ir(\'vehiculos\')">Registrar el primero</button>'
           : '<p style="font-size:.85rem">El administrador debe registrarlos primero.</p>'}
       </div></div>` : `
-      ${angosta() ? listaItinerario(dias, activos, porClave) : `
+      ${angosta() && modoItin === 'dia' ? vistaPorDia(dias, activos, porClave) : `
       <div class="scroll-arriba" id="scroll-arriba"><div id="scroll-ancho"></div></div>
       <div class="tabla-env" id="itin-env"><table>
         <thead><tr>
-          <th style="position:sticky;left:0;background:var(--surface-2);z-index:2;min-width:150px">Vehículo</th>
+          <th class="itin-th-veh">Vehículo</th>
           ${dias.map(rotulo).join('')}
         </tr></thead>
         <tbody>${(() => {
@@ -1561,9 +1583,10 @@ async function verItinerario() {
           const color = Math.abs(desvio) < 1.5 ? 'muted' : desvio > 0 ? 'ambar' : 'azul';
           return `
           <tr>
-            <td style="position:sticky;left:0;background:var(--surface);z-index:1;border-right:1px solid var(--border)">
+            <td class="itin-td-veh">
               <div class="placa">${esc(v.placa)}</div>
-              <div style="font-size:.72rem;color:var(--muted)">${esc(v.conductor_actual || 'Sin conductor')}</div>
+              <div class="cond-fila" title="${esc(v.conductor_actual || 'Sin conductor')}"
+                >${esc(v.conductor_actual || 'Sin conductor')}</div>
               <div style="font-size:.68rem;margin-top:.2rem;color:var(--${color});font-weight:700"
                 title="Total programado en toda la operación${tot?.primera ? ` (desde ${tot.primera})` : ''}
  · ${conDespl} con desplazamiento · ${enPeriodo} en el período que está viendo">
@@ -1581,8 +1604,10 @@ async function verItinerario() {
           `<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--${t.color === 'gris' ? 'muted' : t.color});vertical-align:middle"></span> ${t.et}</span>`).join('')}
         <span><span class="punto ok"></span> ejecutado (el conductor marcó salida)</span>
         <span><span class="mini-cambios">✎</span> modificado</span>
-        <span>${angosta()
-          ? 'Toque un día para programarlo o modificarlo'
+        <span>${angosta() && modoItin === 'dia'
+          ? 'Toque un vehículo libre para adjudicarle el día'
+          : angosta()
+          ? 'Toque un día para programarlo · sostenga el dedo sobre uno ya programado para moverlo'
           : 'Arrastre una celda para moverla · mantenga <b>Ctrl</b> para duplicarla · sostenga el dedo en el celular'}</span>
       </div>`}
   `;
@@ -1590,8 +1615,17 @@ async function verItinerario() {
   // El redibujado rehace las fichas: se vuelve a marcar la del pincel activo.
   if (pincel) {
     $$('.pincel-chip').forEach(c => c.classList.toggle('activo', Number(c.dataset.id) === pincel.id));
-    $('#itin-env')?.classList.add('pintando');
+    marcarPintando(true);
   }
+  // La tira de días es más ancha que la pantalla: si el día escogido queda
+  // fuera, no se ve cuál está seleccionado.
+  $('#tira-dias .d.on')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+}
+
+/** Marca el modo pintar en la vista que esté puesta, matriz o por día. */
+function marcarPintando(si) {
+  $('#itin-env')?.classList.toggle('pintando', si);
+  $('#itin-dia')?.classList.toggle('pintando', si);
 }
 
 /**
@@ -1761,8 +1795,10 @@ function activarPincel(id) {
   pincel = pincel?.id === id ? null : predeterminados.find(p => p.id === id);
   $$('.pincel-chip').forEach(c =>
     c.classList.toggle('activo', pincel && Number(c.dataset.id) === pincel.id));
-  $('#itin-env')?.classList.toggle('pintando', !!pincel);
-  aviso(pincel ? `Pincel: ${pincel.nombre}. Toque o arrastre sobre los días.`
+  marcarPintando(!!pincel);
+  aviso(pincel ? `Pincel: ${pincel.nombre}. ${tactil()
+                   ? 'Toque los días que quiera programar.'
+                   : 'Toque o arrastre sobre los días.'}`
                : 'Pincel apagado', pincel ? 'ok' : 'info');
 }
 
@@ -1809,6 +1845,10 @@ async function guardarPintura(vehiculoId, fecha, idExistente) {
 
 function pincelMove(ev) {
   if (!pincel || !ev.buttons) return;
+  // Con el dedo el pincel es solo por toques: arrastrar es desplazar la
+  // pantalla, y si aquí se llamara a preventDefault la tabla se quedaría
+  // pegada mientras el pincel estuviera encendido.
+  if (ev.pointerType === 'touch') return;
   const sobre = celdaDesde(ev);
   if (!sobre) return;
   ev.preventDefault();
@@ -1848,37 +1888,110 @@ document.addEventListener('pointercancel', () => {
 // ── Navegación del rango ────────────────────────────────────────────────────
 
 /**
- * En un celular la matriz no cabe: se muestra el mismo itinerario como una
- * lista agrupada por día, que es como se consulta en terreno. Los días sin
- * ninguna programación no se listan.
+ * El itinerario en el celular, un día a la vez.
+ *
+ * La matriz de 13 vehículos por 14 días mide unos 1.700 px: en un teléfono se
+ * ven dos días y medio a la vez, así que adjudicar exige buscar la celda
+ * desplazándose. Esta vista muestra el MISMO itinerario, editable igual, pero
+ * de otra forma: se escoge el día en la tira de arriba y debajo salen TODOS
+ * los vehículos, los programados con su destino y —esto es lo que faltaba—
+ * los libres como una ranura que se toca para adjudicar.
+ *
+ * Los vehículos van en el mismo orden que las filas de la matriz: quien
+ * programa busca por placa y no tiene que aprenderse dos ordenaciones.
  */
-function listaItinerario(dias, activos, porClave) {
-  const grupos = dias.map(f => {
-    const filas = activos
-      .map(v => ({ v, it: porClave[f + '|' + v.id] }))
-      .filter(x => x.it);
-    return { f, filas };
-  }).filter(g => g.filas.length);
-
-  if (!grupos.length) {
-    return '<div class="card"><div class="vacio">Sin programación en este período.</div></div>';
+function vistaPorDia(dias, activos, porClave) {
+  // El día escogido tiene que estar dentro del período visible: si se movió el
+  // período o se cambió su largo, el anterior puede haberse quedado fuera.
+  if (!dias.includes(itinDiaSel)) {
+    itinDiaSel = dias.includes(hoy()) ? hoy() : dias[0];
   }
+  const f = itinDiaSel;
+  const i = dias.indexOf(f);
 
-  return `<div class="itin-lista">${grupos.map(({ f, filas }) => `
-    <div class="dia-grupo">
-      <div class="dia-tit">${diaSemana(f)} ${f.slice(8)}/${f.slice(5, 7)}
-        <span style="font-weight:500;color:var(--muted)"> · ${filas.length} vehículo(s)</span></div>
-      ${filas.map(({ v, it }) => {
-        const tj = TIPOS_JORNADA[it.tipo_jornada] || TIPOS_JORNADA.ebs;
-        const enBase = it.tipo_jornada === 'disponible';
-        return `<div class="ren" onclick="modalItinerario(${it.id},${v.id},'${f}')">
-          <span class="pl">${esc(v.placa)}</span>
-          <span class="de"><b>${esc(enBase ? 'Disponible' : (it.destino || tj.et))}</b><br>
-            <span style="font-size:.74rem;color:var(--muted)">${esc(v.conductor_actual?.trim() || 'sin conductor')}</span></span>
-          <span class="etq ${tj.color}">${tj.et}</span>
-          ${it.trayectos_cerrados > 0 ? '<span class="punto ok" title="Ejecutado"></span>' : ''}
-        </div>`; }).join('')}
-    </div>`).join('')}</div>`;
+  const filas = activos.map(v => ({ v, it: porClave[f + '|' + v.id] }));
+  const ocupados = filas.filter(x => x.it).length;
+
+  const tira = dias.map(d => {
+    const n = activos.reduce((a, v) => a + (porClave[d + '|' + v.id] ? 1 : 0), 0);
+    return `<div class="d ${d === f ? 'on' : ''} ${d === hoy() ? 'hoy' : ''}"
+      onclick="verDiaItin('${d}')" title="${diaSemana(d)} ${d}">
+      ${diaSemana(d).slice(0, 3)}<span class="n">${d.slice(8)}</span>
+      <span class="c">${n || '·'}</span></div>`;
+  }).join('');
+
+  const renglon = ({ v, it }) => {
+    const conductor = v.conductor_actual?.trim() || 'sin conductor';
+    if (!it) {
+      return `<div class="itin-ren libre" data-vehiculo-id="${v.id}" data-fecha="${f}"
+        onclick="tocarRenItin(null,${v.id},'${f}')">
+        <span class="pl">${esc(v.placa)}</span>
+        <span class="de"><span class="sub">${esc(conductor)} · sin programación</span></span>
+        <span class="mas">+ Asignar</span></div>`;
+    }
+    const tj = TIPOS_JORNADA[it.tipo_jornada] || TIPOS_JORNADA.ebs;
+    const ejec = it.trayectos_cerrados > 0;
+    const enBase = it.tipo_jornada === 'disponible';
+    return `<div class="itin-ren ${it.tipo_jornada}${ejec ? ' bloqueada' : ''}"
+      data-vehiculo-id="${v.id}" data-fecha="${f}" data-itin-id="${it.id}"
+      onclick="tocarRenItin(${it.id},${v.id},'${f}')">
+      <span class="pl">${esc(v.placa)}</span>
+      <span class="de"><b>${esc(enBase ? 'Disponible' : (it.destino || tj.et))}</b><br>
+        <span class="sub">${esc(conductor)}</span></span>
+      <span class="etq ${tj.color}">${tj.et}</span>
+      ${ejec ? '<span class="punto ok" title="Ejecutado"></span>' : ''}
+      ${it.num_cambios ? `<span class="mini-cambios" title="${it.num_cambios} modificación(es)">✎${it.num_cambios}</span>` : ''}
+    </div>`;
+  };
+
+  return `
+    <div class="tira-dias" id="tira-dias">${tira}</div>
+    <div class="dia-nav">
+      <button class="btn sec sm" ${i > 0 ? `onclick="verDiaItin('${dias[i - 1]}')"` : 'disabled'}>←</button>
+      <div class="tit">${diaSemana(f)} ${new Date(f + 'T12:00:00')
+        .toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}
+        ${f === hoy() ? '<small>hoy</small>' : ''}</div>
+      <button class="btn sec sm" ${i < dias.length - 1 ? `onclick="verDiaItin('${dias[i + 1]}')"` : 'disabled'}>→</button>
+    </div>
+    <div id="itin-dia">
+      <p class="dia-res">${ocupados} programado(s) · ${filas.length - ocupados} libre(s)
+        de ${filas.length} vehículo(s)</p>
+      ${filas.map(renglon).join('')}
+    </div>`;
+}
+
+/** Cambia el día que se está viendo, sin volver a pedirle nada al servidor. */
+function verDiaItin(f) {
+  itinDiaSel = f;
+  verItinerario();
+}
+
+/** Alterna entre la matriz y la vista por día, y lo recuerda. */
+function cambiarModoItin() {
+  modoItin = modoItin === 'dia' ? 'matriz' : 'dia';
+  localStorage.setItem('flota_itin_modo', modoItin);
+  verItinerario();
+}
+
+/**
+ * Toque sobre un renglón de la vista por día.
+ *
+ * Con el pincel encendido el toque programa directamente, que es lo que lo
+ * hace rápido; sin él abre la ventana de siempre. Un día ya ejecutado no se
+ * pinta: la marca del conductor quedaría apuntando a una programación que ya
+ * no describe lo que hizo.
+ */
+function tocarRenItin(id, vehiculoId, fecha) {
+  if (pincel) {
+    const it = id ? itinDatos.find(x => x.id === id) : null;
+    if (it?.trayectos_cerrados > 0) {
+      return aviso('Ese día ya está ejecutado: no se puede pintar encima.', 'mal');
+    }
+    pintarCelda(vehiculoId, fecha, id);
+    pincelFin();
+    return;
+  }
+  modalItinerario(id, vehiculoId, fecha);
 }
 
 function moverItin(n) { itinDesde = nDias(itinDesde, n); verItinerario(); }
@@ -1889,8 +2002,12 @@ function cambiarPeriodo(dias) {
   verItinerario();
 }
 
+/** Programación abierta en la ventana; la consulta avisarMover(). */
+let itinEnEdicion = null;
+
 async function modalItinerario(id, vehiculoId, fecha) {
   const it = id ? itinDatos.find(x => x.id === id) : null;
+  itinEnEdicion = it ? it.id : null;
   const conductores = personas.filter(p => p.es_conductor);
   const veh = vehiculos.find(v => v.id === vehiculoId);
   // En una programación nueva se propone el conductor predeterminado del vehículo.
@@ -1959,7 +2076,21 @@ async function modalItinerario(id, vehiculoId, fecha) {
     <div class="campo"><label class="lb">Observaciones</label>
       <textarea class="inp" id="it-obs" rows="2">${esc(it?.observaciones || '')}</textarea></div>
     ${it ? `<div class="campo"><label class="lb">Motivo del cambio</label>
-      <input class="inp" id="it-motivo" placeholder="Por qué se modifica (queda registrado)"></div>` : ''}
+      <input class="inp" id="it-motivo" placeholder="Por qué se modifica (queda registrado)"></div>
+    <details class="mover-bloque">
+      <summary>Mover a otro día o a otro vehículo</summary>
+      <div class="g2" style="display:grid;gap:.6rem;margin-top:.6rem">
+        <div class="campo" style="margin:0"><label class="lb">Día</label>
+          <input type="date" class="inp" id="it-fecha" value="${fecha}"
+            onchange="avisarMover()"></div>
+        <div class="campo" style="margin:0"><label class="lb">Vehículo</label>
+          <select class="inp" id="it-veh" onchange="avisarMover()">
+            ${vehiculos.filter(v => v.activo !== 0).map(v => `<option value="${v.id}"
+              ${v.id === vehiculoId ? 'selected' : ''}>${esc(v.placa)}</option>`).join('')}
+          </select></div>
+      </div>
+      <p id="it-mover-avi" class="ayuda"></p>
+    </details>` : ''}
     ${it?.num_cambios ? `<button class="btn sec sm" onclick="verCambios(${it.id})">
       Ver historial de cambios (${it.num_cambios})</button>` : ''}`,
     `${it ? `<button class="btn sec" onclick="borrarItinerario(${it.id})">${
@@ -1968,6 +2099,44 @@ async function modalItinerario(id, vehiculoId, fecha) {
      <button class="btn sec" onclick="cerrarModal()">Cerrar</button>
      <button class="btn" id="it-btn" onclick="guardarItinerario(${id || 'null'},${vehiculoId},'${fecha}')">Guardar</button>`);
   itinToggleDestino();
+}
+
+/**
+ * Avisa, antes de guardar, qué va a pasar con el destino escogido para mover.
+ *
+ * El servidor INTERCAMBIA las dos programaciones cuando el destino ya está
+ * ocupado. Arrastrando en la matriz eso se ve venir —la celda se pinta de
+ * ámbar—; desde esta ventana no se vería nada, y un intercambio silencioso
+ * movería de sitio una programación que nadie tocó.
+ */
+function avisarMover() {
+  const p = $('#it-mover-avi');
+  if (!p) return;
+  const f = $('#it-fecha').value, v = Number($('#it-veh').value);
+  const it = itinDatos.find(x => x.id === itinEnEdicion);
+  if (!f || !it || (f === it.fecha && v === Number(it.vehiculo_id))) {
+    p.textContent = ''; p.className = 'ayuda'; return;
+  }
+  const dentro = f >= itinDesde && f <= nDias(itinDesde, itinDias - 1);
+  if (!dentro) {
+    p.className = 'ayuda';
+    p.textContent = 'Ese día está fuera del período que está viendo: al guardar, '
+      + 'la programación desaparece de esta pantalla (no se borra).';
+    return;
+  }
+  const ocupa = itinDatos.find(x => x.fecha === f && Number(x.vehiculo_id) === v
+                                    && x.estado !== 'cancelado' && x.id !== it.id);
+  if (!ocupa) {
+    p.className = 'ayuda';
+    p.textContent = 'Ese día está libre para ese vehículo.';
+  } else if (ocupa.trayectos_cerrados > 0) {
+    p.className = 'ayuda mal';
+    p.textContent = 'Ese día ya tiene viajes registrados: no se puede ocupar.';
+  } else {
+    p.className = 'ayuda mal';
+    p.textContent = `Ese día ya está programado (${ocupa.destino
+      || TIPOS_JORNADA[ocupa.tipo_jornada]?.et || 'ocupado'}): las dos se INTERCAMBIAN de sitio.`;
+  }
 }
 
 function itinToggleDestino() {
@@ -1989,18 +2158,42 @@ async function guardarItinerario(id, vehiculoId, fecha) {
   if (tipo !== 'disponible' && $('#it-dest').value.trim()) {
     cuerpo.destino_nombre = $('#it-dest').value.trim();
   }
-  if (id) cuerpo.motivo = $('#it-motivo')?.value.trim() || undefined;
+  const motivo = id ? ($('#it-motivo')?.value.trim() || undefined) : undefined;
+  if (id) cuerpo.motivo = motivo;
 
+  // Mover va aparte: el PUT no cambia ni la fecha ni el vehículo. No puede,
+  // porque la tabla tiene UNIQUE(fecha, vehiculo_id) y caer sobre una celda
+  // ocupada exige el intercambio en tres pasos que hace /api/itinerario/mover.
+  const fDestino = id ? ($('#it-fecha')?.value || fecha) : fecha;
+  const vDestino = id ? Number($('#it-veh')?.value || vehiculoId) : Number(vehiculoId);
+  const mueve = id && (fDestino !== fecha || vDestino !== Number(vehiculoId));
 
   try {
+    // Primero mover: si el destino no se puede ocupar, se para aquí y no queda
+    // la programación editada a medias, en un sitio que el usuario ya no espera.
+    let intercambio = false;
+    if (mueve) {
+      const r = await api('/api/itinerario/mover', {
+        metodo: 'POST',
+        cuerpo: { id, fecha: fDestino, vehiculo_id: vDestino, motivo },
+      });
+      intercambio = !!r.intercambio;
+      // Queda al alcance del botón Deshacer, igual que un arrastre.
+      ultimoMovimiento = { tipo: 'movido', id, fecha, vehiculo_id: Number(vehiculoId) };
+    }
     if (id) await api('/api/itinerario/' + id, { metodo: 'PUT', cuerpo });
     else await api('/api/itinerario', { metodo: 'POST', cuerpo });
     cerrarModal();
-    aviso(id ? 'Programación actualizada' : 'Desplazamiento adjudicado', 'ok', 'Listo');
+    const fuera = mueve && (fDestino < itinDesde || fDestino > nDias(itinDesde, itinDias - 1));
+    aviso(!id ? 'Desplazamiento adjudicado'
+          : intercambio ? 'Actualizada e intercambiada con la que ocupaba ese día'
+          : mueve ? `Actualizada y movida al ${fDestino}${
+              fuera ? ', que está fuera del período que está viendo' : ''}`
+          : 'Programación actualizada', 'ok', 'Listo');
     cat = await api('/api/catalogos');   // recarga por si se creó un destino nuevo
     verItinerario();
   } catch (e) {
-    aviso(e.message, 'mal', 'No se pudo guardar');
+    aviso(e.message, 'mal', mueve ? 'No se pudo mover' : 'No se pudo guardar');
     btn.disabled = false; btn.textContent = 'Guardar';
   }
 }

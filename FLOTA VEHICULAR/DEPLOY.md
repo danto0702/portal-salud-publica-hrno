@@ -129,6 +129,19 @@ las comprobaciones de archivos y se salta las de navegador. **No toca el Worker*
 así que basta con ejecutarla cuando se cambien `manifest.json`, `sw.js`, los
 iconos o la pantalla de ingreso.
 
+Y la del itinerario en el celular, que programa traslados con un navegador de
+verdad a 412 px de ancho —adjudica, mueve sin arrastrar, pinta con un
+predeterminado— y comprueba de paso que el arrastre con el ratón del escritorio
+siga funcionando:
+
+```bash
+node pruebas/prueba_movil.mjs
+```
+
+También necesita Playwright, y se salta entera si no está. Ejecútela al tocar la
+pantalla de itinerario: su matriz es la misma en el computador y en el teléfono,
+así que un retoque pensado para uno puede romper el otro.
+
 ---
 
 ## Operaciones sobre la base

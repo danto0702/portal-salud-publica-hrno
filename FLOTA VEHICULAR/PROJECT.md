@@ -72,7 +72,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D16 | Arrastrar | Mover con arrastre, duplicar con Ctrl. Soltar sobre una celda ocupada **intercambia** las dos |
 | D17 | Predeterminados | Banco de combinaciones con nombre propio, que además son los valores válidos de la plantilla de Excel |
 | D18 | Plantilla de Excel | Matriz como el archivo original, con fechas ISO, lista desplegable y **vista previa antes de aplicar** |
-| D19 | Móvil | Página adaptable e **instalable** en Android e iPhone. No hay apps de tienda: en la matriz de 14 columnas no cabe un celular, así que ahí se muestra una lista por día |
+| D19 | Móvil | Página adaptable e **instalable** en Android e iPhone. No hay apps de tienda. El itinerario se **programa igual desde el celular**: la misma matriz, desplazable de lado, y un botón que cambia a una vista de un día con todos los vehículos |
 | D20 | Banner | Imagen 2000 × 289 configurable en Ajustes, presente en el ingreso, el encabezado y el PDF. Se guarda en la base, redimensionada en el navegador |
 | D21 | PDF | Todo el período en **una sola hoja**, con el tamaño de papel elegido según cuántos días haya |
 | D22 | Cuentas de conductor | **Obligatorio** vincularlas a una persona: es lo que las conecta con el itinerario |
@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D32 | Mover sin arrastrar | Además del arrastre, la ventana de la programación lleva **día y vehículo de destino**. Con el dedo el arrastre exige sostener 350 ms y soltar sobre una celda que suele estar fuera de pantalla |
 
 Consecuencia de D5: la aplicación nace como **PWA con cola offline** desde la primera fase.
 No es un añadido posterior — en zona rural del Catatumbo, sin ella el registro en vivo no funciona.
@@ -337,9 +338,45 @@ El arrastre usa Pointer Events, no la API de arrastre de HTML5: así el mismo c�
 con el ratón y con el dedo. En táctil, mover exige **sostener el dedo 350 ms**, porque de lo
 contrario el gesto sería indistinguible de desplazar la tabla.
 
-Por debajo de 700 px la matriz se reemplaza por una **lista agrupada por día**, que es como se
-consulta en terreno. Los campos usan letra de 16 px para que iOS no haga zoom al enfocar, y los
-márgenes respetan el *notch*.
+Los campos usan letra de 16 px para que iOS no haga zoom al enfocar, y los márgenes respetan
+el *notch*.
+
+**El itinerario se programa desde el celular igual que desde el computador.** Por debajo de
+700 px hay dos presentaciones del mismo itinerario, y se alterna entre ellas con un botón de la
+cabecera; la elección se recuerda en el aparato:
+
+- **Matriz** — la misma tabla del escritorio, con la columna de placas fija y desplazamiento
+  lateral *dentro de su marco*, no de la página. Trae las casillas libres con su `+`, que es lo
+  que permite adjudicar. Arranca en **una semana** en vez de dos: con 13 vehículos y 14 días la
+  tabla mide unos 1 700 px y en un teléfono de 412 px se verían dos días y medio a la vez.
+- **Por día** — se escoge el día en una tira deslizante, que además dice cuántos vehículos
+  tiene cada uno, y debajo salen **todos** los vehículos: los programados con su destino y los
+  libres como una ranura *+ Asignar*. No hay desplazamiento lateral, y es la forma rápida de
+  llenar un día con una sola mano.
+
+> **El defecto que esto corrige.** Antes, por debajo de 700 px la matriz se reemplazaba por una
+> lista de solo lectura que únicamente listaba los días **ya programados**. Los vehículos libres
+> no aparecían por ninguna parte, así que desde el celular no había dónde tocar para adjudicar un
+> traslado: solo se podía modificar lo que ya existía. Se reportó como «la visual del teléfono no
+> permite modificar itinerarios».
+
+**El pincel también funciona en el celular**, por toques: se escoge el predeterminado y cada
+toque programa un día. Con el dedo **no** se pinta arrastrando — sería el mismo gesto que
+desplazar la pantalla, y `preventDefault` dejaría la tabla pegada mientras el pincel estuviera
+encendido. Con el ratón se sigue pintando de las dos formas.
+
+**Mover sin arrastrar (D32).** La ventana de la programación lleva un bloque *Mover a otro día o
+a otro vehículo* con los dos campos. No es un capricho del móvil: el arrastre es el único camino
+que había, y con el dedo exige sostener 350 ms y soltar sobre una celda que casi siempre está
+fuera de pantalla. Por debajo usa el mismo `POST /api/itinerario/mover` que el arrastre, así que
+queda en el historial exactamente igual, y el movimiento se puede deshacer con el mismo botón.
+Como ese endpoint **intercambia** las dos programaciones cuando el destino está ocupado —cosa que
+arrastrando se ve venir, porque la celda se pinta de ámbar—, el bloque avisa antes de guardar:
+libre, ocupado (se intercambian) o con viajes registrados (no se puede).
+
+Se prueba con `node worker/pruebas/prueba_movil.mjs`, en un navegador de verdad a 412 px: adjudica
+un traslado, lo mueve sin arrastrarlo, pinta con un predeterminado y comprueba que el arrastre con
+el ratón del escritorio siga funcionando — la matriz es la misma en los dos sitios.
 
 ### 5.1.4 Instalación en el teléfono del conductor (D27)
 
