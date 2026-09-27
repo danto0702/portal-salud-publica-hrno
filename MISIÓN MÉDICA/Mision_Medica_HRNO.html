@@ -4634,8 +4634,21 @@ function renderGestion(){
   <!-- ═══ SEGUIMIENTO EMBLEMAS ═══ -->
   <div id="gt-pane-emblemas-seg" style="display:none">
     <div id="seg-emb-kpi" class="gt-kpi-grid"></div>
-    <div class="gt-action-bar">
-      <div style="font-size:.85rem;color:var(--muted)">Vehículos y edificios con emblemas registrados.</div>
+    <div class="gt-action-bar" style="flex-wrap:wrap;gap:.5rem">
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;flex:1">
+        <select id="seg-emb-filtro-tipo" class="form-select" style="width:auto;min-width:140px;font-size:.82rem;padding:.3rem .6rem" onchange="segEmbAplicarFiltros()">
+          <option value="">Todos los tipos</option>
+          <option value="vehiculo">Vehículos</option>
+          <option value="edificio">Edificios</option>
+        </select>
+        <select id="seg-emb-filtro-mun" class="form-select" style="width:auto;min-width:150px;font-size:.82rem;padding:.3rem .6rem" onchange="segEmbAplicarFiltros()">
+          <option value="">Todos los municipios</option>
+        </select>
+        <button class="btn btn-sm" style="background:var(--red);color:#fff;display:flex;align-items:center;gap:.35rem" onclick="segEmbGenerarPDF()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Descargar PDF
+        </button>
+      </div>
       <button class="btn btn-primary btn-sm" onclick="segEmbAbrirModal()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Registrar vehículo / edificio
@@ -4687,6 +4700,45 @@ function renderGestion(){
       <div class="gt-modal-footer">
         <button class="btn btn-secondary" onclick="segEmbCerrarModal()">Cancelar</button>
         <button class="btn btn-primary" onclick="segEmbGuardar()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal acciones de seguimiento de emblemas -->
+  <div id="seg-emb-acciones-modal" class="gt-modal-overlay" style="display:none" onclick="if(event.target===this)segEmbCerrarAcciones()">
+    <div class="gt-modal" style="max-width:680px;max-height:92vh;overflow-y:auto">
+      <div class="gt-modal-header">
+        <div>
+          <h3 id="seg-emb-acc-title" style="font-weight:700;font-size:1rem;margin:0">Acciones de seguimiento</h3>
+          <div id="seg-emb-acc-subtitle" style="font-size:.78rem;color:var(--muted);margin-top:.15rem"></div>
+        </div>
+        <button onclick="segEmbCerrarAcciones()" style="background:none;border:none;cursor:pointer;color:var(--muted)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="gt-modal-body">
+        <input type="hidden" id="seg-emb-acc-id">
+        <!-- Sección: agregar nueva acción -->
+        <div style="background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--r-md);padding:1rem;margin-bottom:1.25rem">
+          <div style="font-size:.85rem;font-weight:700;color:var(--text);margin-bottom:.75rem">Nueva acción de seguimiento</div>
+          <div class="form-group">
+            <label class="form-label" style="font-weight:700;color:var(--text);margin-bottom:.5rem">Estado actualizado de emblemas</label>
+            <div id="seg-emb-acc-emblemas-form" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.5rem;margin-bottom:.75rem"></div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Nota / descripción de la acción <span class="req">*</span></label>
+            <textarea id="seg-emb-acc-nota" class="form-input" rows="3" style="resize:vertical" placeholder="Ej: Se repuso el emblema lateral derecho. Coordinado con el municipio de Ábrego..."></textarea>
+          </div>
+        </div>
+        <!-- Historial -->
+        <div style="font-size:.85rem;font-weight:700;color:var(--text);margin-bottom:.6rem">Historial de acciones</div>
+        <div id="seg-emb-acc-historial" style="min-height:60px">
+          <div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:.82rem"><span class="spinner" style="display:inline-block"></span></div>
+        </div>
+      </div>
+      <div class="gt-modal-footer">
+        <button class="btn btn-secondary" onclick="segEmbCerrarAcciones()">Cerrar</button>
+        <button class="btn btn-primary" onclick="segEmbGuardarAccion()">Guardar acción</button>
       </div>
     </div>
   </div>
@@ -5016,11 +5068,42 @@ async function loadEmblemasSeguimiento(){
   const {data,error} = await supa.from('mm_emblemas_seguimiento').select('*').order('created_at',{ascending:false});
   if(error){ elTbl.innerHTML=`<div style="color:var(--red)">Error: ${error.message}</div>`; return; }
   window._segEmbData = data||[];
+  // Poblar filtro de municipios
+  const munSel = document.getElementById('seg-emb-filtro-mun');
+  if(munSel){
+    const muns = [...new Set((data||[]).map(r=>r.municipio).filter(Boolean))].sort();
+    const curMun = munSel.value;
+    munSel.innerHTML = '<option value="">Todos los municipios</option>' + muns.map(m=>`<option value="${m}" ${m===curMun?'selected':''}>${m}</option>`).join('');
+  }
 
-  const vehiculos = (data||[]).filter(r=>r.tipo==='vehiculo');
-  const edificios = (data||[]).filter(r=>r.tipo==='edificio');
-  const totalFaltantes = (data||[]).reduce((s,r)=>{ const pos=SEG_EMB_POSICIONES[r.tipo]||[]; return s+pos.filter(p=>(r.emblemas||{})[p]==='Ausente').length; },0);
-  const totalDeterioro = (data||[]).reduce((s,r)=>{ const pos=SEG_EMB_POSICIONES[r.tipo]||[]; return s+pos.filter(p=>(r.emblemas||{})[p]==='Deteriorado').length; },0);
+  segEmbRenderTabla(data||[]);
+}
+
+function segEmbEstadoGeneral(r){
+  const pos=SEG_EMB_POSICIONES[r.tipo]||[], emb=r.emblemas||{};
+  if(pos.some(p=>emb[p]==='Ausente')) return{color:'#da291c',label:'Incompleto'};
+  if(pos.some(p=>emb[p]==='Deteriorado')) return{color:'#b45309',label:'Deteriorado'};
+  if(pos.every(p=>emb[p]==='Bueno')) return{color:'#0a8f63',label:'Completo'};
+  return{color:'#76808c',label:'Sin registrar'};
+}
+
+function segEmbAplicarFiltros(){
+  const tipo = (document.getElementById('seg-emb-filtro-tipo')||{}).value||'';
+  const mun  = (document.getElementById('seg-emb-filtro-mun')||{}).value||'';
+  let filtered = window._segEmbData||[];
+  if(tipo) filtered = filtered.filter(r=>r.tipo===tipo);
+  if(mun)  filtered = filtered.filter(r=>r.municipio===mun);
+  segEmbRenderTabla(filtered);
+}
+
+function segEmbRenderTabla(data){
+  const elKpi = document.getElementById('seg-emb-kpi');
+  const elTbl = document.getElementById('seg-emb-table');
+  const todo   = window._segEmbData||[];
+  const vehiculos = todo.filter(r=>r.tipo==='vehiculo');
+  const edificios = todo.filter(r=>r.tipo==='edificio');
+  const totalFaltantes = todo.reduce((s,r)=>{ const pos=SEG_EMB_POSICIONES[r.tipo]||[]; return s+pos.filter(p=>(r.emblemas||{})[p]==='Ausente').length; },0);
+  const totalDeterioro = todo.reduce((s,r)=>{ const pos=SEG_EMB_POSICIONES[r.tipo]||[]; return s+pos.filter(p=>(r.emblemas||{})[p]==='Deteriorado').length; },0);
 
   elKpi.innerHTML=`
   <div class="gt-kpi-card"><div class="gt-kpi-val" style="color:var(--blue)">${vehiculos.length}</div><div class="gt-kpi-label">Vehículos</div></div>
@@ -5028,25 +5111,16 @@ async function loadEmblemasSeguimiento(){
   <div class="gt-kpi-card"><div class="gt-kpi-val" style="color:var(--red)">${totalFaltantes}</div><div class="gt-kpi-label">Emblemas ausentes</div></div>
   <div class="gt-kpi-card"><div class="gt-kpi-val" style="color:var(--yellow)">${totalDeterioro}</div><div class="gt-kpi-label">Deteriorados</div></div>`;
 
-  if(!(data||[]).length){
-    elTbl.innerHTML='<div style="padding:2rem;text-align:center;color:var(--muted)">No hay registros. Haz clic en "Registrar vehículo / edificio" para comenzar.</div>';
+  if(!data.length){
+    elTbl.innerHTML='<div style="padding:2rem;text-align:center;color:var(--muted)">No hay registros que coincidan con los filtros.</div>';
     return;
   }
-
-  function estadoGeneral(r){
-    const pos=SEG_EMB_POSICIONES[r.tipo]||[], emb=r.emblemas||{};
-    if(pos.some(p=>emb[p]==='Ausente')) return{color:'#da291c',label:'Incompleto'};
-    if(pos.some(p=>emb[p]==='Deteriorado')) return{color:'#b45309',label:'Deteriorado'};
-    if(pos.every(p=>emb[p]==='Bueno')) return{color:'#0a8f63',label:'Completo'};
-    return{color:'#76808c',label:'Sin registrar'};
-  }
-
   elTbl.innerHTML=`<table class="data-table">
     <thead><tr><th>Tipo</th><th>Subtipo</th><th>Placa / Nombre</th><th>Municipio</th><th>Marca / Modelo</th><th>Estado</th><th>Faltantes</th><th>Acciones</th></tr></thead>
-    <tbody>${(data||[]).map(r=>{
+    <tbody>${data.map(r=>{
       const pos=SEG_EMB_POSICIONES[r.tipo]||[], emb=r.emblemas||{};
       const faltantes=pos.filter(p=>emb[p]==='Ausente').length;
-      const est=estadoGeneral(r);
+      const est=segEmbEstadoGeneral(r);
       return`<tr>
         <td><span class="badge ${r.tipo==='vehiculo'?'badge-blue':'badge-purple'}">${r.tipo==='vehiculo'?'Vehículo':'Edificio'}</span></td>
         <td style="font-size:.82rem;text-transform:capitalize">${(r.subtipo||'').replace('_',' ')}</td>
@@ -5056,7 +5130,8 @@ async function loadEmblemasSeguimiento(){
         <td><span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.78rem;font-weight:700;color:${est.color}"><span style="width:9px;height:9px;border-radius:50%;background:${est.color}"></span>${est.label}</span>
           <div style="font-size:.68rem;color:var(--muted);margin-top:.15rem">${pos.map(p=>`${SEG_EMB_LABELS[p]}:${emb[p]||'—'}`).join(' · ')}</div></td>
         <td style="font-weight:700;color:${faltantes>0?'#da291c':'#0a8f63'}">${faltantes}</td>
-        <td><div style="display:flex;gap:.3rem">
+        <td><div style="display:flex;gap:.3rem;flex-wrap:wrap">
+          <button class="btn btn-sm" style="background:var(--purple);color:#fff" onclick="segEmbAbrirAcciones('${r.id}')">Acciones</button>
           ${S.adminLoggedIn?`<button class="btn btn-secondary btn-sm" onclick="segEmbAbrirModal('${r.id}')">Editar</button>
           <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b" onclick="segEmbEliminar('${r.id}')">Eliminar</button>`:''}
         </div></td>
@@ -5146,11 +5221,202 @@ async function segEmbGuardar(){
 }
 
 async function segEmbEliminar(id){
-  showConfirm('Eliminar registro','¿Eliminar este registro de seguimiento?',async()=>{
+  showConfirm('Eliminar registro','¿Eliminar este registro de seguimiento? Esta acción no se puede deshacer.',async()=>{
     const {error}=await supa.from('mm_emblemas_seguimiento').delete().eq('id',id);
     if(error){ toast('Error: '+error.message,'error'); return; }
     toast('Eliminado','warn'); loadEmblemasSeguimiento();
   },'Eliminar','btn-secondary');
+}
+
+/* ── ACCIONES DE SEGUIMIENTO ────────────────────────────────── */
+async function segEmbAbrirAcciones(id){
+  const r = (window._segEmbData||[]).find(x=>x.id===id);
+  if(!r) return;
+  document.getElementById('seg-emb-acc-id').value = id;
+  document.getElementById('seg-emb-acc-title').textContent = r.placa_o_nombre;
+  document.getElementById('seg-emb-acc-subtitle').textContent =
+    `${r.tipo==='vehiculo'?'Vehículo':'Edificio'} · ${(r.subtipo||'').replace('_',' ')} · ${r.municipio||'Sin municipio'}`;
+  document.getElementById('seg-emb-acc-nota').value = '';
+  // Poblar selectores de posición con el estado actual
+  const pos = SEG_EMB_POSICIONES[r.tipo]||[];
+  const emb = r.emblemas||{};
+  document.getElementById('seg-emb-acc-emblemas-form').innerHTML = pos.map(p=>`
+    <div style="background:var(--surface-3);border-radius:var(--r-md);padding:.6rem">
+      <div style="font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:.3rem">${SEG_EMB_LABELS[p]}</div>
+      <select class="form-select" style="font-size:.8rem;padding:.3rem" id="seg-emb-acc-pos-${p}">
+        <option value="">Sin registrar</option>
+        ${SEG_EMB_ESTADOS.map(e=>`<option value="${e}" ${emb[p]===e?'selected':''}>${e}</option>`).join('')}
+      </select>
+    </div>`).join('');
+  document.getElementById('seg-emb-acciones-modal').style.display = 'flex';
+  // Cargar historial
+  await segEmbCargarHistorial(id, r.tipo);
+}
+
+function segEmbCerrarAcciones(){
+  document.getElementById('seg-emb-acciones-modal').style.display = 'none';
+}
+
+async function segEmbCargarHistorial(id, tipo){
+  const el = document.getElementById('seg-emb-acc-historial');
+  el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--muted)"><span class="spinner" style="display:inline-block"></span></div>`;
+  const {data,error} = await supa.from('mm_emblemas_acciones').select('*').eq('seguimiento_id',id).order('fecha',{ascending:false});
+  if(error){ el.innerHTML=`<div style="color:var(--red);padding:.75rem">Error: ${error.message}</div>`; return; }
+  if(!data||!data.length){
+    el.innerHTML='<div style="padding:1.25rem;text-align:center;color:var(--muted);font-size:.82rem">Sin acciones registradas aún.</div>'; return;
+  }
+  const pos = SEG_EMB_POSICIONES[tipo]||[];
+  el.innerHTML = data.map(a=>{
+    const emb = a.emblemas_nuevo||{};
+    const estadosStr = pos.length ? pos.map(p=>`<span style="font-size:.7rem;background:var(--surface-3);border-radius:4px;padding:.1rem .35rem;white-space:nowrap">${SEG_EMB_LABELS[p]}: ${emb[p]||'—'}</span>`).join(' ') : '';
+    return `<div style="border-left:3px solid var(--purple);padding:.6rem .75rem;margin-bottom:.6rem;background:var(--bg-soft);border-radius:0 var(--r-md) var(--r-md) 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+        <span style="font-size:.75rem;font-weight:700;color:var(--purple)">${fmtDT(a.fecha)}</span>
+        ${S.adminLoggedIn?`<button onclick="segEmbEliminarAccion('${a.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:.75rem;padding:.1rem .3rem" title="Eliminar acción">✕</button>`:''}
+      </div>
+      <div style="font-size:.83rem;color:var(--text);margin-bottom:.35rem">${a.nota}</div>
+      ${estadosStr?`<div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.3rem">${estadosStr}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+async function segEmbGuardarAccion(){
+  const id = document.getElementById('seg-emb-acc-id').value;
+  const nota = document.getElementById('seg-emb-acc-nota').value.trim();
+  if(!nota){ toast('Escribe una nota para la acción','warn'); return; }
+  const r = (window._segEmbData||[]).find(x=>x.id===id);
+  if(!r) return;
+  const pos = SEG_EMB_POSICIONES[r.tipo]||[];
+  const emblemas_nuevo = {};
+  pos.forEach(p=>{ const v=(document.getElementById(`seg-emb-acc-pos-${p}`)?.value||''); if(v) emblemas_nuevo[p]=v; });
+  // Insertar acción
+  const {error:errAcc} = await supa.from('mm_emblemas_acciones').insert({
+    seguimiento_id: id, nota, emblemas_nuevo, fecha: new Date().toISOString()
+  });
+  if(errAcc){ toast('Error al guardar acción: '+errAcc.message,'error'); return; }
+  // Actualizar estado actual del registro
+  const {error:errUpd} = await supa.from('mm_emblemas_seguimiento').update({
+    emblemas: emblemas_nuevo, updated_at: new Date().toISOString()
+  }).eq('id',id);
+  if(errUpd){ toast('Acción guardada, pero no se pudo actualizar el estado: '+errUpd.message,'warn'); }
+  else {
+    // Actualizar caché local
+    const idx = (window._segEmbData||[]).findIndex(x=>x.id===id);
+    if(idx>=0) window._segEmbData[idx].emblemas = emblemas_nuevo;
+  }
+  document.getElementById('seg-emb-acc-nota').value = '';
+  toast('Acción registrada','success');
+  segEmbAplicarFiltros();
+  await segEmbCargarHistorial(id, r.tipo);
+}
+
+async function segEmbEliminarAccion(accionId){
+  if(!confirm('¿Eliminar esta acción del historial?')) return;
+  const {error} = await supa.from('mm_emblemas_acciones').delete().eq('id',accionId);
+  if(error){ toast('Error: '+error.message,'error'); return; }
+  toast('Acción eliminada','warn');
+  const id = document.getElementById('seg-emb-acc-id').value;
+  const r = (window._segEmbData||[]).find(x=>x.id===id);
+  if(r) await segEmbCargarHistorial(id, r.tipo);
+}
+
+/* ── PDF SEGUIMIENTO EMBLEMAS ───────────────────────────────── */
+async function segEmbGenerarPDF(){
+  if(!window.jspdf){ toast('Librería PDF no disponible','warn'); return; }
+  const filtroTipo = (document.getElementById('seg-emb-filtro-tipo')||{}).value||'';
+  const filtroMun  = (document.getElementById('seg-emb-filtro-mun')||{}).value||'';
+  let data = window._segEmbData||[];
+  if(filtroTipo) data = data.filter(r=>r.tipo===filtroTipo);
+  if(filtroMun)  data = data.filter(r=>r.municipio===filtroMun);
+  if(!data.length){ toast('No hay registros para exportar','warn'); return; }
+
+  // Cargar acciones para todos los registros
+  const ids = data.map(r=>r.id);
+  const {data:acciones} = await supa.from('mm_emblemas_acciones').select('*').in('seguimiento_id',ids).order('fecha',{ascending:false});
+  const accMap = {};
+  (acciones||[]).forEach(a=>{ if(!accMap[a.seguimiento_id]) accMap[a.seguimiento_id]=[]; accMap[a.seguimiento_id].push(a); });
+
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({unit:'mm',format:'a4'});
+  const W=210, m=14, cw=182;
+  let y=0;
+
+  function addPage(){ doc.addPage(); y=14; }
+  function checkY(h){ if(y+h>283) addPage(); }
+
+  // Banner
+  doc.setFillColor(13,17,23); doc.rect(0,0,W,30,'F');
+  doc.setTextColor(218,41,28); doc.setFontSize(14); doc.setFont('helvetica','bold');
+  doc.text('MISIÓN MÉDICA — ESE HRNO',W/2,12,{align:'center'});
+  doc.setTextColor(220,220,220); doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text('Seguimiento de Emblemas en Campo — Vehículos y Edificios',W/2,19,{align:'center'});
+  const tipoLabel = filtroTipo ? 'Tipo: '+(filtroTipo==='vehiculo'?'Vehículos':'Edificios') : '';
+  const filtroLabel = [tipoLabel, filtroMun?'Municipio: '+filtroMun:''].filter(Boolean).join(' · ')||'Todos los registros';
+  doc.text(`${filtroLabel}  ·  Generado: ${new Date().toLocaleDateString('es-CO')}`,W/2,25.5,{align:'center'});
+  doc.setTextColor(0,0,0);
+  y = 38;
+
+  data.forEach((r,i)=>{
+    const pos = SEG_EMB_POSICIONES[r.tipo]||[];
+    const emb = r.emblemas||{};
+    const est = segEmbEstadoGeneral(r);
+    const accs = accMap[r.id]||[];
+    const blockH = 28 + (accs.length ? accs.length*14+8 : 0);
+    checkY(blockH);
+
+    // Cabecera del registro
+    doc.setFillColor(245,246,248); doc.roundedRect(m,y,cw,11,1.5,1.5,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
+    doc.setTextColor(13,17,23);
+    doc.text(`${r.tipo==='vehiculo'?'Vehículo':'Edificio'} · ${r.placa_o_nombre}`,m+3,y+7);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    doc.setTextColor(118,128,140);
+    const rightInfo = [r.municipio, [r.marca,r.modelo,r.anio].filter(Boolean).join(' ')].filter(Boolean).join(' — ');
+    doc.text(rightInfo, W-m-2, y+7, {align:'right'});
+    y+=13;
+
+    // Estado de posiciones
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    pos.forEach((p,pi)=>{
+      const v=emb[p]||'Sin registrar';
+      const col = v==='Bueno'?[10,143,99]:v==='Deteriorado'?[180,83,9]:v==='Ausente'?[218,41,28]:[118,128,140];
+      doc.setTextColor(...col);
+      doc.text(`${SEG_EMB_LABELS[p]}: ${v}`, m+3+(pi%3)*62, y+(Math.floor(pi/3)*5.5));
+    });
+    y += Math.ceil(pos.length/3)*5.5 + 2;
+
+    if(r.observaciones){
+      doc.setTextColor(100,100,100); doc.setFontSize(7.5); doc.setFont('helvetica','italic');
+      const obs = doc.splitTextToSize(`Obs: ${r.observaciones}`,cw-4);
+      obs.forEach(l=>{ checkY(5); doc.text(l,m+3,y); y+=4.5; });
+    }
+
+    // Historial de acciones
+    if(accs.length){
+      y+=2;
+      doc.setFillColor(124,58,237); doc.rect(m,y,cw,5.5,'F');
+      doc.setTextColor(255,255,255); doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+      doc.text(`Historial de acciones (${accs.length})`,m+3,y+3.8);
+      y+=7;
+      accs.forEach(a=>{
+        checkY(12);
+        doc.setDrawColor(200,200,210); doc.setLineWidth(0.2);
+        doc.rect(m,y,cw,0,'S');
+        doc.setTextColor(124,58,237); doc.setFontSize(7); doc.setFont('helvetica','bold');
+        doc.text(fmtDT(a.fecha),m+3,y+4);
+        doc.setTextColor(40,40,40); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+        const notaLines = doc.splitTextToSize(a.nota, cw-45);
+        notaLines.forEach((l,li)=>{ checkY(5); doc.text(l,m+3,y+4+(li+1)*4.5); });
+        y+=4+notaLines.length*4.5+3;
+      });
+    }
+    y+=6;
+    if(i<data.length-1){ doc.setDrawColor(220,220,228); doc.setLineWidth(0.3); doc.line(m,y,W-m,y); y+=4; }
+  });
+
+  const suffix = [filtroTipo||'todos',filtroMun||''].filter(Boolean).join('_');
+  doc.save(`Emblemas_Seguimiento_${suffix}_${new Date().toISOString().slice(0,10)}.pdf`);
+  toast('PDF generado','success');
 }
 
 // ── MATRIZ DE RIESGOS ──────────────────────────────────────────
