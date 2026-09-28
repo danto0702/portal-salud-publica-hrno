@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D33 | Días fuera de servicio | Se registra el **rango de días** en que un vehículo no pudo operar, con su causa. Un día parado **no es pagable**. El conductor puede declararlo desde el celular, acotado a su vehículo y desde hoy |
 | D32 | Mover sin arrastrar | Además del arrastre, la ventana de la programación lleva **día y vehículo de destino**. Con el dedo el arrastre exige sostener 350 ms y soltar sobre una celda que suele estar fuera de pantalla |
 
 Consecuencia de D5: la aplicación nace como **PWA con cola offline** desde la primera fase.
@@ -450,6 +451,63 @@ Ficha y hoja de vida, con **`propiedad` = propio / contratista / comodato** y `v
 que es lo que alimenta la liquidación. Foto y **QR pegado en el parabrisas** que abre el checklist
 móvil de ese vehículo. Semáforo de vencimientos: verde (> 30 días), amarillo (≤ 30 días), rojo
 (vencido), configurable en `parametros`.
+
+### 5.2.1 Días fuera de servicio (D33)
+
+Un vehículo parado no es lo mismo que un vehículo sin programar, y hasta ahora no había dónde
+anotar la diferencia. `vehiculos.estado` dice cómo está **hoy** y no desde cuándo; la tabla
+`mantenimientos` es el libro de taller de la fase de logística —repuestos, costo, factura— y no
+la disponibilidad. La tabla `fuera_servicio` responde a una sola pregunta, que es la que sostiene
+la liquidación: **qué días estuvo parado cada vehículo y por qué**.
+
+**No son solo averías.** Un vehículo parado por SOAT vencido, retenido en un retén o sin conductor
+cuesta los mismos días de operación que uno en el taller. Las causas son *avería o varada,
+mantenimiento programado, accidente, documentos vencidos, retenido, sin conductor* y *otro*. Todas
+se cuentan igual; la causa sirve para separarlas en el informe y para que un mantenimiento
+programado se distinga de un daño (`dias_operacion.estado_dia` queda en `mantenimiento` en vez de
+`fuera_servicio`).
+
+**Un día fuera de servicio no es pagable.** Pesa sobre todo en los días **DISPONIBLE**, que por
+D11 se pagan sin que el conductor marque nada: sin esto, un vehículo en el taller seguiría
+cobrando por estar «en base».
+
+> **Excepción deliberada.** Si ese día hay viajes **cerrados**, el vehículo demostrablemente
+> operó. Entonces manda el hecho, no el registro: el día sigue pagable y no se marca parado. Una
+> contradicción así es un error de fechas, y al guardar el período se avisa cuántos días la
+> tienen — pero nunca se descuenta en silencio un día que el vehículo trabajó.
+
+**`fecha_fin` NULL significa que sigue parado.** Es el caso normal cuando lo reporta el conductor
+desde la vía: sabe que se varó, no sabe cuándo vuelve. Quien cierra el período es Coordinación, con
+un motivo que queda registrado.
+
+**Dos períodos del mismo vehículo no pueden solaparse.** Si se permitiera, un mismo día se contaría
+dos veces y el descuento al contratista quedaría mal. SQLite no tiene restricciones de rango: lo
+comprueba el Worker y explica con cuál choca.
+
+**En la matriz se ve, pero no bloquea.** Los días cubiertos salen rayados en rojo, también los que
+están vacíos —que es justo donde se adjudicaría un traslado imposible—, y la ventana de
+programación muestra el reparo con la causa. Programar igual se permite: la decisión es de quien
+programa, como con los documentos vencidos (§5.1.2). Al registrar un período, si ya había días
+programados dentro del rango se dice cuántos son y **se ofrece** cancelarlos con motivo; no se
+cancela nada por cuenta propia, y un día con viajes ya registrados no se toca.
+
+**Quién lo registra.** Coordinación y el administrador, desde el botón de la columna de placas de
+la matriz —la pantalla de Vehículos es solo del administrador, así que el acceso no podía vivir
+solo allí—. **El conductor también**, desde *Mi día*, acotado por el servidor: solo el vehículo que
+tiene asignado hoy, solo desde hoy, sin fecha de fin y sin taller. Desde la vía no se sabe nada
+más. Queda registrado el rol de quien lo reportó, y Coordinación lo ve como *«Reportado por el
+conductor»*. No entra en la cola sin señal: esto cambia la liquidación de un tercero y no debe
+quedar dependiendo de que un teléfono sincronice días después; si no hay señal se dice y el
+conductor reporta por radio.
+
+**La tabla se crea sola.** La base de producción se creó antes que esta tabla, y quien despliega no
+tiene terminal: pega el Worker en el editor web de Cloudflare y ya. `asegurarEsquema()` la crea en
+el primer uso con `CREATE TABLE IF NOT EXISTS`. La suite `prueba_api.mjs` siembra su base **sin**
+esa tabla, a propósito, para que ese camino se pruebe aquí y no en Ocaña.
+
+Se prueba con `node worker/pruebas/prueba_averias.mjs`, en un navegador de verdad: registrar el
+rango, el ofrecimiento sobre los días programados, las celdas marcadas, el reporte del conductor
+desde un teléfono y el cierre por Coordinación.
 
 ### 5.3 Personas
 Conductores y tripulación en una sola tabla con banderas de rol. Vigencia de licencia por

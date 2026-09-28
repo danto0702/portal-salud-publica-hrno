@@ -138,6 +138,14 @@ siga funcionando:
 node pruebas/prueba_movil.mjs
 ```
 
+Y la de los días fuera de servicio, que registra un período, comprueba que los
+días marcados se vean en la matriz y que el conductor pueda declarar su vehículo
+averiado desde el teléfono:
+
+```bash
+node pruebas/prueba_averias.mjs
+```
+
 También necesita Playwright, y se salta entera si no está. Ejecútela al tocar la
 pantalla de itinerario: su matriz es la misma en el computador y en el teléfono,
 así que un retoque pensado para uno puede romper el otro.

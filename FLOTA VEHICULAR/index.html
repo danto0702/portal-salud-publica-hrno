@@ -229,6 +229,34 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 .itin-celda.destino-no{border-color:var(--rojo);box-shadow:0 0 0 3px var(--rojo-glow);cursor:not-allowed}
 .itin-celda.bloqueada{border-left-width:3px;background:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(16,32,48,.035) 5px,rgba(16,32,48,.035) 10px)}
 
+/* ── Días fuera de servicio (D33) ────────────────────────────────────
+   Un vehículo parado tiene que verse en la matriz aunque ese día no haya nada
+   programado: si no, la casilla vacía invita a adjudicarle un traslado que no
+   puede hacer. Las rayas rojas se leen de un vistazo a lo ancho de la tabla,
+   donde el texto de cada celda es diminuto. */
+.itin-celda.fs,.itin-ren.fs{
+  background-image:repeating-linear-gradient(45deg,
+    var(--rojo-glow),var(--rojo-glow) 6px,transparent 6px,transparent 12px);
+  border-color:rgba(194,46,36,.4);
+}
+.itin-celda.vacia.fs{border-style:solid}
+/* En la columna de placas: el acceso de Coordinación a los días parados.
+   La pantalla de Vehículos es solo del administrador, así que sin esto
+   Coordinación no tendría desde dónde registrarlos. */
+.fs-boton{
+  display:block;margin-top:.2rem;padding:.1rem .3rem;border-radius:5px;cursor:pointer;
+  font:700 .66rem 'Inter',sans-serif;text-align:left;
+  background:none;border:1px dashed var(--border);color:var(--muted);width:100%;
+}
+.fs-boton:hover{border-color:var(--rojo);color:var(--rojo);border-style:solid}
+.fs-boton.con{color:var(--rojo);border-color:rgba(194,46,36,.35);border-style:solid}
+.fs-marca{
+  display:inline-block;margin-top:.2rem;font:700 .58rem 'Inter',sans-serif;
+  text-transform:uppercase;letter-spacing:.04em;color:var(--rojo);
+  background:var(--surface);border:1px solid rgba(194,46,36,.3);
+  border-radius:999px;padding:.05rem .35rem;white-space:nowrap;
+}
+
 /* Fichas del banco de predeterminados */
 .pred-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.9rem}
 .pred-chip{

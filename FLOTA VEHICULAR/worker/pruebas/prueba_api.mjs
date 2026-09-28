@@ -13,8 +13,22 @@ import worker from '../src/index.js';
 const db = crearD1();
 const esquema = fs.readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const semilla = fs.readFileSync(new URL('../seed_catalogos.sql', import.meta.url), 'utf8');
-db.exec(esquema);
+
+// A PROPÓSITO se siembra la base SIN la tabla fuera_servicio, para ejercitar la
+// misma situación en que está la base de producción: se creó antes de que esa
+// tabla existiera, y quien despliega no tiene terminal para ejecutar un CREATE
+// TABLE — pega el Worker en el editor web de Cloudflare y ya. El Worker la crea
+// solo en el primer uso (asegurarEsquema en src/lib.js). Si eso se rompiera,
+// toda la sección de días fuera de servicio fallaría aquí antes que en Ocaña.
+const esquemaViejo = esquema
+  .replace(/CREATE TABLE fuera_servicio[\s\S]*?\n\);\n/, '')
+  .replace(/CREATE INDEX idx_fs_[^;]*;\n/g, '');
+if (esquemaViejo === esquema) throw new Error('no se pudo quitar fuera_servicio del esquema');
+db.exec(esquemaViejo);
 db.exec(semilla);
+
+const existeTabla = n => !!db.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name = ?").bind(n).first();
 
 const env = {
   DB: db,
@@ -51,7 +65,13 @@ const hoy = new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
 const FOTO = { mime: 'image/jpeg', datos: '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==' };
 
 console.log('\n── Salud e instalación ───────────────────────────────────────');
-let r = await api('GET', '/api/salud');
+verificar('la base arranca SIN fuera_servicio, como la de producción',
+  !existeTabla('fuera_servicio'));
+let r = await api('GET', '/api/fuera-servicio');
+verificar('una base vieja no revienta al preguntar por los días parados',
+  r.estado === 401, r.estado);          // 401: sin sesión, pero llegó a la ruta
+
+r = await api('GET', '/api/salud');
 verificar('la sonda de salud responde', r.estado === 200 && r.datos.ok, r.datos);
 verificar('hay rutas registradas', r.datos.rutas > 30, r.datos.rutas);
 
@@ -778,6 +798,176 @@ r = await api('GET', '/api/personas', null, tCoord);
 const per = r.datos.find(p => p.id === personaConductor);
 verificar('la persona reporta el curso vencido',
   per.docs_vencidos_tipos === 'curso_mision_medica', per.docs_vencidos_tipos);
+
+
+console.log('\n── Días fuera de servicio ────────────────────────────────────');
+
+// Un conductor propio para esta sección: `tCond` ya no sirve porque más arriba
+// se le cambió la clave, y cambiar la clave cierra las sesiones abiertas.
+await api('POST', '/api/usuarios', {
+  usuario: 'condfs', clave: 'Conductor2026', rol: 'conductor',
+  persona_id: personaConductor,
+}, tokenPrincipal);
+const tCondFS = (await api('POST', '/api/auth/login',
+  { usuario: 'condfs', clave: 'Conductor2026' })).datos.token;
+verificar('ingresa el conductor de esta sección', !!tCondFS);
+
+// Un vehículo aparte, para no enredar los días que ya usaron las pruebas de arriba.
+verificar('a estas alturas el Worker ya creó la tabla él solo',
+  existeTabla('fuera_servicio'));
+
+r = await api('POST', '/api/vehiculos', {
+  placa: 'FSV-001', tipo: 'camioneta', propiedad: 'contratista',
+  contratista: 'Transportes Prueba', valor_dia: 300000,
+}, tokenPrincipal);
+const vehFS = r.datos.id;
+
+// Un día DISPONIBLE se paga sin que el conductor marque nada: es justo el que
+// quedaría cobrando aunque el vehículo estuviera en el taller.
+await api('POST', '/api/itinerario', {
+  fecha: '2026-11-10', vehiculo_id: vehFS, tipo_jornada: 'disponible', municipio_id: 1,
+}, tCoord);
+r = await api('GET', '/api/dias?desde=2026-11-10&hasta=2026-11-10', null, tCoord);
+verificar('antes de registrar la avería, el día DISPONIBLE se paga',
+  r.datos[0] && r.datos[0].dia_pagable === 1, r.datos[0]);
+
+r = await api('POST', '/api/fuera-servicio', {
+  vehiculo_id: vehFS, causa: 'averia',
+  fecha_inicio: '2026-11-08', fecha_fin: '2026-11-12',
+  descripcion: 'Caja de velocidades', taller: 'Taller Ocaña',
+}, tCoord);
+verificar('coordinación registra el período fuera de servicio', r.estado === 200, r.datos);
+const fsId = r.datos.id;
+verificar('y avisa de los días que ya estaban programados',
+  r.datos.programados.length === 1 && r.datos.programados[0].fecha === '2026-11-10',
+  r.datos.programados);
+
+r = await api('GET', '/api/dias?desde=2026-11-10&hasta=2026-11-10', null, tCoord);
+verificar('el día deja de ser pagable', r.datos[0] && r.datos[0].dia_pagable === 0, r.datos[0]);
+verificar('y queda marcado como fuera de servicio',
+  r.datos[0] && r.datos[0].estado_dia === 'fuera_servicio', r.datos[0]);
+
+r = await api('GET', '/api/dias?desde=2026-11-08&hasta=2026-11-12', null, tCoord);
+verificar('los cinco días del rango quedan registrados', r.datos.length === 5, r.datos.length);
+verificar('ninguno es pagable', r.datos.every(d => d.dia_pagable === 0), r.datos);
+
+// El mantenimiento preventivo se distingue de la avería en el estado del día.
+r = await api('POST', '/api/fuera-servicio', {
+  vehiculo_id: vehFS, causa: 'mantenimiento',
+  fecha_inicio: '2026-11-20', fecha_fin: '2026-11-21',
+}, tCoord);
+verificar('un mantenimiento preventivo también se registra', r.estado === 200, r.datos);
+r = await api('GET', '/api/dias?desde=2026-11-20&hasta=2026-11-20', null, tCoord);
+verificar('y el día se distingue como mantenimiento',
+  r.datos[0] && r.datos[0].estado_dia === 'mantenimiento', r.datos[0]);
+
+// Solapes: dos períodos del mismo vehículo contarían el día dos veces.
+r = await api('POST', '/api/fuera-servicio', {
+  vehiculo_id: vehFS, causa: 'accidente',
+  fecha_inicio: '2026-11-11', fecha_fin: '2026-11-15',
+}, tCoord);
+verificar('rechaza un período que se solapa con otro', r.estado === 400, r.datos);
+verificar('y dice con cuál choca',
+  /2026-11-08/.test(r.datos.error || ''), r.datos);
+
+r = await api('POST', '/api/fuera-servicio', {
+  vehiculo_id: vehFS, causa: 'averia', fecha_inicio: '2026-12-05', fecha_fin: '2026-12-01',
+}, tCoord);
+verificar('rechaza un fin anterior al inicio', r.estado === 400, r.datos);
+
+r = await api('POST', '/api/fuera-servicio', {
+  vehiculo_id: vehFS, causa: 'inventada', fecha_inicio: '2026-12-05',
+}, tCoord);
+verificar('rechaza una causa que no existe', r.estado === 400, r.datos);
+
+// Mover las fechas tiene que liberar los días que dejan de estar cubiertos.
+r = await api('PUT', `/api/fuera-servicio/${fsId}`, {
+  fecha_inicio: '2026-11-08', fecha_fin: '2026-11-09',
+  motivo_cierre: 'Salió del taller antes de lo previsto',
+}, tCoord);
+verificar('se acorta el período', r.estado === 200 && r.datos.cerrado === true, r.datos);
+r = await api('GET', '/api/dias?desde=2026-11-10&hasta=2026-11-10', null, tCoord);
+verificar('el día que se libera vuelve a ser pagable',
+  r.datos[0] && r.datos[0].dia_pagable === 1, r.datos[0]);
+verificar('y vuelve a contar como disponible',
+  r.datos[0] && r.datos[0].estado_dia === 'disponible', r.datos[0]);
+
+// Un día con viajes CERRADOS manda sobre el registro: el vehículo operó.
+r = await api('GET', `/api/dias?desde=${hoy}&hasta=${hoy}`, null, tCoord);
+const diaTrabajado = r.datos.find(d => d.vehiculo_id === vehiculo && d.ejecutado === 1);
+verificar('hay un día realmente ejecutado con el que contrastar', !!diaTrabajado, r.datos);
+r = await api('POST', '/api/fuera-servicio', {
+  vehiculo_id: vehiculo, causa: 'averia', fecha_inicio: hoy, fecha_fin: hoy,
+}, tCoord);
+verificar('deja registrar aunque ese día haya viajes', r.estado === 200, r.datos);
+const fsChoque = r.datos.id;
+r = await api('GET', `/api/dias?desde=${hoy}&hasta=${hoy}`, null, tCoord);
+const tras = r.datos.find(d => d.vehiculo_id === vehiculo);
+verificar('pero NO desconoce un día que el vehículo trabajó de verdad',
+  tras && tras.dia_pagable === 1 && tras.estado_dia !== 'fuera_servicio', tras);
+await api('DELETE', `/api/fuera-servicio/${fsChoque}`, null, tokenPrincipal);
+
+// El conductor: solo su vehículo, solo desde hoy, sin fecha de fin.
+r = await api('POST', '/api/fuera-servicio', {
+  vehiculo_id: vehFS, causa: 'averia', descripcion: 'Se varó en la vía',
+}, tCondFS);
+verificar('el conductor NO puede reportar un vehículo que no es el suyo',
+  r.estado === 403, r.datos);
+
+r = await api('POST', '/api/fuera-servicio', {
+  vehiculo_id: vehiculo, causa: 'averia', descripcion: 'Se varó subiendo',
+  fecha_inicio: '2020-01-01', fecha_fin: '2030-01-01', taller: 'El que yo diga',
+  foto: FOTO,
+}, tCondFS);
+verificar('el conductor sí reporta el suyo', r.estado === 200, r.datos);
+const fsCond = r.datos.id;
+
+r = await api('GET', `/api/fuera-servicio?vehiculo_id=${vehiculo}`, null, tCoord);
+const suyo = r.datos.find(x => x.id === fsCond);
+verificar('el reporte del conductor empieza HOY, no en la fecha que mandó',
+  suyo && suyo.fecha_inicio === hoy, suyo);
+verificar('y queda abierto: él no decide cuándo vuelve',
+  suyo && suyo.fecha_fin === null, suyo);
+verificar('queda registrado que lo reportó un conductor',
+  suyo && suyo.rol_registro === 'conductor', suyo);
+verificar('no se le acepta el taller: eso lo pone Coordinación',
+  suyo && suyo.taller === null, suyo);
+verificar('la lista dice que hay fotografía sin cargarla',
+  suyo && suyo.tiene_foto === 1 && suyo.foto_datos === undefined, suyo);
+
+r = await api('GET', `/api/fuera-servicio/${fsCond}/foto`, null, tCoord);
+verificar('la fotografía se pide aparte', r.estado === 200 && !!r.datos.datos, r.estado);
+
+r = await api('PUT', `/api/fuera-servicio/${fsCond}`, { fecha_fin: hoy }, tCondFS);
+verificar('el conductor NO puede cerrar el período', r.estado === 403, r.datos);
+r = await api('PUT', `/api/fuera-servicio/${fsCond}`, {
+  fecha_fin: hoy, motivo_cierre: 'Arreglado en la vía',
+}, tCoord);
+verificar('coordinación sí lo cierra', r.estado === 200, r.datos);
+
+r = await api('DELETE', `/api/fuera-servicio/${fsCond}`, null, tCoord);
+verificar('coordinación NO borra un período', r.estado === 403, r.datos);
+r = await api('DELETE', `/api/fuera-servicio/${fsCond}`, null, tokenPrincipal);
+verificar('el administrador sí lo borra', r.estado === 200, r.datos);
+
+// El resumen: lo que sostiene el descuento al contratista.
+r = await api('GET', '/api/fuera-servicio/resumen', null, tCoord);
+const resFS = r.datos.vehiculos.find(v => v.vehiculo_id === vehFS);
+verificar('el resumen cuenta los días parados por vehículo',
+  resFS && resFS.dias === 4, resFS);
+verificar('y separa los de mantenimiento',
+  resFS && resFS.dias_mantenimiento === 2, resFS);
+
+r = await api('POST', '/api/fuera-servicio', {
+  vehiculo_id: vehFS, causa: 'documentos', fecha_inicio: '2026-12-01',
+}, tCoord);
+verificar('un período sin fecha de fin se acepta', r.estado === 200, r.datos);
+r = await api('GET', '/api/fuera-servicio', null, tCoord);
+verificar('y sale en la lista de los que siguen parados',
+  r.datos.some(x => x.vehiculo_id === vehFS && x.fecha_fin === null), r.datos.length);
+
+r = await api('GET', '/api/fuera-servicio/resumen', null, tCondFS);
+verificar('el conductor no ve el resumen de toda la flota', r.estado === 403, r.estado);
 
 console.log('\n── Integridad de catálogos ───────────────────────────────────');
 r = await api('DELETE', '/api/catalogos/destinos/8', null, tokenPrincipal);

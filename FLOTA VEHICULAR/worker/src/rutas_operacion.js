@@ -7,10 +7,9 @@ import { ruta } from './router.js';
 import {
   ahora, hoyISO, malaPeticion, prohibido, noEncontrado,
   auditar, recalcularDia, marcarUsoDestino, resolverDestino, siguienteConsecutivo,
+  fueraDeServicio, TODOS, GESTION,
 } from './lib.js';
 
-const TODOS = ['principal', 'coordinacion', 'conductor'];
-const GESTION = ['principal', 'coordinacion'];
 
 
 /**
@@ -691,7 +690,15 @@ ruta('GET', '/api/mi-dia', async ({ db, sesion, url }) => {
      WHERE t.conductor_id = ? AND t.fecha_operacion = ? AND t.estado != 'anulado'
      ORDER BY t.ts_salida`).bind(personaId, fecha).all() : { results: [] };
 
-  return { fecha, itinerario, trayecto_abierto: abierto, trayectos: delDia.results };
+  // Si su vehículo está registrado fuera de servicio, el conductor tiene que
+  // verlo en su propia pantalla: es lo que le explica por qué no debe salir, y
+  // le evita reportar dos veces la misma varada. Se busca por el vehículo del
+  // día; sin itinerario no hay nada que mirar.
+  const vehId = (itinerario && itinerario.vehiculo_id) || (abierto && abierto.vehiculo_id);
+  const fs = vehId ? await fueraDeServicio(db, fecha, vehId) : null;
+
+  return { fecha, itinerario, trayecto_abierto: abierto, trayectos: delDia.results,
+           fuera_servicio: fs || null, vehiculo_id: vehId || null };
 }, TODOS);
 
 /**

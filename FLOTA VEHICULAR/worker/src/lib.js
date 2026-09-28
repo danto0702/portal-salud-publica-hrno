@@ -33,7 +33,18 @@
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 9;
+const VERSION_API = 10;
+
+/**
+ * Juegos de roles que usan las rutas.
+ *
+ * Viven aquí y no en cada archivo de rutas porque el Worker se publica como UN
+ * SOLO archivo concatenado (construir_bundle.mjs): dos módulos que declararan
+ * `const TODOS` cada uno chocarían al unirse, y el fallo saldría solo al pegar
+ * el bundle en Cloudflare, no al correr el código fuente.
+ */
+const TODOS = ['principal', 'coordinacion', 'conductor'];
+const GESTION = ['principal', 'coordinacion'];
 
 const ahora = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 /**
@@ -164,6 +175,65 @@ async function auditar(db, sesion, accion, entidad, entidadId, antes, despues) {
     .run();
 }
 
+// ─────────────────────────────────────────────── fuera de servicio ──────────
+
+/**
+ * Crea `fuera_servicio` si todavía no existe.
+ *
+ * La base de producción se creó antes de esta tabla, y quien despliega no tiene
+ * terminal: pega el Worker en el editor web de Cloudflare y ya. Pedirle además
+ * que ejecute un CREATE TABLE por su cuenta sería el paso donde se rompe todo.
+ * Así el primer uso la crea sola, y en una instalación nueva ya viene en
+ * schema.sql y esto no hace nada.
+ *
+ * Se intenta una sola vez por isolate: no es una consulta que valga la pena
+ * repetir en cada petición.
+ */
+let esquemaListo = false;
+async function asegurarEsquema(db) {
+  if (esquemaListo) return;
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS fuera_servicio (
+      id             INTEGER PRIMARY KEY,
+      vehiculo_id    INTEGER NOT NULL REFERENCES vehiculos(id),
+      causa          TEXT NOT NULL,
+      fecha_inicio   TEXT NOT NULL,
+      fecha_fin      TEXT,
+      descripcion    TEXT,
+      taller         TEXT,
+      km_evento      INTEGER,
+      evento_id      INTEGER REFERENCES eventos(id),
+      foto_mime      TEXT,
+      foto_datos     TEXT,
+      registrado_por INTEGER NOT NULL REFERENCES usuarios(id),
+      rol_registro   TEXT NOT NULL,
+      creado_en      TEXT NOT NULL,
+      cerrado_por    INTEGER REFERENCES usuarios(id),
+      cerrado_en     TEXT,
+      motivo_cierre  TEXT
+    )`).run();
+  await db.prepare(
+    'CREATE INDEX IF NOT EXISTS idx_fs_veh ON fuera_servicio(vehiculo_id, fecha_inicio)').run();
+  await db.prepare(
+    'CREATE INDEX IF NOT EXISTS idx_fs_abierto ON fuera_servicio(fecha_fin, vehiculo_id)').run();
+  esquemaListo = true;
+}
+
+/**
+ * El período de fuera de servicio que cubre ese día, si lo hay.
+ *
+ * fecha_fin NULL significa «sigue parado», así que cubre desde su inicio hasta
+ * hoy y hasta que alguien lo cierre.
+ */
+async function fueraDeServicio(db, fecha, vehiculoId) {
+  await asegurarEsquema(db);
+  return db.prepare(`
+    SELECT id, causa, fecha_inicio, fecha_fin FROM fuera_servicio
+     WHERE vehiculo_id = ? AND fecha_inicio <= ?
+       AND (fecha_fin IS NULL OR fecha_fin >= ?)
+     LIMIT 1`).bind(vehiculoId, fecha, fecha).first();
+}
+
 // ────────────────────────────────────── recálculo de días de operación ──────
 
 /**
@@ -214,7 +284,24 @@ async function recalcularDia(db, fecha, vehiculoId) {
     "SELECT valor FROM parametros WHERE clave = 'dia_disponible_es_pagable'").first();
   const disponiblePaga = !param || param.valor === '1';
 
-  const pagable = (ejecutado || (tipo === 'disponible' && disponiblePaga)) && programado ? 1 : 0;
+  let pagable = (ejecutado || (tipo === 'disponible' && disponiblePaga)) && programado ? 1 : 0;
+
+  // ── Días fuera de servicio (D33) ──
+  // Un vehículo parado no se paga, aunque el día estuviera programado. Pesa
+  // sobre todo en los días DISPONIBLE, que se pagan sin que el conductor marque
+  // nada: sin esto, un vehículo en el taller seguiría cobrando por estar «en
+  // base».
+  //
+  // Excepción deliberada: si ese día hay viajes CERRADOS, el vehículo
+  // demostrablemente operó. Entonces manda el hecho, no el registro, y el día
+  // sigue pagable. Una contradicción así es un error de fechas, y al guardar el
+  // período se avisa cuántos días la tienen — pero nunca se descuenta en
+  // silencio un día que el vehículo trabajó.
+  const fs = await fueraDeServicio(db, fecha, vehiculoId);
+  if (fs && !ejecutado) {
+    estadoDia = fs.causa === 'mantenimiento' ? 'mantenimiento' : 'fuera_servicio';
+    pagable = 0;
+  }
 
   await db.prepare(`
     INSERT INTO dias_operacion (fecha, vehiculo_id, conductor_id, estado_dia,
@@ -298,10 +385,11 @@ async function resolverDestino(db, nombre, municipioId, tipo, usuarioId) {
 }
 
 export {
-  VERSION_API,
+  VERSION_API, TODOS, GESTION,
   ahora, hoyISO, cors, json, ErrorApi,
   malaPeticion, noAutorizado, prohibido, noEncontrado,
   hashClave, verificarClave,
   sesionActual, exigirRol, auditar,
   recalcularDia, marcarUsoDestino, resolverDestino, siguienteConsecutivo,
+  asegurarEsquema, fueraDeServicio,
 };

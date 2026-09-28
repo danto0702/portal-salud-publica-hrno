@@ -50,6 +50,19 @@ const TEL = {
              '(KHTML, like Gecko) Chrome/126 Mobile Safari/537.36',
 };
 
+/** Salta al primer día del período que tenga algún vehículo sin programar. */
+async function irADiaConLibres(pag) {
+  const hay = await pag.evaluate(() => {
+    const total = vehiculos.filter(v => v.activo !== 0).length;
+    const d = [...document.querySelectorAll('.tira-dias .d')]
+      .find(d => Number(d.querySelector('.c').textContent) < total);
+    if (d) d.click();
+    return !!d;
+  });
+  await pag.waitForTimeout(500);
+  return hay;
+}
+
 const servidor = spawn(process.execPath, [path.join(AQUI, 'servidor_local.mjs')],
   { cwd: APP, env: { ...process.env, PUERTO: String(PUERTO) }, stdio: 'ignore' });
 const esperar = ms => new Promise(r => setTimeout(r, ms));
@@ -185,6 +198,12 @@ try {
   const activos = await pag.evaluate(() => vehiculos.filter(v => v.activo !== 0).length);
   verificar('salen todos los vehículos, programados y libres',
     await pag.locator('#itin-dia .itin-ren').count() === activos, `de ${activos}`);
+
+  // A un día que tenga ranuras libres. Cuál sea depende del día de la semana en
+  // que se corra la prueba: los datos de ejemplo programan toda la flota entre
+  // semana, así que un lunes no habría ninguna libre y la prueba fallaría sin
+  // que nada estuviera roto.
+  verificar('hay un día con ranuras libres', await irADiaConLibres(pag));
   verificar('los libres salen como ranura «+ Asignar»',
     await pag.locator('#itin-dia .itin-ren.libre').count() > 0);
   verificar('la vista por día no se desborda de lado',
@@ -225,14 +244,7 @@ try {
   await pag.evaluate(() => verItinerario());
   await pag.waitForSelector('#itin-dia');
   await pag.waitForTimeout(500);
-  const hayLibres = await pag.evaluate(() => {
-    const total = vehiculos.filter(v => v.activo !== 0).length;
-    const d = [...document.querySelectorAll('.tira-dias .d')]
-      .find(d => Number(d.querySelector('.c').textContent) < total);
-    if (d) d.click();
-    return !!d;
-  });
-  await pag.waitForTimeout(500);
+  const hayLibres = await irADiaConLibres(pag);
   verificar('las fichas del pincel ya no se esconden en el celular',
     await pag.locator('.pincel-chip').count() > 0);
   const antesLibres = await pag.locator('#itin-dia .itin-ren.libre').count();

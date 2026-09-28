@@ -17,6 +17,7 @@ import { cors, json, ErrorApi, sesionActual, ahora, hashClave, VERSION_API } fro
 // El sólo hecho de importarlos registra sus rutas en el router.
 import './rutas_admin.js';
 import './rutas_operacion.js';
+import './rutas_fuera_servicio.js';
 
 export default {
   async fetch(request, env) {

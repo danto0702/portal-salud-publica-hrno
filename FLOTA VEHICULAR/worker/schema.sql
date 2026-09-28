@@ -441,6 +441,45 @@ CREATE TABLE mantenimientos (
   factura_url         TEXT
 );
 
+-- Dias en que un vehiculo NO pudo operar, con su causa y su rango de fechas.
+--
+-- Es distinto de vehiculos.estado, que dice como esta HOY y no desde cuando; y
+-- distinto de mantenimientos, que es el libro de taller (repuestos, costo,
+-- factura) de la fase de logistica. Esta tabla responde a una sola pregunta, la
+-- que sostiene la liquidacion: que dias estuvo parado cada vehiculo y por que.
+--
+-- fecha_fin NULL significa que SIGUE fuera de servicio. Es el caso normal
+-- cuando lo reporta el conductor desde la via: sabe que se varo, no sabe
+-- cuando vuelve.
+--
+-- Dos periodos del mismo vehiculo no pueden solaparse: si se permitiera, un
+-- mismo dia se contaria dos veces y el descuento al contratista quedaria mal.
+-- La comprobacion la hace el Worker, porque SQLite no tiene restricciones de
+-- rango.
+CREATE TABLE fuera_servicio (
+  id             INTEGER PRIMARY KEY,
+  vehiculo_id    INTEGER NOT NULL REFERENCES vehiculos(id),
+  causa          TEXT NOT NULL,
+                 -- averia | mantenimiento | accidente | documentos |
+                 -- retenido | sin_conductor | otro
+  fecha_inicio   TEXT NOT NULL,          -- dia operativo 'YYYY-MM-DD'
+  fecha_fin      TEXT,                   -- NULL = sigue fuera de servicio
+  descripcion    TEXT,
+  taller         TEXT,
+  km_evento      INTEGER,
+  evento_id      INTEGER REFERENCES eventos(id),  -- la varada que lo origino
+  foto_mime      TEXT,
+  foto_datos     TEXT,                   -- base64, igual que trayecto_fotos
+  registrado_por INTEGER NOT NULL REFERENCES usuarios(id),
+  rol_registro   TEXT NOT NULL,          -- conductor | coordinacion | principal
+  creado_en      TEXT NOT NULL,
+  cerrado_por    INTEGER REFERENCES usuarios(id),
+  cerrado_en     TEXT,
+  motivo_cierre  TEXT
+);
+CREATE INDEX idx_fs_veh ON fuera_servicio(vehiculo_id, fecha_inicio);
+CREATE INDEX idx_fs_abierto ON fuera_servicio(fecha_fin, vehiculo_id);
+
 CREATE TABLE tanqueos (
   id            INTEGER PRIMARY KEY,
   vehiculo_id   INTEGER NOT NULL REFERENCES vehiculos(id),

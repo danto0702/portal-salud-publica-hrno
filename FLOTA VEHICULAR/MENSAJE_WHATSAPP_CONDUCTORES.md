@@ -271,6 +271,37 @@ guardadas igual, solo que señaladas *sin GPS*. No pierde el día.
 
 ---
 
+## 8.2 · Si el vehículo se le vara (sin imagen)
+
+```
+*SI EL VEHÍCULO QUEDA AVERIADO* 🔧
+
+En *Mi día*, abajo, hay un botón: *El vehículo quedó averiado*.
+
+Tóquelo, escoja qué pasó, cuente en dos renglones qué fue —_"se partió la
+correa saliendo de Ábrego"_— y, si puede, tome una foto del daño. Con eso
+el vehículo queda marcado y en Coordinación lo vemos de una vez.
+
+📅 Queda registrado *desde hoy*. No le pedimos fecha de regreso porque
+usted no la sabe: cuando el vehículo vuelva a rodar, nosotros cerramos el
+registro desde acá.
+
+👀 Mientras esté marcado, en su pantalla verá un aviso rojo y *ya no le
+volveremos a pedir que lo reporte*. Si sale arreglado antes de lo previsto,
+avísenos para quitarlo.
+
+📶 *Esto sí necesita señal*, a diferencia de las salidas y llegadas. Si está
+sin cobertura, repórtelo por radio o por teléfono y lo registra cuando
+tenga señal. No se pierde nada.
+
+⚠️ Ojo: esto NO reemplaza el botón naranja de *Reportar novedad*. La novedad
+es para contar lo que pasó en la vía —un retén, un derrumbe, una varada—;
+este botón es para decir que *el vehículo queda parado* y no puede operar.
+Si se varó y quedó tirado, use los dos.
+```
+
+---
+
 ## 9 · Reglas de oro (sin imagen, para fijar en el grupo)
 
 ```
@@ -291,6 +322,7 @@ guardadas igual, solo que señaladas *sin GPS*. No pierde el día.
 
 6️⃣ Cualquier novedad en la vía —retén, derrumbe, bloqueo, varada— se
    reporta por el botón naranja *Reportar novedad*, con foto si se puede.
+   Y si el vehículo queda *parado*, además use *El vehículo quedó averiado*.
 
 _Su usuario es personal. Todo lo que se registre queda a su nombre y con la
 hora exacta._

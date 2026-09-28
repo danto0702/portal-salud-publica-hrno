@@ -17,7 +17,7 @@
  * peticiones e ignora en silencio lo que no entiende — un campo que no se
  * guarda y ningún mensaje de error. Por eso se comprueba y se avisa.
  */
-const VERSION_API_REQUERIDA = 9;
+const VERSION_API_REQUERIDA = 10;
 
 const esLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 const API = localStorage.getItem('flota_api') ||
@@ -59,6 +59,25 @@ const TIPOS_EVENTO = [
   ['mantenimiento', 'Mantenimiento'], ['novedad_distintivo', 'Novedad de distintivo'],
   ['otro', 'Otro'],
 ];
+
+/**
+ * Causas por las que un vehículo no pudo operar (D33).
+ *
+ * No son solo averías: un vehículo parado por SOAT vencido o retenido en un
+ * retén cuesta los mismos días de operación que uno en el taller. Todas se
+ * cuentan igual como días sin operar; la causa sirve para separarlas después
+ * en el informe y para distinguir el mantenimiento programado del daño.
+ */
+const CAUSAS_FS = {
+  averia:        { et: 'Avería o varada',        color: 'rojo'   },
+  mantenimiento: { et: 'Mantenimiento programado', color: 'azul' },
+  accidente:     { et: 'Accidente',              color: 'rojo'   },
+  documentos:    { et: 'Documentos vencidos',    color: 'ambar'  },
+  retenido:      { et: 'Retenido',               color: 'ambar'  },
+  sin_conductor: { et: 'Sin conductor',          color: 'gris'   },
+  otro:          { et: 'Otro',                   color: 'gris'   },
+};
+const causaEt = c => CAUSAS_FS[c]?.et || c;
 
 // ── Estado ───────────────────────────────────────────────────────────────────
 let sesion = null;
@@ -719,6 +738,17 @@ async function verHoy() {
 
     <div id="gps-hoy">${avisoUbicacion('hoy')}</div>
 
+    ${diaActual.fuera_servicio ? `
+      <div class="card" style="border-left:4px solid var(--rojo);margin-bottom:.85rem">
+        <b>Este vehículo está registrado fuera de servicio</b>
+        <p style="margin:.4rem 0 0;font-size:.88rem;color:var(--text-soft)">
+          ${esc(causaEt(diaActual.fuera_servicio.causa))}, desde el
+          ${esc(diaActual.fuera_servicio.fecha_inicio)}${diaActual.fuera_servicio.fecha_fin
+            ? ' hasta el ' + esc(diaActual.fuera_servicio.fecha_fin) : ', sin fecha de regreso'}.
+          No hace falta que lo vuelva a reportar. Si ya está arreglado, avise a
+          Coordinación para que cierre el registro.</p>
+      </div>` : ''}
+
     ${diaActual.sin_persona ? `
       <div class="card" style="border-left:4px solid var(--rojo)">
         <b>Su cuenta no está vinculada a una persona</b>
@@ -776,6 +806,12 @@ async function verHoy() {
         Reportar novedad
       </button>
     </div>
+
+    ${diaActual.vehiculo_id && !diaActual.fuera_servicio ? `
+      <button class="btn sec" style="width:100%;margin-top:.5rem;padding:.75rem"
+        onclick="modalAveriaConductor()">
+        El vehículo quedó averiado
+      </button>` : ''}
 
     <h2 style="margin:1.4rem 0 .6rem">Viajes de hoy</h2>
     ${trayectos.length ? trayectos.map(t => `
@@ -1184,7 +1220,7 @@ function abrirAppFoto() {
  * en el teléfono porque en el Catatumbo la subida es el cuello de botella, y
  * porque la base guarda estas imágenes y crecería sin control.
  */
-function tomarFoto(input) {
+function tomarFoto(input, pref = 'mk') {
   const archivo = input.files?.[0];
   input.value = '';
   if (!archivo) return;
@@ -1206,18 +1242,19 @@ function tomarFoto(input) {
       if (url.length * 3 / 4 > 550_000) url = lienzo.toDataURL('image/jpeg', 0.55);
 
       fotoTomada = { mime: 'image/jpeg', datos: url.slice(url.indexOf(',') + 1) };
-      $('#mk-foto-img').src = url;
-      $('#mk-foto-vista').style.display = '';
-      $('#mk-foto-peso').textContent =
+      $(`#${pref}-foto-img`).src = url;
+      $(`#${pref}-foto-vista`).style.display = '';
+      $(`#${pref}-foto-peso`).textContent =
         `${Math.round(fotoTomada.datos.length * 3 / 4 / 1024)} KB · toque el botón para cambiarla`;
-      $('#mk-foto-btn').textContent = 'Cambiar fotografía';
+      $(`#${pref}-foto-btn`).textContent = 'Cambiar fotografía';
 
       // Al adjuntar desde la galería se podría escoger una foto de otro día.
       // No se bloquea —puede haber una razón válida— pero se dice.
       const tope = Number(par('foto_antiguedad_minutos', '60'));
       const minutos = archivo.lastModified
         ? Math.round((Date.now() - archivo.lastModified) / 60000) : 0;
-      $('#mk-foto-avi').innerHTML = tope && minutos > tope
+      const avi = $(`#${pref}-foto-avi`);
+      if (avi) avi.innerHTML = tope && minutos > tope
         ? `<div class="nota avi" style="margin-top:.4rem">Esta foto se tomó hace
              ${minutos >= 1440 ? Math.round(minutos / 1440) + ' día(s)' : minutos + ' minutos'}.
              Verifique que sea la de este viaje.</div>`
@@ -1430,6 +1467,8 @@ async function guardarEvento() {
 let itinDesde = null, itinDatos = [], predeterminados = [];
 /** vehiculo_id -> { dias, con_salida, primera, ultima } de TODA la operación. */
 let totalesItin = new Map();
+/** vehiculo_id -> { dias, dias_mantenimiento } fuera de servicio (D33). */
+let totalesFSItin = new Map();
 // En el celular dos semanas obligan a un desplazamiento lateral largo: se
 // arranca en una. Si el usuario escoge otro período, manda el suyo.
 let itinDias = Number(localStorage.getItem('flota_itin_dias')) || (angosta() ? 7 : 14);
@@ -1454,16 +1493,20 @@ async function verItinerario() {
 
   $('#main').innerHTML = '<div class="cargando">Cargando itinerario...</div>';
   try {
-    let resumen;
-    [itinDatos, predeterminados, resumen] = await Promise.all([
+    let resumen, periodosFS, resumenFS;
+    [itinDatos, predeterminados, resumen, periodosFS, resumenFS] = await Promise.all([
       api(`/api/itinerario?desde=${itinDesde}&hasta=${hasta}`),
       api('/api/predeterminados'),
       // Los totales NO salen del período visible: se piden aparte, de toda la
       // operación. Si este endpoint falla —por ejemplo contra un Worker viejo—
       // el itinerario se dibuja igual, sin contador, que es mejor que no abrir.
       api('/api/itinerario/resumen').catch(() => null),
+      api(`/api/fuera-servicio?desde=${itinDesde}&hasta=${hasta}`).catch(() => []),
+      api('/api/fuera-servicio/resumen').catch(() => null),
     ]);
     totalesItin = new Map((resumen?.vehiculos || []).map(v => [v.vehiculo_id, v]));
+    totalesFSItin = new Map((resumenFS?.vehiculos || []).map(v => [v.vehiculo_id, v]));
+    indexarFS(periodosFS, Array.from({ length: itinDias }, (_, i) => nDias(itinDesde, i)));
   } catch (e) {
     return $('#main').innerHTML = `<div class="card"><div class="nota avi">${esc(e.message)}</div></div>`;
   }
@@ -1475,11 +1518,20 @@ async function verItinerario() {
 
   const celda = (v, f) => {
     const it = porClave[f + '|' + v.id];
+    const fs = fsDe(f, v.id);
     const datos = `data-vehiculo-id="${v.id}" data-fecha="${f}"${it ? ` data-itin-id="${it.id}"` : ''}`;
+    // Un día en que el vehículo está parado se ve, programado o no: sin esto,
+    // una casilla vacía de un vehículo en el taller invita a adjudicarle un
+    // traslado que no puede hacer.
+    const marcaFS = fs
+      ? `<span class="fs-marca" title="${esc(causaEt(fs.causa))}, desde el ${esc(fs.fecha_inicio)}${
+          fs.fecha_fin ? ' hasta el ' + esc(fs.fecha_fin) : ''}">fuera de servicio</span>`
+      : '';
     if (!it) {
-      return `<td style="padding:.2rem"><div class="itin-celda vacia" ${datos}
+      return `<td style="padding:.2rem"><div class="itin-celda vacia${fs ? ' fs' : ''}" ${datos}
         onpointerdown="itinPointerDown(event,null,${v.id},'${f}')"
-        onclick="if(!pincel)modalItinerario(null,${v.id},'${f}')">+</div></td>`;
+        onclick="if(!pincel)modalItinerario(null,${v.id},'${f}')">${
+          fs ? marcaFS + '<div style="margin-top:.15rem">+</div>' : '+'}</div></td>`;
     }
     const tj = TIPOS_JORNADA[it.tipo_jornada] || TIPOS_JORNADA.ebs;
     const ejec = it.trayectos_cerrados > 0;
@@ -1489,12 +1541,13 @@ async function verItinerario() {
     // Un día ya ejecutado no se arrastra: la marca del conductor quedaría
     // apuntando a una programación que ya no describe lo que hizo.
     return `<td style="padding:.2rem"><div
-      class="itin-celda ${it.tipo_jornada}${ejec ? ' bloqueada' : ''}" ${datos}
+      class="itin-celda ${it.tipo_jornada}${ejec ? ' bloqueada' : ''}${fs ? ' fs' : ''}" ${datos}
       ${ejec ? '' : `onpointerdown="itinPointerDown(event,${it.id},${v.id},'${f}')"`}
       title="${ejec ? 'Ya ejecutado: no se puede mover' : 'Arrastre para mover · con Ctrl para duplicar'}"
       onclick="if(!pincel)modalItinerario(${it.id},${v.id},'${f}')">
       <span class="dest">${esc(titulo)}</span>
       <span class="tj" style="color:var(--${tj.color === 'gris' ? 'muted' : tj.color})">${esc(pie)}</span>
+      ${marcaFS}
       <div class="marcas">
         <span class="punto ${ejec ? 'ok' : 'no'}" title="${ejec ? 'Ejecutado' : 'Sin marcar'}"></span>
         <span style="font-size:.62rem;color:var(--muted)">${ejec ? 'ejecutado' : 'pendiente'}</span>
@@ -1592,6 +1645,13 @@ async function verItinerario() {
  · ${conDespl} con desplazamiento · ${enPeriodo} en el período que está viendo">
                 ${diasTotal} día(s) · ${conDespl} con salida
               </div>
+              ${(() => {
+                const fs = totalesFSItin.get(v.id);
+                return `<button class="fs-boton ${fs?.dias ? 'con' : ''}" onclick="modalFueraServicio(${v.id})"
+                  title="Días en que no pudo operar${fs?.dias_mantenimiento
+                    ? `, de los cuales ${fs.dias_mantenimiento} de mantenimiento programado` : ''}">
+                  ${fs?.dias ? `${fs.dias} día(s) fuera de servicio` : 'Registrar avería'}</button>`;
+              })()}
               ${v.docs_vencidos ? `<div class="etq rojo" style="margin-top:.2rem;font-size:.62rem"
                 title="${esc(v.docs_vencidos_tipos || '')}">${v.docs_vencidos} doc. vencido(s)</div>` : ''}
             </td>
@@ -1603,6 +1663,7 @@ async function verItinerario() {
         ${Object.entries(TIPOS_JORNADA).map(([k, t]) =>
           `<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--${t.color === 'gris' ? 'muted' : t.color});vertical-align:middle"></span> ${t.et}</span>`).join('')}
         <span><span class="punto ok"></span> ejecutado (el conductor marcó salida)</span>
+        <span><span class="fs-marca">fuera de servicio</span> no cuenta como día pagable</span>
         <span><span class="mini-cambios">✎</span> modificado</span>
         <span>${angosta() && modoItin === 'dia'
           ? 'Toque un vehículo libre para adjudicarle el día'
@@ -1922,22 +1983,26 @@ function vistaPorDia(dias, activos, porClave) {
 
   const renglon = ({ v, it }) => {
     const conductor = v.conductor_actual?.trim() || 'sin conductor';
+    const fs = fsDe(f, v.id);
     if (!it) {
-      return `<div class="itin-ren libre" data-vehiculo-id="${v.id}" data-fecha="${f}"
+      return `<div class="itin-ren libre${fs ? ' fs' : ''}" data-vehiculo-id="${v.id}" data-fecha="${f}"
         onclick="tocarRenItin(null,${v.id},'${f}')">
         <span class="pl">${esc(v.placa)}</span>
-        <span class="de"><span class="sub">${esc(conductor)} · sin programación</span></span>
+        <span class="de"><span class="sub">${esc(conductor)} · ${fs
+          ? 'fuera de servicio (' + esc(causaEt(fs.causa)) + ')' : 'sin programación'}</span></span>
         <span class="mas">+ Asignar</span></div>`;
     }
     const tj = TIPOS_JORNADA[it.tipo_jornada] || TIPOS_JORNADA.ebs;
     const ejec = it.trayectos_cerrados > 0;
     const enBase = it.tipo_jornada === 'disponible';
-    return `<div class="itin-ren ${it.tipo_jornada}${ejec ? ' bloqueada' : ''}"
+    return `<div class="itin-ren ${it.tipo_jornada}${ejec ? ' bloqueada' : ''}${fs ? ' fs' : ''}"
       data-vehiculo-id="${v.id}" data-fecha="${f}" data-itin-id="${it.id}"
       onclick="tocarRenItin(${it.id},${v.id},'${f}')">
       <span class="pl">${esc(v.placa)}</span>
       <span class="de"><b>${esc(enBase ? 'Disponible' : (it.destino || tj.et))}</b><br>
-        <span class="sub">${esc(conductor)}</span></span>
+        <span class="sub">${fs
+          ? '<b style="color:var(--rojo)">Fuera de servicio</b> · ' + esc(conductor)
+          : esc(conductor)}</span></span>
       <span class="etq ${tj.color}">${tj.et}</span>
       ${ejec ? '<span class="punto ok" title="Ejecutado"></span>' : ''}
       ${it.num_cambios ? `<span class="mini-cambios" title="${it.num_cambios} modificación(es)">✎${it.num_cambios}</span>` : ''}
@@ -1955,7 +2020,10 @@ function vistaPorDia(dias, activos, porClave) {
     </div>
     <div id="itin-dia">
       <p class="dia-res">${ocupados} programado(s) · ${filas.length - ocupados} libre(s)
-        de ${filas.length} vehículo(s)</p>
+        de ${filas.length} vehículo(s)${(() => {
+          const n = filas.filter(x => fsDe(f, x.v.id)).length;
+          return n ? ` · <b style="color:var(--rojo)">${n} fuera de servicio</b>` : '';
+        })()}</p>
       ${filas.map(renglon).join('')}
     </div>`;
 }
@@ -2015,6 +2083,13 @@ async function modalItinerario(id, vehiculoId, fecha) {
 
   const cond = personas.find(p => p.id === condPropuesto);
   const reparos = [];
+  const fsDia = fsDe(fecha, vehiculoId);
+  if (fsDia) {
+    reparos.push(`<b>${esc(veh?.placa || '')}</b> está registrado <b>fuera de servicio</b> ` +
+      `ese día (${esc(causaEt(fsDia.causa))}, desde el ${esc(fsDia.fecha_inicio)}` +
+      `${fsDia.fecha_fin ? ' hasta el ' + esc(fsDia.fecha_fin) : ', sin fecha de regreso'}). ` +
+      'Ese día no cuenta como pagable.');
+  }
   if (veh?.docs_vencidos) {
     reparos.push(`<b>${esc(veh.placa)}</b> tiene vencido: ${esc(veh.docs_vencidos_tipos || 'documentos')}`);
   }
@@ -2748,20 +2823,384 @@ async function cerrarEvento(id) {
 }
 
 // ── Vehículos ────────────────────────────────────────────────────────────────
+// ── Días fuera de servicio (D33) ─────────────────────────────────────────────
+//
+// Responde a una pregunta que hasta ahora no tenía dónde contestarse: qué días
+// estuvo parado cada vehículo y por qué. `vehiculos.estado` dice cómo está HOY
+// y no desde cuándo, así que no sirve para liquidar.
+//
+// Un día fuera de servicio deja de ser pagable. Eso pesa sobre todo en los días
+// DISPONIBLE, que se pagan sin que el conductor marque nada: sin esto, un
+// vehículo en el taller seguiría cobrando por estar «en base».
+
+/** Períodos del período visible del itinerario: fecha|vehiculo -> período. */
+let fsPorDia = new Map();
+
+/** Marca los días que cubre cada período, para pintarlos en la matriz. */
+function indexarFS(periodos, dias) {
+  fsPorDia = new Map();
+  for (const p of periodos || []) {
+    for (const f of dias) {
+      if (f >= p.fecha_inicio && (!p.fecha_fin || f <= p.fecha_fin)) {
+        fsPorDia.set(`${f}|${p.vehiculo_id}`, p);
+      }
+    }
+  }
+}
+
+const fsDe = (fecha, vehiculoId) => fsPorDia.get(`${fecha}|${vehiculoId}`);
+
+/**
+ * El conductor declara que su vehículo quedó averiado.
+ *
+ * Acotado a propósito, y el servidor lo impone además: solo el vehículo que
+ * tiene asignado hoy, desde hoy y sin fecha de regreso. Desde la vía no se sabe
+ * nada más — se varó, y no sabe cuándo vuelve. Quien cierra el período es
+ * Coordinación.
+ *
+ * No entra en la cola sin señal, igual que las novedades: esto cambia la
+ * liquidación de un tercero y no debe quedar dependiendo de que el teléfono
+ * sincronice días después. Si no hay señal se dice, y el conductor reporta por
+ * radio o por teléfono.
+ */
+function modalAveriaConductor() {
+  fotoTomada = null;
+  const placa = diaActual?.itinerario?.placa || diaActual?.trayecto_abierto?.placa || '';
+  abrirModal('El vehículo quedó averiado', `
+    <div class="nota avi" style="margin-bottom:1rem">
+      Esto deja el vehículo <b>${esc(placa)}</b> registrado como fuera de servicio
+      <b>desde hoy</b>. Coordinación lo verá de inmediato y cerrará el registro
+      cuando el vehículo vuelva a operar.
+    </div>
+    <div class="campo"><label class="lb">Qué pasó <span class="req">*</span></label>
+      <select class="inp" id="av-causa">
+        ${['averia', 'accidente', 'otro'].map(c =>
+          `<option value="${c}">${CAUSAS_FS[c].et}</option>`).join('')}
+      </select></div>
+    <div class="campo"><label class="lb">Describa el daño <span class="req">*</span></label>
+      <textarea class="inp" id="av-desc" rows="3"
+        placeholder="Ej: se partió la correa saliendo de Ábrego; quedó en la vía"></textarea></div>
+    <div class="campo"><label class="lb">Kilometraje, si lo tiene a la vista</label>
+      <input class="inp" type="number" inputmode="numeric" id="av-km"></div>
+    <div class="campo"><label class="lb">Fotografía</label>
+      <input type="file" id="av-foto" accept="image/*" capture="environment"
+        style="display:none" onchange="tomarFoto(this,'av')">
+      <button type="button" class="btn sec bloque" id="av-foto-btn"
+        onclick="$('#av-foto').click()" style="padding:.8rem">Tomar fotografía</button>
+      <div id="av-foto-vista" style="display:none;margin-top:.5rem">
+        <img id="av-foto-img" style="width:100%;border-radius:var(--r);border:1px solid var(--border)">
+        <p style="font-size:.72rem;color:var(--muted);margin:.3rem 0 0" id="av-foto-peso"></p>
+      </div>
+      <p style="font-size:.72rem;color:var(--muted);margin:.35rem 0 0">
+        Aquí la foto es opcional y se toma con la cámara normal: no es un soporte
+        de pago, es para que en Coordinación vean el daño.</p>
+    </div>`,
+    `<button class="btn sec" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn rojo" id="av-btn" onclick="guardarAveriaConductor()">Reportar</button>`);
+}
+
+async function guardarAveriaConductor() {
+  const desc = $('#av-desc').value.trim();
+  if (!desc) return aviso('Describa el daño', 'mal', 'Falta la descripción');
+  const btn = $('#av-btn'); btn.disabled = true; btn.textContent = 'Enviando...';
+  try {
+    await api('/api/fuera-servicio', {
+      metodo: 'POST',
+      cuerpo: {
+        vehiculo_id: diaActual.vehiculo_id,
+        causa: $('#av-causa').value,
+        descripcion: desc,
+        km_evento: $('#av-km').value ? Number($('#av-km').value) : undefined,
+        foto: fotoTomada || undefined,
+      },
+    });
+    fotoTomada = null;
+    cerrarModal();
+    aviso('Quedó registrado. Coordinación ya lo ve.', 'ok', 'Reportado');
+    verHoy();
+  } catch (e) {
+    aviso(esFalloDeRed(e)
+      ? 'Sin señal. Esto no se guarda en el celular porque afecta el pago: ' +
+        'repórtelo por radio o por teléfono y vuelva a intentarlo con señal.'
+      : e.message, 'mal', 'No se pudo reportar');
+    btn.disabled = false; btn.textContent = 'Reportar';
+  }
+}
+
+// ── Coordinación: el historial de cada vehículo ─────────────────────────────
+
+let fsDelVehiculo = [];
+
+/** Los períodos fuera de servicio de un vehículo, con qué registrar uno nuevo. */
+async function modalFueraServicio(vehiculoId) {
+  const v = vehiculos.find(x => x.id === vehiculoId);
+  abrirModal(`Fuera de servicio · ${v?.placa || ''}`,
+    '<div class="cargando">Cargando...</div>', '');
+  try {
+    fsDelVehiculo = await api('/api/fuera-servicio?vehiculo_id=' + vehiculoId);
+  } catch (e) {
+    return abrirModal(`Fuera de servicio · ${v?.placa || ''}`,
+      `<div class="nota avi">${esc(e.message)}</div>`);
+  }
+  pintarFueraServicio(vehiculoId);
+}
+
+function pintarFueraServicio(vehiculoId) {
+  const v = vehiculos.find(x => x.id === vehiculoId);
+  const abierto = fsDelVehiculo.find(p => !p.fecha_fin);
+  const admin = sesion.rol === 'principal';
+
+  abrirModal(`Fuera de servicio · ${v?.placa || ''}`, `
+    ${abierto ? `<div class="nota avi" style="margin-bottom:1rem">
+      <b>Sigue fuera de servicio</b> desde el ${esc(abierto.fecha_inicio)}
+      (${esc(causaEt(abierto.causa))}). Ciérrelo cuando vuelva a operar: mientras
+      esté abierto, cada día que pasa deja de ser pagable.
+    </div>` : ''}
+
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.6rem">
+      <b style="font-size:.85rem">${fsDelVehiculo.length} período(s) registrado(s)</b>
+      <button class="btn sm" onclick="modalPeriodoFS(${vehiculoId})">Registrar período</button>
+    </div>
+
+    ${fsDelVehiculo.length ? `<div class="tabla-env"><table>
+      <thead><tr><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Causa</th>
+        <th>Detalle</th><th></th></tr></thead>
+      <tbody>${fsDelVehiculo.map(p => {
+        const cau = CAUSAS_FS[p.causa] || CAUSAS_FS.otro;
+        return `<tr>
+          <td>${esc(p.fecha_inicio)}</td>
+          <td>${p.fecha_fin ? esc(p.fecha_fin)
+            : '<span class="etq rojo">sigue parado</span>'}</td>
+          <td class="num">${diasEntre(p.fecha_inicio, p.fecha_fin)}</td>
+          <td><span class="etq ${cau.color}">${cau.et}</span></td>
+          <td style="font-size:.78rem">
+            ${p.descripcion ? esc(p.descripcion) + '<br>' : ''}
+            ${p.taller ? '<span style="color:var(--muted)">Taller: ' + esc(p.taller) + '</span><br>' : ''}
+            <span style="color:var(--muted);font-size:.72rem">
+              ${p.rol_registro === 'conductor'
+                ? 'Reportado por el conductor' : 'Registrado por Coordinación'}
+              ${p.registrado_por_nombre ? '· ' + esc(p.registrado_por_nombre.trim()) : ''}</span>
+            ${p.tiene_foto ? `<br><button class="btn sec sm" style="margin-top:.25rem"
+              onclick="verFotoFS(${p.id})">Ver fotografía</button>` : ''}
+          </td>
+          <td style="white-space:nowrap">
+            <button class="btn sec sm" onclick="modalPeriodoFS(${vehiculoId},${p.id})">Editar</button>
+            ${admin ? `<button class="btn sec sm" onclick="borrarPeriodoFS(${vehiculoId},${p.id})"
+              title="Borrar: úselo solo si se registró por error">Borrar</button>` : ''}
+          </td>
+        </tr>`; }).join('')}</tbody></table></div>`
+      : '<div class="vacio"><p>Este vehículo no tiene días fuera de servicio registrados.</p></div>'}`,
+    '<button class="btn sec" onclick="cerrarModal()">Cerrar</button>');
+}
+
+/** Días de un período; uno abierto se cuenta hasta hoy, que es lo que lleva. */
+function diasEntre(desde, hasta) {
+  const fin = hasta || hoy();
+  if (fin < desde) return 0;
+  return Math.round((Date.parse(fin) - Date.parse(desde)) / 86400000) + 1;
+}
+
+async function verFotoFS(id) {
+  try {
+    const f = await api(`/api/fuera-servicio/${id}/foto`);
+    abrirModal('Fotografía del daño',
+      `<img src="data:${f.mime};base64,${f.datos}"
+            style="width:100%;border-radius:var(--r)">`,
+      `<button class="btn sec" onclick="cerrarModal()">Cerrar</button>`);
+  } catch (e) { aviso(e.message, 'mal', 'No se pudo cargar'); }
+}
+
+/** Alta o edición de un período. */
+function modalPeriodoFS(vehiculoId, id) {
+  const p = id ? fsDelVehiculo.find(x => x.id === id) : null;
+  const v = vehiculos.find(x => x.id === vehiculoId);
+
+  abrirModal(p ? 'Modificar período' : 'Registrar días fuera de servicio', `
+    <div class="nota" style="margin-bottom:1rem">
+      <b>${esc(v?.placa || '')}</b> · los días de este rango dejan de contarse como
+      pagables${v?.propiedad === 'contratista' ? ', que es lo que sustenta el descuento al contratista' : ''}.
+    </div>
+    <div class="campo"><label class="lb">Causa <span class="req">*</span></label>
+      <select class="inp" id="fs-causa">
+        ${Object.entries(CAUSAS_FS).map(([k, c]) =>
+          `<option value="${k}" ${p && p.causa === k ? 'selected' : ''}>${c.et}</option>`).join('')}
+      </select></div>
+    <div class="g2" style="display:grid;gap:.6rem">
+      <div class="campo" style="margin:0"><label class="lb">Desde <span class="req">*</span></label>
+        <input type="date" class="inp" id="fs-desde" value="${esc(p?.fecha_inicio || hoy())}"></div>
+      <div class="campo" style="margin:0"><label class="lb">Hasta</label>
+        <input type="date" class="inp" id="fs-hasta" value="${esc(p?.fecha_fin || '')}">
+        <p class="ayuda">Déjelo vacío mientras siga parado.</p></div>
+    </div>
+    <div class="campo"><label class="lb">Qué pasó</label>
+      <textarea class="inp" id="fs-desc" rows="2">${esc(p?.descripcion || '')}</textarea></div>
+    <div class="g2" style="display:grid;gap:.6rem">
+      <div class="campo" style="margin:0"><label class="lb">Taller</label>
+        <input class="inp" id="fs-taller" value="${esc(p?.taller || '')}"></div>
+      <div class="campo" style="margin:0"><label class="lb">Kilometraje</label>
+        <input class="inp" type="number" id="fs-km" value="${p?.km_evento ?? ''}"></div>
+    </div>
+    ${p && !p.fecha_fin ? `<div class="campo"><label class="lb">Motivo del cierre</label>
+      <input class="inp" id="fs-motivo" placeholder="Por qué vuelve a operar (queda registrado)">
+      </div>` : ''}`,
+    `<button class="btn sec" onclick="modalFueraServicio(${vehiculoId})">Volver</button>
+     <button class="btn" id="fs-btn"
+       onclick="guardarPeriodoFS(${vehiculoId},${id || 'null'})">Guardar</button>`);
+}
+
+async function guardarPeriodoFS(vehiculoId, id) {
+  const desde = $('#fs-desde').value, hasta = $('#fs-hasta').value || null;
+  if (!desde) return aviso('Indique desde qué día', 'mal', 'Falta la fecha');
+  if (hasta && hasta < desde) {
+    return aviso('La fecha de fin es anterior a la de inicio', 'mal', 'Fechas al revés');
+  }
+  const btn = $('#fs-btn'); btn.disabled = true; btn.textContent = 'Guardando...';
+  const cuerpo = {
+    vehiculo_id: vehiculoId,
+    causa: $('#fs-causa').value,
+    fecha_inicio: desde,
+    fecha_fin: hasta,
+    descripcion: $('#fs-desc').value.trim() || null,
+    taller: $('#fs-taller').value.trim() || null,
+    km_evento: $('#fs-km').value ? Number($('#fs-km').value) : null,
+    motivo_cierre: $('#fs-motivo')?.value.trim() || undefined,
+  };
+  try {
+    const r = id
+      ? await api('/api/fuera-servicio/' + id, { metodo: 'PUT', cuerpo })
+      : await api('/api/fuera-servicio', { metodo: 'POST', cuerpo });
+    aviso(id ? 'Período actualizado' : 'Días registrados', 'ok', 'Listo');
+
+    // Lo que hay que decidir a continuación: los días que ya estaban
+    // programados dentro del rango. No se cancela nada por cuenta propia.
+    if (!id && r.programados?.length) {
+      return modalProgramadosFS(vehiculoId, r.programados);
+    }
+    if (vistaActual === 'vehiculos') await verVehiculos();
+    if (vistaActual === 'itinerario') return verItinerario();
+    modalFueraServicio(vehiculoId);
+  } catch (e) {
+    aviso(e.message, 'mal', 'No se pudo guardar');
+    btn.disabled = false; btn.textContent = 'Guardar';
+  }
+}
+
+/**
+ * Qué hacer con lo que ya estaba programado dentro del rango.
+ *
+ * Se ofrece cancelarlo, no se hace solo: puede haber un motivo para dejarlo —
+ * un relevo con otro vehículo que todavía no se ha adjudicado, por ejemplo. Un
+ * día con viajes ya registrados no se toca, y se dice cuál.
+ */
+function modalProgramadosFS(vehiculoId, programados) {
+  const v = vehiculos.find(x => x.id === vehiculoId);
+  const conViajes = programados.filter(p => p.viajes > 0);
+  const limpios = programados.filter(p => !p.viajes);
+
+  abrirModal('Días ya programados', `
+    <div class="nota avi" style="margin-bottom:1rem">
+      <b>${esc(v?.placa || '')}</b> tiene <b>${programados.length} día(s)</b> programados
+      dentro de ese rango. Mientras sigan ahí, el itinerario dice que el vehículo sale.
+    </div>
+    <div class="tabla-env"><table>
+      <thead><tr><th>Día</th><th>Destino</th><th></th></tr></thead>
+      <tbody>${programados.map(p => `<tr>
+        <td>${esc(p.fecha)}</td>
+        <td>${esc(p.destino || TIPOS_JORNADA[p.tipo_jornada]?.et || '')}</td>
+        <td>${p.viajes ? '<span class="etq verde">ya tiene viajes</span>' : ''}</td>
+      </tr>`).join('')}</tbody></table></div>
+    ${conViajes.length ? `<div class="nota avi" style="margin-top:.8rem">
+      ${conViajes.length} de esos días <b>ya tienen viajes registrados</b> por el
+      conductor. Esos no se pueden cancelar, y además significan que el vehículo
+      sí operó: revise las fechas del período.
+    </div>` : ''}`,
+    `<button class="btn sec" onclick="cerrarYVolverFS(${vehiculoId})">Dejarlos como están</button>
+     ${limpios.length ? `<button class="btn rojo" id="fsp-btn"
+       onclick="cancelarProgramadosFS(${vehiculoId},${JSON.stringify(limpios.map(p => p.id)).replace(/"/g, '&quot;')})">
+       Cancelar los ${limpios.length} días</button>` : ''}`);
+}
+
+function cerrarYVolverFS(vehiculoId) {
+  cerrarModal();
+  if (vistaActual === 'itinerario') verItinerario();
+  else if (vistaActual === 'vehiculos') verVehiculos();
+}
+
+async function cancelarProgramadosFS(vehiculoId, ids) {
+  const btn = $('#fsp-btn'); btn.disabled = true; btn.textContent = 'Cancelando...';
+  let hechos = 0; const fallos = [];
+  for (const id of ids) {
+    try {
+      await api('/api/itinerario/' + id, {
+        metodo: 'DELETE', cuerpo: { motivo: 'Vehículo fuera de servicio' },
+      });
+      hechos++;
+    } catch (e) { fallos.push(e.message); }
+  }
+  cerrarModal();
+  aviso(fallos.length
+    ? `${hechos} cancelado(s); ${fallos.length} no se pudo: ${fallos[0]}`
+    : `${hechos} día(s) cancelado(s)`, fallos.length ? 'avi' : 'ok', 'Listo');
+  if (vistaActual === 'itinerario') verItinerario();
+  else if (vistaActual === 'vehiculos') verVehiculos();
+}
+
+async function borrarPeriodoFS(vehiculoId, id) {
+  const p = fsDelVehiculo.find(x => x.id === id);
+  abrirModal('Borrar el período', `
+    <div class="nota avi">
+      Se va a borrar el período del <b>${esc(p?.fecha_inicio || '')}</b>
+      ${p?.fecha_fin ? 'al <b>' + esc(p.fecha_fin) + '</b>' : 'en adelante'}.
+      Esos días vuelven a contarse como antes.
+    </div>
+    <p style="font-size:.85rem;color:var(--text-soft);margin:.8rem 0 0">
+      Borrar es para lo que se registró <b>por error</b>. Si el vehículo sí estuvo
+      parado y ya volvió, lo correcto es <b>ponerle fecha de fin</b>, no borrarlo:
+      así queda el rastro de los días que no operó.</p>`,
+    `<button class="btn sec" onclick="modalFueraServicio(${vehiculoId})">Volver</button>
+     <button class="btn rojo" id="fsb-btn"
+       onclick="confirmarBorradoFS(${vehiculoId},${id})">Borrar</button>`);
+}
+
+async function confirmarBorradoFS(vehiculoId, id) {
+  const btn = $('#fsb-btn'); btn.disabled = true; btn.textContent = 'Borrando...';
+  try {
+    await api('/api/fuera-servicio/' + id, { metodo: 'DELETE', cuerpo: {} });
+    aviso('Período borrado', 'ok', 'Listo');
+    if (vistaActual === 'vehiculos') await verVehiculos();
+    modalFueraServicio(vehiculoId);
+  } catch (e) {
+    aviso(e.message, 'mal', 'No se pudo borrar');
+    btn.disabled = false; btn.textContent = 'Borrar';
+  }
+}
+
 async function verVehiculos() {
   // Las personas hacen falta para el selector de conductor predeterminado.
+  // El resumen de días parados no debe tumbar la pantalla si falla —por ejemplo
+  // contra un Worker viejo—: se dibuja igual, sin esa columna.
+  let abiertos = [], totalesFS = new Map();
   [vehiculos, personas] = await Promise.all([
     api('/api/vehiculos?todos=1'),
     api('/api/personas'),
   ]);
+  try {
+    const res = await api('/api/fuera-servicio/resumen');
+    abiertos = res.abiertos || [];
+    totalesFS = new Map((res.vehiculos || []).map(x => [x.vehiculo_id, x]));
+  } catch { /* sin resumen se sigue */ }
+  const abiertoDe = id => abiertos.find(a => a.vehiculo_id === id);
+
   $('#main').innerHTML = `
     <div class="cab">
-      <div><h1>Vehículos</h1><p>${vehiculos.length} registrado(s)</p></div>
+      <div><h1>Vehículos</h1><p>${vehiculos.length} registrado(s)${
+        abiertos.length ? ` · <b style="color:var(--rojo)">${abiertos.length} fuera de servicio ahora</b>` : ''}</p></div>
       <button class="btn" onclick="modalVehiculo()">Registrar vehículo</button>
     </div>
     ${vehiculos.length ? `<div class="tabla-env"><table>
       <thead><tr><th>Placa</th><th>Tipo</th><th>Base</th><th>Conductor</th>
-        <th>Propiedad</th><th class="num">Valor día</th><th>Estado</th><th></th></tr></thead>
+        <th>Propiedad</th><th class="num">Valor día</th><th>Estado</th>
+        <th>Fuera de servicio</th><th></th></tr></thead>
       <tbody>${vehiculos.map(v => `
         <tr>
           <td class="placa">${esc(v.placa)}</td>
@@ -2774,7 +3213,17 @@ async function verVehiculos() {
           <td>${v.activo ? `<span class="etq ${v.estado === 'activo' ? 'verde' : 'ambar'}">${esc(v.estado)}</span>`
             : '<span class="etq gris">inactivo</span>'}
             ${v.docs_vencidos ? `<br><span class="etq rojo">${v.docs_vencidos} doc. vencido(s)</span>` : ''}</td>
-          <td><button class="btn sec sm" onclick="modalVehiculo(${v.id})">Editar</button></td>
+          <td>${(() => {
+            const ab = abiertoDe(v.id), tot = totalesFS.get(v.id);
+            return `${ab ? `<span class="etq rojo" title="Desde el ${ab.fecha_inicio}">
+                parado desde ${esc(ab.fecha_inicio.slice(5))}</span><br>` : ''}
+              <span style="font-size:.72rem;color:var(--muted)">${
+                tot ? `${tot.dias} día(s) en total` : 'sin días registrados'}</span>`;
+          })()}</td>
+          <td style="white-space:nowrap">
+            <button class="btn sec sm" onclick="modalFueraServicio(${v.id})"
+              title="Días en que no pudo operar">Averías</button>
+            <button class="btn sec sm" onclick="modalVehiculo(${v.id})">Editar</button></td>
         </tr>`).join('')}</tbody></table></div>`
       : `<div class="card"><div class="vacio">
           <p>No hay vehículos registrados.</p>
