@@ -162,6 +162,7 @@ tr:hover td{background:#fafcfe}
     <button class="tab active" data-tab="generar" onclick="showTab('generar')">Generar</button>
     <button class="tab" data-tab="masivo" onclick="showTab('masivo')">Generación masiva</button>
     <button class="tab" data-tab="contratistas" onclick="showTab('contratistas')">Contratistas</button>
+    <button class="tab" data-tab="cargue" onclick="showTab('cargue')">Cargue masivo</button>
     <button class="tab" data-tab="ebs" onclick="showTab('ebs')">EBS / Territorios</button>
     <button class="tab" data-tab="periodos" onclick="showTab('periodos')">Cuentas</button>
     <button class="tab" data-tab="emitidos" onclick="showTab('emitidos')">Emitidos</button>
@@ -285,6 +286,33 @@ tr:hover td{background:#fafcfe}
             <table><thead><tr>
               <th>Contrato</th><th>Contratista</th><th>Rol</th><th>Mun</th><th>EBS</th><th>V. mensual</th><th>V. total</th><th></th>
             </tr></thead><tbody id="ctBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CARGUE MASIVO ── -->
+    <div class="panel" id="p-cargue">
+      <div class="card">
+        <div class="card-h"><h2>Cargue masivo de contratistas</h2><span class="sub">Importa el Excel de contratos evitando duplicados</span></div>
+        <div class="card-b">
+          <div class="hint info">Sube el <b>Excel de contratos</b> (columnas CÓDIGOCONTRATO, OBJETOCONTRATO, VALOR, TIEMPO EJECUCIÓN, CONTRATISTAS, FECHA ACTAINICIO). El sistema deriva rol, municipio, EBS y valor mensual, y <b>omite los que ya existen</b> (por número de contrato o cédula). Revisa la vista previa antes de importar.</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0">
+            <input type="file" id="cargueFile" accept=".xlsx,.xls" onchange="onCargueFile(event)">
+            <button class="btn btn-ghost btn-sm" onclick="resetCargue()">Limpiar</button>
+          </div>
+          <div id="cargueResumen"></div>
+          <div id="carguePreview"></div>
+          <div id="cargueActions" style="margin-top:12px"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Historial de cargues</h2><span class="sub">Registro de importaciones realizadas</span></div>
+        <div class="card-b">
+          <div class="tbl-scroll">
+            <table><thead><tr>
+              <th>Fecha</th><th>Archivo</th><th>Filas</th><th>Nuevos</th><th>Duplicados</th><th>Omitidos</th><th></th>
+            </tr></thead><tbody id="cargueHist"></tbody></table>
           </div>
         </div>
       </div>
@@ -496,11 +524,12 @@ const ST = {
   radicador:{prefijo:'ESP-116-',consecutivo:1,sufijo:'-2026',pad:4},
   valores:{}, coordinadores:{}, transporteDefault:0,
   diasPorCuenta:30,
-  genSel:null
+  genSel:null,
+  cargues:[], carguePrev:null, cargueArchivo:null
 };
 
 const MUN_DISPLAY = {'ABREGO':'Ábrego','EL CARMEN':'El Carmen','CONVENCION':'Convención','TEORAMA':'Teorama'};
-const ROL_DISPLAY = {'AUXILIAR DE ENFERMERIA':'AUXILIAR DE ENFERMERÍA','PSICOLOGO':'PSICÓLOGO','MEDICO GENERAL':'MÉDICO GENERAL','ODONTOLOGO':'ODONTÓLOGO','ENFERMERA PROFESIONAL':'ENFERMERA PROFESIONAL','GESTOR COMUNITARIO':'GESTOR COMUNITARIO'};
+const ROL_DISPLAY = {'AUXILIAR DE ENFERMERIA':'AUXILIAR DE ENFERMERÍA','PSICOLOGO':'PSICÓLOGO','MEDICO GENERAL':'MÉDICO GENERAL','ODONTOLOGO':'ODONTÓLOGO','ENFERMERA PROFESIONAL':'ENFERMERA PROFESIONAL','GESTOR COMUNITARIO':'GESTOR COMUNITARIO','NUTRICIONISTA':'NUTRICIONISTA','TRABAJADORA SOCIAL':'TRABAJADORA SOCIAL','BACTERIOLOGA':'BACTERIÓLOGA','ADMINISTRATIVO':'ADMINISTRATIVO','TRANSPORTE':'TRANSPORTE','SUMINISTROS':'SUMINISTROS'};
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 /* ══════════════════════════════════════════════════════════════
@@ -556,6 +585,7 @@ async function boot(){
       if(row.clave==='coordinadores') ST.coordinadores=row.valor||{};
       if(row.clave==='transporte_default') ST.transporteDefault=(row.valor&&row.valor.valor)||0;
       if(row.clave==='cuentas') ST.diasPorCuenta=(row.valor&&row.valor.dias)||30;
+      if(row.clave==='cargues_historial') ST.cargues=(row.valor&&row.valor.items)||[];
     });
     initFilters();
     renderAll();
@@ -580,6 +610,7 @@ function renderAll(){
   renderGenPeriodos(); renderGenResults();
   renderMasivoPeriodos(); renderMasivoEbs();
   renderContratistas(); renderEbs(); renderCuentasCfg(); renderEmitidos(); renderConfig();
+  renderCarguePreview(); renderCargueHist();
 }
 
 /* ── Tabs ── */
@@ -1047,6 +1078,203 @@ function exportContratistas(){
   const rows=ST.contratistas.map(c=>({Contrato:c.codigo_contrato,Cedula:c.cedula,Nombre:c.nombre,Rol:c.rol,Municipio:c.municipio,EBS:c.ebs_num,Territorio:c.territorio,ValorMensual:c.valor_mensual,ValorTotal:c.valor_total,TiempoDias:c.tiempo_ejec,ActaInicio:c.acta_inicio,Objeto:c.objeto}));
   const ws=XLSX.utils.json_to_sheet(rows); const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Contratistas'); XLSX.writeFile(wb,'Contratistas_EBS_'+todayISO()+'.xlsx');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CARGUE MASIVO DE CONTRATISTAS (desde Excel de contratos)
+   ══════════════════════════════════════════════════════════════ */
+const CARGUE_VALBASE_FALLBACK={PSICOLOGO:6300000,ODONTOLOGO:6300000,'MEDICO GENERAL':11550000,'GESTOR COMUNITARIO':2500000,'ENFERMERA PROFESIONAL':8400000,'AUXILIAR DE ENFERMERIA':3450000};
+const CARGUE_INACTIVOS=['TRANSPORTE','SUMINISTROS'];
+function _cnorm(s){ return (s==null?'':String(s)).replace(/\s+/g,' ').trim().toUpperCase(); }
+function _ckey(s){ return _cnorm(s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]/g,''); }
+function cargueRol(o){
+  o=_cnorm(o);
+  if(o.includes('GESTOR COMUNITARIO')) return 'GESTOR COMUNITARIO';
+  if(o.includes('MEDICO GENERAL')||/\bMEDICO\b/.test(o)) return 'MEDICO GENERAL';
+  if(o.includes('ODONTOLOG')) return 'ODONTOLOGO';
+  if(o.includes('PSICOLOG')) return 'PSICOLOGO';
+  if(o.includes('NUTRICIONISTA')) return 'NUTRICIONISTA';
+  if(o.includes('TRABAJADOR')&&o.includes('SOCIAL')) return 'TRABAJADORA SOCIAL';
+  if(o.includes('BACTERIOLOG')) return 'BACTERIOLOGA';
+  if(o.includes('AUXILIAR')&&o.includes('ENFERMER')) return 'AUXILIAR DE ENFERMERIA';
+  if(o.includes('ENFERMER')&&(o.includes('PROFESIONAL')||o.includes('JEFE'))) return 'ENFERMERA PROFESIONAL';
+  if(o.includes('TRANSPORTE')) return 'TRANSPORTE';
+  if(o.includes('SUMINISTRO')) return 'SUMINISTROS';
+  if(o.includes('FACTURACION')||o.includes('APOYO ADMINISTRATIVO')||o.includes('ADMINISTRATIVO')) return 'ADMINISTRATIVO';
+  return null;
+}
+function cargueMuni(o){
+  o=_cnorm(o); const seen=[];
+  [['ABREGO',['ABREGO','ABREO']],['EL CARMEN',['EL CARMEN']],['CONVENCION',['CONVENCION']],['TEORAMA',['TEORAMA']]]
+    .forEach(([canon,keys])=>{ if(keys.some(k=>o.includes(k))&&!seen.includes(canon)) seen.push(canon); });
+  return seen.length===1?seen[0]:null;
+}
+function cargueEbs(o){ const m=_cnorm(o).match(/EQUIPO BASICO DE ATENCION\s+N[O°.\s]*\s*(\d{1,3})/); return m?m[1].padStart(3,'0'):null; }
+function cargueSplit(s){
+  s=(s==null?'':String(s)).trim();
+  const m=s.match(/^\s*(\d[\d.]*)\s+(.*)$/);
+  if(m) return {cedula:m[1].replace(/\D/g,''), nombre:_cnorm(m[2])};
+  return {cedula:'', nombre:_cnorm(s)};
+}
+function cargueActa(v){
+  if(v==null||v==='') return null;
+  if(v instanceof Date && !isNaN(v)) return fmtISO(v);
+  const s=String(v).trim();
+  let m=s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  if(m) return m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0');
+  m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if(m) return m[3]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[1]).padStart(2,'0');
+  return null;
+}
+function cargueMoney(v){
+  if(v==null||v==='') return null;
+  if(typeof v==='number') return Math.round(v);
+  let s=String(v).replace(/[^\d,.-]/g,''); if(!s) return null;
+  if(s.includes(',')) s=s.split(',')[0].replace(/\./g,'');
+  else s=s.replace(/\./g,'');
+  const n=parseInt(s,10); return isNaN(n)?null:n;
+}
+function cargueEntero(v){ if(v==null||v==='') return null; const n=parseInt(String(v).replace(/[^\d]/g,''),10); return isNaN(n)?null:n; }
+function cargueMapHeader(rowsRaw){
+  for(let i=0;i<Math.min(rowsRaw.length,12);i++){
+    const cells=(rowsRaw[i]||[]).map(c=>_ckey(c));
+    if(cells.some(c=>c.includes('CODIGOCONTRATO')) && cells.some(c=>c.includes('CONTRATISTAS'))){
+      const idx={};
+      cells.forEach((c,j)=>{
+        if(idx.codigo==null && c.includes('CODIGOCONTRATO')) idx.codigo=j;
+        else if(idx.objeto==null && c.includes('OBJETOCONTRATO')) idx.objeto=j;
+        else if(idx.valorHide==null && c.includes('HIDE')) idx.valorHide=j;
+        else if(idx.valorInic==null && c.includes('VALORINICCONTRATO')) idx.valorInic=j;
+        else if(idx.tiempo==null && c.includes('TIEMPOEJECUCION')) idx.tiempo=j;
+        else if(idx.contratista==null && c.includes('CONTRATISTAS')) idx.contratista=j;
+        else if(idx.acta==null && c.includes('FECHAACTAINICIO')) idx.acta=j;
+      });
+      return {headerRow:i, idx};
+    }
+  }
+  return null;
+}
+function onCargueFile(ev){
+  const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+  ST.cargueArchivo=f.name;
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rowsRaw=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+      procesarCargue(rowsRaw);
+    }catch(err){ console.error(err); toast('No se pudo leer el Excel: '+err.message,'err'); }
+  };
+  rd.readAsArrayBuffer(f);
+}
+function dupCodPorCed(ced){ const c=ST.contratistas.find(x=>String(x.cedula||'').replace(/\D/g,'')===ced); return c?c.codigo_contrato:'—'; }
+function procesarCargue(rowsRaw){
+  const map=cargueMapHeader(rowsRaw);
+  if(!map){ toast('No se hallaron las columnas esperadas (CÓDIGOCONTRATO, CONTRATISTAS)','err'); resetCargue(); return; }
+  const {headerRow, idx}=map;
+  const val=(ST.valores&&Object.keys(ST.valores).length)?ST.valores:CARGUE_VALBASE_FALLBACK;
+  const codDB=new Set(ST.contratistas.map(c=>_cnorm(c.codigo_contrato)).filter(Boolean));
+  const cedDB=new Set(ST.contratistas.map(c=>String(c.cedula||'').replace(/\D/g,'')).filter(Boolean));
+  const codVis=new Set(), cedVis=new Set();
+  const nuevos=[], duplicados=[], omitidos=[];
+  for(let i=headerRow+1;i<rowsRaw.length;i++){
+    const r=rowsRaw[i]||[];
+    const cod=_cnorm(r[idx.codigo]);
+    const objeto=(r[idx.objeto]==null?'':String(r[idx.objeto])).trim();
+    const {cedula,nombre}=cargueSplit(r[idx.contratista]);
+    if(!cod && !cedula && !nombre) continue;
+    if(!cod || !cedula || !nombre){ omitidos.push({codigo:cod||'—',nombre:nombre||'—',motivo:'Faltan datos clave (código, cédula o nombre)'}); continue; }
+    let motivo=null;
+    if(codDB.has(cod)) motivo='El número de contrato ya existe en la base';
+    else if(cedDB.has(cedula)) motivo='La cédula ya existe en la base (contrato '+dupCodPorCed(cedula)+')';
+    else if(codVis.has(cod)) motivo='Contrato repetido dentro del archivo';
+    else if(cedVis.has(cedula)) motivo='Cédula repetida dentro del archivo';
+    if(motivo){ duplicados.push({codigo:cod,nombre,cedula,motivo}); continue; }
+    codVis.add(cod); cedVis.add(cedula);
+    const rol=cargueRol(objeto);
+    nuevos.push({
+      codigo_contrato:cod, cedula, nombre, rol, objeto,
+      municipio:cargueMuni(objeto), ebs_num:cargueEbs(objeto),
+      valor_total:cargueMoney(idx.valorHide!=null?r[idx.valorHide]:r[idx.valorInic]),
+      valor_mensual:(val[rol]!=null?val[rol]:null),
+      tiempo_ejec:cargueEntero(r[idx.tiempo]), acta_inicio:cargueActa(r[idx.acta]),
+      transporte:0, activo: CARGUE_INACTIVOS.indexOf(rol)<0
+    });
+  }
+  ST.carguePrev={nuevos,duplicados,omitidos,archivo:ST.cargueArchivo};
+  renderCarguePreview();
+}
+function renderCarguePreview(){
+  const R=$('cargueResumen'), P=$('carguePreview'), A=$('cargueActions'); if(!R) return;
+  const p=ST.carguePrev;
+  if(!p){ R.innerHTML=''; P.innerHTML=''; A.innerHTML=''; return; }
+  const tot=p.nuevos.length+p.duplicados.length+p.omitidos.length;
+  R.innerHTML=`<div class="kpis">
+    <div class="kpi"><div class="n">${tot}</div><div class="l">Filas leídas</div></div>
+    <div class="kpi"><div class="n" style="color:var(--green)">${p.nuevos.length}</div><div class="l">Nuevos a importar</div></div>
+    <div class="kpi"><div class="n" style="color:#ffb432">${p.duplicados.length}</div><div class="l">Ya existen (omitidos)</div></div>
+    <div class="kpi"><div class="n">${p.omitidos.length}</div><div class="l">Sin datos</div></div></div>`;
+  let html='';
+  if(p.nuevos.length){
+    html+='<div class="small" style="font-weight:700;margin:12px 0 6px">Nuevos a importar</div><div class="tbl-scroll"><table><thead><tr><th>Contrato</th><th>Contratista</th><th>Rol</th><th>Mun</th><th>EBS</th><th>V. mensual</th><th>V. total</th><th>Acta</th><th>Estado</th></tr></thead><tbody>';
+    html+=p.nuevos.map(c=>{
+      const f=[]; if(!c.rol)f.push('sin rol'); if(!c.valor_mensual&&c.activo)f.push('sin valor mensual'); if(!c.municipio)f.push('sin municipio'); if(!c.acta_inicio)f.push('sin acta');
+      const st=f.length?'<span class="small" style="color:#ffb432">⚠ '+esc(f.join(', '))+'</span>':'<span class="small" style="color:var(--green)">OK</span>';
+      return `<tr><td class="mono">${esc(c.codigo_contrato)}</td><td>${esc(c.nombre)}<div class="small muted">C.C. ${esc(c.cedula)}</div></td><td>${esc(rolDisp(c.rol)||'—')}</td><td>${esc(c.municipio?munDisp(c.municipio):'—')}</td><td>${esc(c.ebs_num||'—')}</td><td class="mono">${c.valor_mensual?money(c.valor_mensual):'—'}</td><td class="mono">${c.valor_total?money(c.valor_total):'—'}</td><td class="mono">${esc(c.acta_inicio||'—')}</td><td>${st}${c.activo?'':' <span class="small muted">(inactivo)</span>'}</td></tr>`;
+    }).join('');
+    html+='</tbody></table></div>';
+  }
+  if(p.duplicados.length){
+    html+='<div class="small" style="font-weight:700;margin:16px 0 6px">Omitidos por duplicado</div><div class="tbl-scroll"><table><thead><tr><th>Contrato</th><th>Contratista</th><th>Motivo</th></tr></thead><tbody>';
+    html+=p.duplicados.map(d=>`<tr><td class="mono">${esc(d.codigo)}</td><td>${esc(d.nombre)}</td><td class="small">${esc(d.motivo)}</td></tr>`).join('');
+    html+='</tbody></table></div>';
+  }
+  if(p.omitidos.length){
+    html+='<div class="small" style="font-weight:700;margin:16px 0 6px">Sin datos suficientes</div><div class="tbl-scroll"><table><thead><tr><th>Contrato</th><th>Contratista</th><th>Motivo</th></tr></thead><tbody>';
+    html+=p.omitidos.map(d=>`<tr><td class="mono">${esc(d.codigo)}</td><td>${esc(d.nombre)}</td><td class="small">${esc(d.motivo)}</td></tr>`).join('');
+    html+='</tbody></table></div>';
+  }
+  P.innerHTML=html;
+  A.innerHTML = p.nuevos.length
+    ? `<button class="btn btn-green" id="btnImportCargue" onclick="importarCargue()">⬆ Importar ${p.nuevos.length} contratista(s)</button>`
+    : '<span class="muted small">No hay contratistas nuevos para importar.</span>';
+}
+async function importarCargue(){
+  const p=ST.carguePrev; if(!p||!p.nuevos.length) return;
+  const btn=$('btnImportCargue'); if(btn){ btn.disabled=true; btn.textContent='Importando…'; }
+  const recs=p.nuevos.map(c=>Object.assign({},c,{updated_at:new Date().toISOString()}));
+  const res=await supa.from('certeb_contratistas').insert(recs).select();
+  if(res.error){ toast('Error importando: '+res.error.message,'err'); if(btn){ btn.disabled=false; btn.textContent='⬆ Importar '+p.nuevos.length+' contratista(s)'; } return; }
+  ST.contratistas.push(...(res.data||recs));
+  const hist={ id:(self.crypto&&crypto.randomUUID?crypto.randomUUID():String(Date.now())),
+    archivo:p.archivo||'(sin nombre)', fecha:new Date().toISOString(), usuario:'Coordinación EBS',
+    total_filas:p.nuevos.length+p.duplicados.length+p.omitidos.length,
+    nuevos:p.nuevos.length, duplicados:p.duplicados.length, omitidos:p.omitidos.length,
+    detalle:{ nuevos:p.nuevos.map(c=>c.codigo_contrato),
+      duplicados:p.duplicados.map(d=>({codigo:d.codigo,motivo:d.motivo})),
+      omitidos:p.omitidos.map(d=>({codigo:d.codigo,motivo:d.motivo})) } };
+  ST.cargues.unshift(hist); if(ST.cargues.length>200) ST.cargues=ST.cargues.slice(0,200);
+  try{ await supa.from('certeb_config').upsert({clave:'cargues_historial',valor:{items:ST.cargues}},{onConflict:'clave'}); }
+  catch(e){ console.warn('No se pudo guardar historial',e); }
+  initFilters(); renderContratistas(); renderGenResults(); renderCargueHist();
+  toast('Importados '+recs.length+' contratistas','ok');
+  resetCargue();
+}
+function resetCargue(){ ST.carguePrev=null; const f=$('cargueFile'); if(f) f.value=''; renderCarguePreview(); }
+function verCargueDetalle(id){
+  const h=(ST.cargues||[]).find(x=>x.id===id); if(!h||!h.detalle) return;
+  const n=(h.detalle.nuevos||[]).join(', ')||'(ninguno)';
+  const d=(h.detalle.duplicados||[]).map(x=>x.codigo).join(', ')||'(ninguno)';
+  alert('Archivo: '+(h.archivo||'')+'\n\nImportados ('+(h.nuevos||0)+'): '+n+'\n\nOmitidos por duplicado ('+(h.duplicados||0)+'): '+d);
+}
+function renderCargueHist(){
+  const tb=$('cargueHist'); if(!tb) return;
+  if(!ST.cargues||!ST.cargues.length){ tb.innerHTML='<tr><td colspan="7" class="muted small" style="text-align:center;padding:14px">Aún no hay cargues registrados.</td></tr>'; return; }
+  tb.innerHTML=ST.cargues.map(h=>{
+    const fs=h.fecha?new Date(h.fecha).toLocaleString('es-CO'):'—';
+    return `<tr><td class="small">${esc(fs)}</td><td>${esc(h.archivo||'—')}</td><td class="mono">${h.total_filas||0}</td><td class="mono" style="color:var(--green)">${h.nuevos||0}</td><td class="mono">${h.duplicados||0}</td><td class="mono">${h.omitidos||0}</td><td><button class="btn btn-ghost btn-sm" onclick="verCargueDetalle('${esc(h.id)}')">ver</button></td></tr>`;
+  }).join('');
 }
 
 /* ══════════════════════════════════════════════════════════════
