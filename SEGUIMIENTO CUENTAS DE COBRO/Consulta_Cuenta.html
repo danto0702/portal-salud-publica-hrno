@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consulta de Cuenta de Cobro · ESE HRNO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../auth.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#eef4fb;--surface:#fff;--surface2:#f4f8fd;--border:rgba(15,76,129,.14);--text:#0c1b33;--text2:#4a6a8a;--primary:#0f4c81;--primary2:#1565c0;--green:#059669;--red:#dc2626}
+body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',Arial,sans-serif;min-height:100vh}
+h1,h2{font-family:'Lora',Georgia,serif}
+.top{background:linear-gradient(135deg,#0f4c81,#1565c0);color:#fff;padding:28px 16px 70px;text-align:center}
+.top h1{font-size:22px}
+.top p{font-size:13px;opacity:.85;margin-top:6px}
+.wrap{max-width:760px;margin:-50px auto 40px;padding:0 16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 6px 24px rgba(15,76,129,.08)}
+.search{display:flex;gap:8px;flex-wrap:wrap}
+.search input{flex:1;min-width:180px;padding:12px 14px;border:1px solid rgba(15,76,129,.3);border-radius:10px;font-size:16px}
+.search button{padding:12px 20px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-weight:700;font-size:15px;cursor:pointer}
+.search button:disabled{opacity:.6}
+.muted{color:var(--text2);font-size:12px}
+.cta h2{font-size:16px;color:var(--primary)}
+.cta .meta{font-size:12px;color:var(--text2);margin:4px 0 12px}
+.steps{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px}
+.step{flex:1;min-width:78px;text-align:center;font-size:10.5px;font-weight:700;color:var(--text2);padding:8px 4px;border-radius:8px;background:var(--surface2);border:1px solid var(--border)}
+.step.done{background:rgba(5,150,105,.10);color:var(--green);border-color:rgba(5,150,105,.25)}
+.step.cur{background:#fff;color:var(--primary);border:2px solid var(--primary2)}
+.step.dev{background:rgba(220,38,38,.08);color:var(--red);border-color:rgba(220,38,38,.3)}
+.status{margin-top:10px;font-size:13px;padding:10px 12px;border-radius:8px;background:var(--surface2)}
+.status.dev{background:rgba(220,38,38,.08);color:#7f1d1d}
+.status.ok{background:rgba(5,150,105,.10);color:#065f46}
+.foot{text-align:center;font-size:11px;color:var(--text2);margin-top:20px}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Consulta de su cuenta de cobro</h1>
+  <p>ESE Hospital Regional Noroccidental · Oficina de Salud Pública</p>
+</div>
+<div class="wrap">
+  <div class="card">
+    <form class="search" onsubmit="consultar(event)">
+      <input id="ced" inputmode="numeric" autocomplete="off" placeholder="Número de cédula" aria-label="Número de cédula">
+      <button id="btn">Consultar</button>
+    </form>
+    <p class="muted" style="margin-top:8px">Escriba su número de cédula sin puntos. Verá en qué proceso va cada una de sus cuentas.</p>
+  </div>
+  <div id="res"></div>
+  <p class="foot">Si tiene dudas sobre una devolución, comuníquese con la Oficina de Salud Pública.</p>
+</div>
+<script>
+'use strict';
+const ETAPAS=['contratista','salud_publica','contratacion','subgerencia','secop','supervision','tesoreria','pagada'];
+const LBL={contratista:'Entrega',salud_publica:'Salud Pública',contratacion:'Contratación',subgerencia:'Subgerencia',secop:'SECOP II',supervision:'Supervisión',tesoreria:'Tesorería',pagada:'Pagada'};
+const TXT={
+  salud_publica:'Su cuenta está en revisión en la Oficina de Salud Pública.',
+  contratacion:'Su cuenta está en revisión en la Oficina de Contratación.',
+  subgerencia:'Su cuenta está en revisión en Subgerencia (radicado y factura electrónica).',
+  secop:'Subgerencia le envió los soportes y la factura electrónica. Cargue la cuenta en SECOP II e informe a Subgerencia por correo electrónico.',
+  supervision:'Su cuenta está en revisión de supervisión.',
+  tesoreria:'Su cuenta está en Tesorería para pago.'
+};
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>n==null?'—':'$ '+Math.round(+n).toLocaleString('es-CO');
+const fecha=s=>{ if(!s) return '—'; const p=String(s).slice(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
+async function consultar(ev){
+  ev.preventDefault();
+  const ced=document.getElementById('ced').value.replace(/\D/g,'');
+  const res=document.getElementById('res'); const btn=document.getElementById('btn');
+  if(ced.length<5){ res.innerHTML='<div class="card muted">Escriba un número de cédula válido.</div>'; return; }
+  btn.disabled=true; btn.textContent='Consultando…';
+  const {data,error}=await window.portalSb.rpc('cc_consulta_publica',{p_cedula:ced});
+  btn.disabled=false; btn.textContent='Consultar';
+  if(error){ res.innerHTML='<div class="card">No fue posible consultar en este momento. Intente más tarde.</div>'; return; }
+  if(!data||!data.length){ res.innerHTML='<div class="card muted">No se encontraron cuentas para esa cédula.</div>'; return; }
+  res.innerHTML=data.map(c=>{
+    const i=ETAPAS.indexOf(c.etapa); const dev=c.etapa==='contratista'&&c.motivo_ult_dev;
+    const hoy=new Date(); const fin=c.periodo_fin?new Date(c.periodo_fin+'T00:00:00'):null;
+    let st;
+    if(c.etapa==='pagada') st=`<div class="status ok"><b>Pagada</b> el ${fecha(c.tes_fecha)}.</div>`;
+    else if(dev) st=`<div class="status dev"><b>Devuelta para corrección.</b> Motivo: ${esc(c.motivo_ult_dev)}<br>Corríjala y entréguela de nuevo.</div>`;
+    else if(c.etapa==='contratista') st=`<div class="status">${fin&&hoy<=fin?'El periodo aún no termina.':'Pendiente de entrega a la Oficina de Salud Pública.'}</div>`;
+    else st=`<div class="status">${esc(TXT[c.etapa])} <span class="muted">Desde ${fecha(c.etapa_desde)}.</span>${c.radicado?'<br>Radicado: <b>'+esc(c.radicado)+'</b>':''}</div>`;
+    return `<div class="card cta"><h2>Contrato ${esc(c.numero_contrato)} · Pago ${c.num_pago}</h2>
+      <div class="meta">${esc(c.nombre)} · ${esc(c.programa)} · Periodo ${fecha(c.periodo_ini)} a ${fecha(c.periodo_fin)} · ${money(c.valor)}</div>
+      <div class="steps">${ETAPAS.map((e,j)=>`<div class="step ${c.etapa==='pagada'||j<i?'done':j===i?(dev?'dev':'cur'):''}">${LBL[e]}</div>`).join('')}</div>${st}</div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>

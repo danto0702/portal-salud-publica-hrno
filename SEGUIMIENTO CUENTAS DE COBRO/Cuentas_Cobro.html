@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seguimiento de Cuentas de Cobro · Salud Pública · ESE HRNO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../auth.js"></script>
+<script src="../libs/xlsx.full.min.js"></script>
+<script src="../libs/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#eef4fb; --surface:#ffffff; --surface2:#f4f8fd; --surface3:#e9f0f9;
+  --border:rgba(15,76,129,0.12); --border2:rgba(15,76,129,0.28);
+  --text:#0c1b33; --text2:#4a6a8a; --text3:#1e3a5f;
+  --primary:#0f4c81; --primary2:#1565c0; --purple:#7c1d6f;
+  --green:#059669; --yellow:#b45309; --red:#dc2626;
+  --ok-bg:rgba(5,150,105,.10); --warn-bg:rgba(180,83,9,.12); --alert-bg:rgba(220,38,38,.10);
+  --r:12px; --rs:8px;
+}
+html{font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',Arial,sans-serif;min-height:100vh}
+h1,h2,h3{font-family:'Lora',Georgia,serif}
+button,input,select,textarea{font-family:inherit;font-size:inherit}
+*::-webkit-scrollbar{height:10px;width:10px}
+*::-webkit-scrollbar-thumb{background:var(--border2);border-radius:20px}
+
+/* Header */
+.header{background:var(--surface);border-bottom:3px solid var(--primary);padding:0 20px;display:flex;align-items:center;justify-content:space-between;min-height:62px;position:sticky;top:0;z-index:200;box-shadow:0 2px 12px rgba(15,76,129,.10);gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:12px;text-decoration:none}
+.logo-icon{width:40px;height:40px;background:linear-gradient(135deg,var(--primary),var(--purple));border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px}
+.logo-text h1{font-size:15px;color:var(--primary);line-height:1.1}
+.logo-text p{font-size:9.5px;color:var(--text2);margin-top:2px;letter-spacing:.6px;text-transform:uppercase;font-weight:600}
+.hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 12px 4px 4px;font-size:12px}
+.chip .av{width:26px;height:26px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.chip small{display:block;font-size:9.5px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;font-weight:700}
+.btn{border:1px solid var(--border2);background:var(--surface);color:var(--text3);padding:7px 13px;border-radius:var(--rs);font-weight:600;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;white-space:nowrap}
+.btn:hover{background:var(--surface3)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.pri{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.pri:hover{background:var(--primary2)}
+.btn.ok{background:var(--green);border-color:var(--green);color:#fff}
+.btn.bad{background:#fff;border-color:rgba(220,38,38,.4);color:var(--red)}
+.btn.bad:hover{background:var(--alert-bg)}
+.btn.sm{padding:4px 9px;font-size:11px}
+
+/* Filtros */
+.fbar{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:62px;z-index:150}
+.fbar-in{max-width:1280px;margin:0 auto;padding:10px 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.fld{display:flex;flex-direction:column;gap:3px}
+.fld label{font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px}
+.inp{padding:7px 10px;border:1px solid var(--border2);border-radius:var(--rs);background:var(--surface);color:var(--text);min-width:0}
+.inp:focus{outline:2px solid rgba(21,101,192,.25);border-color:var(--primary2)}
+.fbar .inp{min-width:140px}
+.fbar .grow{flex:1;min-width:200px}
+
+/* Tabs */
+.tabbar{max-width:1280px;margin:12px auto 0;padding:0 20px;display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--border)}
+.tab{border:none;background:none;padding:10px 15px;font-weight:600;color:var(--text2);cursor:pointer;position:relative;white-space:nowrap;font-size:12.5px}
+.tab.active{color:var(--primary)}
+.tab.active::after{content:'';position:absolute;left:12px;right:12px;bottom:-1px;height:3px;background:var(--primary);border-radius:3px 3px 0 0}
+.tab .cnt{background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:5px}
+.main{max-width:1280px;margin:0 auto;padding:18px 20px 60px}
+.panel{display:none}.panel.active{display:block}
+
+/* Cards / KPIs */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px}
+.card h3{font-size:15px;color:var(--text3);margin-bottom:10px}
+.card .sub{font-size:11.5px;color:var(--text2);margin:-6px 0 10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
+.kpi .n{font-size:22px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .l{font-size:10.5px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;font-weight:700;margin-top:4px}
+.kpi .d{font-size:11px;color:var(--text2);margin-top:3px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(420px,100%),1fr));gap:14px}
+.grid2>*{min-width:0}
+.chart-box{position:relative;height:260px}
+.flow{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.flow .st{flex:1;min-width:110px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;cursor:pointer}
+.flow .st:hover{border-color:var(--primary2)}
+.flow .st .n{font-size:22px;font-weight:800;color:var(--primary)}
+.flow .st .l{font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase}
+.flow .st .s{font-size:10.5px;margin-top:4px;display:flex;justify-content:center;gap:6px}
+
+/* Tablas */
+.tbl-wrap{overflow:auto;border:1px solid var(--border);border-radius:var(--rs);background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--surface2);color:var(--text2);text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;padding:8px 9px;position:sticky;top:0;z-index:1;white-space:nowrap;border-bottom:1px solid var(--border)}
+td{padding:7px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+tr.clk{cursor:pointer}
+tr.clk:hover td{background:var(--surface2)}
+.mono{font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--text2)}
+.small{font-size:11px}
+.right{text-align:right}
+
+/* Etiquetas */
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;white-space:nowrap;border:1px solid transparent}
+.tag.ok{background:var(--ok-bg);color:var(--green)}
+.tag.warn{background:var(--warn-bg);color:var(--yellow)}
+.tag.alert{background:var(--alert-bg);color:var(--red)}
+.tag.none{background:var(--surface3);color:var(--text2)}
+.tag.et{background:rgba(15,76,129,.08);color:var(--primary);border-color:rgba(15,76,129,.18)}
+.tag.paid{background:var(--green);color:#fff}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(12,27,51,.45);display:none;align-items:flex-start;justify-content:center;z-index:500;padding:30px 12px;overflow:auto}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border-radius:14px;width:100%;max-width:980px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal.narrow{max-width:560px}
+.mhead{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.mhead h2{font-size:17px;color:var(--primary)}
+.mbody{padding:16px 20px}
+.mfoot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.xbtn{border:none;background:none;font-size:22px;cursor:pointer;color:var(--text2);line-height:1}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.frm .full{grid-column:1/-1}
+
+/* Stepper */
+.stepper{display:flex;gap:4px;margin:6px 0 14px;overflow-x:auto}
+.step{flex:1;min-width:100px;border-radius:8px;padding:8px;border:1px solid var(--border);background:var(--surface2);font-size:11px}
+.step .t{font-weight:700;color:var(--text3);font-size:10.5px;text-transform:uppercase}
+.step .v{margin-top:4px}
+.step.cur{border:2px solid var(--primary2);background:#fff}
+.step.done{background:var(--ok-bg);border-color:rgba(5,150,105,.25)}
+.step.dev{background:var(--alert-bg);border-color:rgba(220,38,38,.25)}
+.acc{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px}
+.acc h4{font-size:13px;color:var(--text3);margin-bottom:10px}
+.acc .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px}
+.timeline{list-style:none;border-left:2px solid var(--border2);margin-left:6px;padding-left:14px}
+.timeline li{position:relative;margin-bottom:10px;font-size:12px}
+.timeline li::before{content:'';position:absolute;left:-20px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--primary2)}
+.timeline li.dev::before{background:var(--red)}
+.timeline li.pay::before{background:var(--green)}
+.alertbox{background:var(--alert-bg);border:1px solid rgba(220,38,38,.25);color:#7f1d1d;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px}
+.infobox{background:rgba(15,76,129,.06);border:1px solid var(--border);padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;color:var(--text3)}
+
+.toasts{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:900}
+.toast{background:var(--text);color:#fff;padding:10px 14px;border-radius:8px;font-size:12.5px;max-width:380px;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.toast.err{background:var(--red)}.toast.ok{background:var(--green)}
+.center-msg{max-width:520px;margin:80px auto;text-align:center;background:var(--surface);padding:30px;border-radius:14px;border:1px solid var(--border)}
+.center-msg h2{color:var(--primary);margin-bottom:10px}
+.loading{padding:60px;text-align:center;color:var(--text2)}
+.bulkbar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px}
+.legend-sem{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-bottom:8px}
+@media (max-width:640px){
+  .grid2{grid-template-columns:1fr}
+  .fbar{position:static}
+  .header{position:static}
+  .fbar .inp{min-width:0;width:100%}
+  .fld{flex:1 1 45%}
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <a class="logo" href="../index.html">
+    <div class="logo-icon">🧾</div>
+    <div class="logo-text"><h1>Seguimiento de Cuentas de Cobro</h1><p>Salud Pública · ESE Hospital Regional Noroccidental</p></div>
+  </a>
+  <div class="hdr-right">
+    <a class="btn" href="Consulta_Cuenta.html" target="_blank" title="Página pública para que el contratista consulte su cuenta">🔎 Consulta contratista</a>
+    <a class="btn" href="../index.html">← Portal</a>
+    <div class="chip" id="userChip" style="display:none"><div class="av" id="uAv">?</div><div><span id="uNom"></span><small id="uRol"></small></div></div>
+    <button class="btn" onclick="portalCerrarSesion()">Salir</button>
+  </div>
+</header>
+
+<div id="app" style="display:none">
+  <div class="fbar"><div class="fbar-in">
+    <div class="fld"><label>Programa</label><select class="inp" id="fPrograma" onchange="renderAll()"></select></div>
+    <div class="fld"><label>Resolución</label><select class="inp" id="fResolucion" onchange="renderAll()"></select></div>
+    <div class="fld"><label>Municipio</label><select class="inp" id="fMunicipio" onchange="renderAll()"></select></div>
+    <div class="fld"><label>Proceso actual</label><select class="inp" id="fEtapa" onchange="renderAll()"></select></div>
+    <div class="fld"><label>Mes del periodo</label><select class="inp" id="fMes" onchange="renderAll()"></select></div>
+    <div class="fld"><label>No. pago</label><select class="inp" id="fPago" onchange="renderAll()"></select></div>
+    <div class="fld grow"><label>Buscar</label><input class="inp" id="fQ" placeholder="Cédula, nombre, contrato, radicado…" oninput="debRender()"></div>
+    <button class="btn" onclick="limpiarFiltros()">Limpiar</button>
+    <button class="btn pri" id="btnExport" onclick="exportarExcel()" style="display:none">⬇ Excel</button>
+  </div></div>
+
+  <nav class="tabbar" id="tabbar">
+    <button class="tab active" data-tab="dash">📊 Dashboard</button>
+    <button class="tab" data-tab="bandeja" id="tabBandeja">📥 Mis pendientes <span class="cnt" id="cntBandeja" style="display:none"></span></button>
+    <button class="tab" data-tab="cuentas">🧾 Cuentas</button>
+    <button class="tab" data-tab="contratos">📁 Contratos</button>
+    <button class="tab" data-tab="cargue" id="tabCargue">⬆ Cargue masivo</button>
+    <button class="tab" data-tab="admin" id="tabAdmin">⚙ Administración</button>
+  </nav>
+
+  <main class="main">
+    <!-- DASHBOARD -->
+    <section class="panel active" id="p-dash">
+      <div class="kpis" id="dashKpis"></div>
+      <div class="card">
+        <h3>Cuentas en cada proceso</h3>
+        <div class="sub">Haga clic en un proceso para ver sus cuentas. El semáforo cuenta días calendario frente al plazo configurado para cada proceso.</div>
+        <div class="flow" id="dashFlow"></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><h3>Valor pagado frente a pendiente, por programa</h3><div class="chart-box"><canvas id="chProg"></canvas></div></div>
+        <div class="card"><h3>Valor pagado frente a pendiente, por municipio</h3><div class="chart-box"><canvas id="chMun"></canvas></div></div>
+        <div class="card"><h3>Tiempo promedio por proceso (días)</h3><div class="sub">Solo permanencias ya cerradas. La barra se pinta en rojo cuando el promedio supera el plazo del proceso.</div><div class="chart-box"><canvas id="chTiempo"></canvas></div></div>
+        <div class="card"><h3>Avance por número de pago</h3><div class="chart-box"><canvas id="chPago"></canvas></div></div>
+        <div class="card"><h3>Devoluciones por proceso</h3><div class="chart-box"><canvas id="chDev"></canvas></div></div>
+        <div class="card"><h3>Motivos de devolución más recientes</h3><div id="dashMotivos" style="max-height:260px;overflow:auto"></div></div>
+      </div>
+      <div class="card"><h3>Tabla resumen por proceso</h3><div class="tbl-wrap" id="dashTabla"></div></div>
+    </section>
+
+    <!-- BANDEJA -->
+    <section class="panel" id="p-bandeja">
+      <div class="infobox" id="bandejaInfo"></div>
+      <div class="bulkbar" id="bulkbar">
+        <div class="fld" id="fldVerComo" style="display:none"><label>Ver bandeja de</label><select class="inp" id="bVerComo" onchange="renderBandeja()"></select></div>
+        <div class="fld"><label>Fecha del movimiento</label><input type="date" class="inp" id="bFecha"></div>
+        <button class="btn" onclick="selTodo(true)">Seleccionar todo</button>
+        <button class="btn" onclick="selTodo(false)">Quitar selección</button>
+        <button class="btn pri" onclick="accionLote('recibir')">📥 Registrar recepción</button>
+        <button class="btn ok" onclick="accionLote('aprobar')">✔ Aprobar y enviar</button>
+        <label class="small" style="display:flex;gap:6px;align-items:center;margin-left:auto"><input type="checkbox" id="bFuturas" onchange="renderBandeja()"> Incluir cuentas con periodo sin terminar</label>
+      </div>
+      <div class="legend-sem"><span class="tag ok">● a tiempo</span><span class="tag warn">● en el límite</span><span class="tag alert">● vencida</span><span class="tag none">● sin plazo</span></div>
+      <div class="tbl-wrap" id="bandejaTabla"></div>
+    </section>
+
+    <!-- CUENTAS -->
+    <section class="panel" id="p-cuentas">
+      <div class="legend-sem"><span class="tag ok">● a tiempo</span><span class="tag warn">● en el límite</span><span class="tag alert">● vencida</span><span class="tag none">● sin plazo</span><span id="cuentasCount" style="margin-left:auto"></span></div>
+      <div class="tbl-wrap" id="cuentasTabla" style="max-height:70vh"></div>
+    </section>
+
+    <!-- CONTRATOS -->
+    <section class="panel" id="p-contratos">
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn pri" id="btnNuevoContrato" onclick="abrirContrato(null)">＋ Nuevo contrato</button>
+        <label class="small"><input type="checkbox" id="cInactivos" onchange="renderContratos()"> Mostrar inactivos (proveedores)</label>
+        <span id="contratosCount" class="small muted" style="margin-left:auto"></span>
+      </div>
+      <div class="tbl-wrap" id="contratosTabla" style="max-height:70vh"></div>
+    </section>
+
+    <!-- CARGUE -->
+    <section class="panel" id="p-cargue">
+      <div class="card">
+        <h3>Cargue masivo desde el Excel de contratos</h3>
+        <div class="sub">Formato del listado de contratos (CÓDIGOCONTRATO, OBJETOCONTRATO, VALOR, TIEMPO EJECUCIÓN, CONTRATISTAS, FECHA ACTAINICIO). Se omiten contratos que ya existan. Los proveedores (transporte, suministros) quedan inactivos y sin cuentas.</div>
+        <div class="frm">
+          <div class="fld"><label>Programa *</label><select class="inp" id="cgPrograma"></select></div>
+          <div class="fld"><label>Resolución (vacío = detectar del objeto)</label><input class="inp" id="cgResolucion" placeholder="Ej: 0272 de 2026"></div>
+          <div class="fld"><label>Archivo Excel</label><input type="file" class="inp" id="cgFile" accept=".xlsx,.xls,.csv" onchange="leerCargue(event)"></div>
+        </div>
+      </div>
+      <div id="cgPrev"></div>
+      <div class="card"><h3>Historial de cargues</h3><div id="cgHist"></div></div>
+    </section>
+
+    <!-- ADMIN -->
+    <section class="panel" id="p-admin">
+      <div class="card">
+        <h3>Usuarios del módulo</h3>
+        <div class="sub">Todos los usuarios del portal aparecen aquí. Asigne a cada uno su proceso (editor) o el rol de lector. «Sin acceso» impide ver el módulo. El superadministrador del portal tiene acceso total siempre.</div>
+        <div class="tbl-wrap" id="admUsuarios"></div>
+      </div>
+      <div class="card">
+        <h3>Plazos del semáforo (días calendario por proceso)</h3>
+        <div class="frm" id="admUmbrales"></div>
+        <div style="margin-top:10px"><button class="btn pri" onclick="guardarUmbrales()">Guardar plazos</button></div>
+      </div>
+      <div class="card">
+        <h3>Programas</h3>
+        <div class="sub">Uno por línea.</div>
+        <textarea class="inp" id="admProgramas" rows="6" style="width:100%"></textarea>
+        <div style="margin-top:10px"><button class="btn pri" onclick="guardarProgramas()">Guardar programas</button></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="gate" class="loading">Cargando…</div>
+
+<!-- Modal cuenta -->
+<div class="modal-bg" id="mdCuenta" onclick="if(event.target===this)cerrarModal('mdCuenta')">
+  <div class="modal">
+    <div class="mhead"><div><h2 id="mcTitulo"></h2><div class="small muted" id="mcSub"></div></div><button class="xbtn" onclick="cerrarModal('mdCuenta')">×</button></div>
+    <div class="mbody" id="mcBody"></div>
+  </div>
+</div>
+
+<!-- Modal contrato -->
+<div class="modal-bg" id="mdContrato" onclick="if(event.target===this)cerrarModal('mdContrato')">
+  <div class="modal">
+    <div class="mhead"><h2 id="mkTitulo">Contrato</h2><button class="xbtn" onclick="cerrarModal('mdContrato')">×</button></div>
+    <div class="mbody" id="mkBody"></div>
+    <div class="mfoot" id="mkFoot"></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════
+   CONSTANTES
+   ═══════════════════════════════════════════════════════════════ */
+const ETAPAS = ['contratista','salud_publica','contratacion','subgerencia','secop','supervision','tesoreria','pagada'];
+const ETAPA_LBL = {
+  contratista:'Contratista', salud_publica:'Salud Pública', contratacion:'Contratación',
+  subgerencia:'Subgerencia', secop:'SECOP II', supervision:'Supervisión', tesoreria:'Tesorería', pagada:'Pagada'
+};
+const ETAPA_DET = {
+  contratista:'En manos del contratista', salud_publica:'1er filtro', contratacion:'2do filtro',
+  subgerencia:'3er filtro · radicado y factura', secop:'Cargue del contratista', supervision:'Subgerencia',
+  tesoreria:'Pago', pagada:'Proceso terminado'
+};
+const PROCESOS = {salud_publica:'Salud Pública', contratacion:'Contratación', subgerencia:'Subgerencia', tesoreria:'Tesorería', lector:'Lector', superadmin:'Superadministrador'};
+const PREF = {salud_publica:'sp', contratacion:'ct', subgerencia:'sg', secop:'secop', supervision:'sup', tesoreria:'tes'};
+const MUN_DISPLAY = {'ABREGO':'Ábrego','EL CARMEN':'El Carmen','CONVENCION':'Convención','TEORAMA':'Teorama'};
+const INACTIVOS_ROL = ['TRANSPORTE','SUMINISTROS'];
+
+const ST = {
+  me:null, proceso:null, contratos:[], contratoById:new Map(), cuentas:[], movs:[], movsByCuenta:new Map(),
+  certs:new Map(), config:{umbrales:{}, programas:[], cargues:[]}, usuarios:[], cc_usuarios:[], charts:{},
+  cargue:null, tab:'dash'
+};
+let sb;
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILIDADES
+   ═══════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function money(n){ if(n==null||isNaN(n)) return '—'; return '$ '+Math.round(+n).toLocaleString('es-CO'); }
+function moneyCorto(n){ n=+n||0; if(Math.abs(n)>=1e9) return '$ '+(n/1e9).toLocaleString('es-CO',{maximumFractionDigits:2})+' MM'; if(Math.abs(n)>=1e6) return '$ '+(n/1e6).toLocaleString('es-CO',{maximumFractionDigits:1})+' M'; return money(n); }
+function toast(msg,type){ const t=document.createElement('div'); t.className='toast '+(type||''); t.textContent=msg; $('toasts').appendChild(t); setTimeout(()=>t.remove(),type==='err'?7000:3800); }
+function todayISO(){ const d=new Date(); return fmtISO(d); }
+function fmtISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function parseISO(s){ if(!s) return null; const p=String(s).slice(0,10).split('-'); if(p.length<3) return null; return new Date(+p[0],+p[1]-1,+p[2]); }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function addMonths(d,n){ const day=d.getDate(); const t=new Date(d.getFullYear(),d.getMonth()+n,1); const last=new Date(t.getFullYear(),t.getMonth()+1,0).getDate(); t.setDate(Math.min(day,last)); return t; }
+function fechaCorta(s){ const d=parseISO(s); if(!d) return '—'; return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); }
+function fechaHora(ts){ if(!ts) return '—'; const d=new Date(ts); return d.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}); }
+function localISO(ts){ return ts? fmtISO(new Date(ts)) : null; }
+function diasEntre(a,b){ return Math.round((new Date(b.getFullYear(),b.getMonth(),b.getDate()) - new Date(a.getFullYear(),a.getMonth(),a.getDate()))/86400000); }
+function munDisp(m){ return MUN_DISPLAY[m] || (m? m.charAt(0)+m.slice(1).toLowerCase() : '—'); }
+const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function mesLbl(ym){ const [y,m]=ym.split('-'); return MESES[+m-1].replace(/^./,c=>c.toUpperCase())+' '+y; }
+// Fecha elegida por el usuario → marca de tiempo. Si es hoy, usa la hora actual.
+function fechaMovimiento(iso){ if(!iso || iso===todayISO()) return null; return iso+'T12:00:00-05:00'; }
+function nombreCorto(n){ return (n||'').split(' ').slice(0,3).join(' '); }
+
+/* ── Permisos (espejo de las funciones SQL; la base de datos es quien decide) ── */
+function dueno(c){
+  const e = c.etapa==='contratista' ? (c.devuelta_desde||'salud_publica') : c.etapa;
+  return {salud_publica:'salud_publica',contratacion:'contratacion',subgerencia:'subgerencia',secop:'subgerencia',supervision:'subgerencia',tesoreria:'tesoreria'}[e]||null;
+}
+const esSuper = () => ST.proceso==='superadmin';
+const puedeGestionar = () => ST.proceso==='superadmin' || ST.proceso==='salud_publica';
+const puedeActuar = c => esSuper() || (ST.proceso!=='lector' && dueno(c)===ST.proceso);
+const siguiente = e => ETAPAS[ETAPAS.indexOf(e)+1];
+
+/* ── Semáforo ── */
+function semaforo(c){
+  const hoy=new Date();
+  if(c.etapa==='pagada') return {nivel:'paid', dias:null, txt:'Pagada'};
+  const um=ST.config.umbrales||{};
+  let dias, limite;
+  if(c.etapa==='contratista' && !c.devuelta_desde){
+    // aún no entregada: cuenta desde el fin del periodo
+    const fin=parseISO(c.periodo_fin);
+    if(!fin || hoy<=fin) return {nivel:'none', dias:null, txt:'Periodo en curso'};
+    dias=diasEntre(fin,hoy); limite=um.contratista;
+    const niv = limite==null? 'none' : dias<limite?'ok':dias===limite?'warn':'alert';
+    return {nivel:niv, dias, txt:dias+' d sin entregar'};
+  }
+  dias=diasEntre(new Date(c.etapa_desde),hoy); limite=um[c.etapa];
+  if(limite==null) return {nivel:'none', dias, txt:dias+' d'};
+  return {nivel: dias<limite?'ok':dias===limite?'warn':'alert', dias, txt:dias+' d'};
+}
+function semTag(c){ const s=semaforo(c); if(s.nivel==='paid') return '<span class="tag paid">✔ Pagada</span>'; const ic={ok:'●',warn:'▲',alert:'■',none:'○'}[s.nivel]; return `<span class="tag ${s.nivel}" title="Días en el proceso actual">${ic} ${esc(s.txt)}</span>`; }
+function etapaTag(c){
+  let t=ETAPA_LBL[c.etapa];
+  if(c.etapa==='contratista') t = c.devuelta_desde ? 'Devuelta al contratista' : 'Por entregar';
+  const cls = c.etapa==='pagada'?'paid': (c.etapa==='contratista'&&c.devuelta_desde)?'alert':'et';
+  return `<span class="tag ${cls}">${esc(t)}</span>`;
+}
+
+/* ── Plan de pagos automático: un mes calendario por pago desde el acta ── */
+function planAuto(acta, dur, total, n){
+  const a=parseISO(acta); const arr=[];
+  if(a && dur){
+    const finMax=addDays(a,dur-1); let k=1;
+    while(k<=24){ const ini=addMonths(a,k-1); if(ini>finMax) break; let fin=addDays(addMonths(a,k),-1); if(fin>finMax) fin=finMax; arr.push({num_pago:k, periodo_ini:fmtISO(ini), periodo_fin:fmtISO(fin)}); k++; }
+  }
+  if(n && n>0 && n!==arr.length){ // número manual de pagos: se ajusta la lista
+    while(arr.length>n) arr.pop();
+    while(arr.length<n) arr.push({num_pago:arr.length+1, periodo_ini:null, periodo_fin:null});
+    if(a && dur && arr.length) arr[arr.length-1].periodo_fin=fmtISO(addDays(a,dur-1));
+  }
+  const cant=arr.length; const base=cant? Math.floor((+total||0)/cant) : 0;
+  arr.forEach((p,i)=>{ p.valor = i===cant-1 ? (+total||0)-base*(cant-1) : base; });
+  return arr;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CARGA DE DATOS
+   ═══════════════════════════════════════════════════════════════ */
+async function fetchAll(tabla, select, orden){
+  const out=[]; const size=1000; let from=0;
+  while(true){
+    let q=sb.from(tabla).select(select).range(from,from+size-1);
+    if(orden) q=q.order(orden);
+    const {data,error}=await q; if(error) throw error;
+    out.push(...data); if(data.length<size) break; from+=size;
+  }
+  return out;
+}
+async function cargarDatos(){
+  const [contratos, cuentas, movs, cfg] = await Promise.all([
+    fetchAll('cc_contratos','*','numero_contrato'),
+    fetchAll('cc_cuentas','*','num_pago'),
+    fetchAll('cc_movimientos','*','fecha'),
+    sb.from('cc_config').select('*')
+  ]);
+  ST.contratos=contratos; ST.contratoById=new Map(contratos.map(k=>[k.id,k]));
+  ST.cuentas=cuentas.filter(c=>ST.contratoById.has(c.contrato_id));
+  ST.cuentas.forEach(c=>c.k=ST.contratoById.get(c.contrato_id));
+  ST.movs=movs; ST.movsByCuenta=new Map();
+  movs.forEach(m=>{ if(!ST.movsByCuenta.has(m.cuenta_id)) ST.movsByCuenta.set(m.cuenta_id,[]); ST.movsByCuenta.get(m.cuenta_id).push(m); });
+  const conf={}; (cfg.data||[]).forEach(r=>conf[r.clave]=r.valor);
+  ST.config.umbrales=conf.umbrales||{};
+  ST.config.programas=Array.isArray(conf.programas)?conf.programas:['EBS','Jóvenes en Paz','PIC Departamental','PIC Municipal','Vacunación'];
+  ST.config.cargues=(conf.cargues_historial&&conf.cargues_historial.items)||[];
+  await cargarCertificados();
+}
+// Certificados de cumplimiento EBS emitidos (módulo Certificados EBS)
+async function cargarCertificados(){
+  ST.certs=new Map();
+  try{
+    const {data,error}=await sb.from('certeb_emitidos').select('codigo_contrato,cuenta_num,radicado,fecha_emision');
+    if(error) return;
+    (data||[]).forEach(r=>{ if(r.cuenta_num==null) return; const key=normCod(r.codigo_contrato)+'|'+r.cuenta_num; if(!ST.certs.has(key)) ST.certs.set(key,r); });
+  }catch(e){ /* opcional */ }
+}
+function normCod(s){ return String(s||'').replace(/\s+/g,'').replace(/^0+/,'').toUpperCase(); }
+function certDe(c){ return ST.certs.get(normCod(c.k.numero_contrato)+'|'+c.num_pago)||null; }
+
+async function recargarCuenta(id){
+  const [{data:c},{data:ms}] = await Promise.all([
+    sb.from('cc_cuentas').select('*').eq('id',id).single(),
+    sb.from('cc_movimientos').select('*').eq('cuenta_id',id).order('fecha')
+  ]);
+  if(!c) return;
+  c.k=ST.contratoById.get(c.contrato_id);
+  const i=ST.cuentas.findIndex(x=>x.id===id); if(i>=0) ST.cuentas[i]=c; else ST.cuentas.push(c);
+  ST.movs=ST.movs.filter(m=>m.cuenta_id!==id).concat(ms||[]);
+  ST.movsByCuenta.set(id,ms||[]);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INICIO
+   ═══════════════════════════════════════════════════════════════ */
+(async function init(){
+  try{
+    const ses = await portalVerificarSesion();
+    if(!ses) return;
+    sb = window.portalSb;
+    ST.me = ses.user;
+    const {data:proc,error} = await sb.rpc('cc_proceso');
+    if(error) throw error;
+    ST.proceso = proc;
+    if(!proc){
+      $('gate').className='center-msg';
+      $('gate').innerHTML='<h2>Sin acceso al módulo</h2><p class="muted">Su usuario del portal todavía no tiene un rol en Seguimiento de Cuentas de Cobro. Solicite al superadministrador que le asigne su proceso o el rol de lector.</p><p style="margin-top:16px"><a class="btn" href="../index.html">← Volver al portal</a></p>';
+      return;
+    }
+    const {data:yo} = await sb.from('cc_usuarios').select('*').eq('usuario_id',ST.me.id).maybeSingle();
+    ST.meCC = yo||null;
+    const nom = (yo&&yo.nombre_completo) || ST.me.nombre || ST.me.email;
+    $('uNom').textContent=nom; $('uAv').textContent=(nom||'?').charAt(0).toUpperCase();
+    $('uRol').textContent=(PROCESOS[proc]||proc)+(yo&&yo.cargo?' · '+yo.cargo:'');
+    $('userChip').style.display='flex';
+
+    await cargarDatos();
+    configurarUI();
+    $('gate').style.display='none'; $('app').style.display='block';
+    renderAll();
+    if(ST.proceso!=='lector' && !esSuper()) cambiarTab('bandeja');
+    if(typeof portalLog==='function') portalLog('cuentas_cobro','ingreso',{proceso:proc});
+  }catch(e){
+    console.error(e);
+    $('gate').className='center-msg';
+    $('gate').innerHTML='<h2>No se pudo cargar</h2><p class="muted">'+esc(e.message||e)+'</p>';
+  }
+})();
+
+function configurarUI(){
+  $('tabbar').addEventListener('click',e=>{ const b=e.target.closest('.tab'); if(b) cambiarTab(b.dataset.tab); });
+  if(ST.proceso==='lector') $('tabBandeja').style.display='none';
+  if(!puedeGestionar()){ $('tabCargue').style.display='none'; $('btnNuevoContrato').style.display='none'; }
+  if(!esSuper()) $('tabAdmin').style.display='none';
+  if(esSuper()) $('btnExport').style.display='';
+  $('bFecha').value=todayISO();
+  if(esSuper()){
+    $('fldVerComo').style.display='';
+    $('bVerComo').innerHTML=['salud_publica','contratacion','subgerencia','tesoreria'].map(p=>`<option value="${p}">${PROCESOS[p]}</option>`).join('')+'<option value="todas">Todas las cuentas en trámite</option>';
+    $('bVerComo').value='todas';
+  }
+  poblarFiltros();
+}
+function poblarFiltros(){
+  const keep=id=>$(id).value;
+  const opts=(id,arr,todos)=>{ const v=keep(id); $(id).innerHTML=`<option value="">${todos}</option>`+arr.map(([val,lbl])=>`<option value="${esc(val)}">${esc(lbl)}</option>`).join(''); if([...$(id).options].some(o=>o.value===v)) $(id).value=v; };
+  const progs=[...new Set([...ST.config.programas, ...ST.contratos.map(k=>k.programa)])].filter(Boolean);
+  opts('fPrograma',progs.map(p=>[p,p]),'Todos');
+  opts('fResolucion',[...new Set(ST.contratos.map(k=>k.resolucion).filter(Boolean))].sort().map(r=>[r,r]),'Todas');
+  opts('fMunicipio',[...new Set(ST.contratos.map(k=>k.municipio).filter(Boolean))].sort().map(m=>[m,munDisp(m)]),'Todos');
+  opts('fEtapa',ETAPAS.map(e=>[e,ETAPA_LBL[e]]).concat([['_devueltas','Devueltas al contratista'],['_vencidas','Vencidas (semáforo rojo)']]),'Todos');
+  opts('fMes',[...new Set(ST.cuentas.map(c=>(c.periodo_ini||'').slice(0,7)).filter(Boolean))].sort().map(m=>[m,mesLbl(m)]),'Todos');
+  opts('fPago',[...new Set(ST.cuentas.map(c=>c.num_pago))].sort((a,b)=>a-b).map(n=>[n,'Pago '+n]),'Todos');
+  const sel=$('cgPrograma'); const v=sel.value; sel.innerHTML='<option value="">— Seleccione —</option>'+progs.map(p=>`<option>${esc(p)}</option>`).join(''); sel.value=v;
+}
+function limpiarFiltros(){ ['fPrograma','fResolucion','fMunicipio','fEtapa','fMes','fPago','fQ'].forEach(id=>$(id).value=''); renderAll(); }
+let _deb; function debRender(){ clearTimeout(_deb); _deb=setTimeout(renderAll,220); }
+function cambiarTab(t){
+  ST.tab=t;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='p-'+t));
+  renderTab();
+}
+
+/* ── Filtros ── */
+function filtrarContrato(k){
+  const P=$('fPrograma').value, R=$('fResolucion').value, M=$('fMunicipio').value;
+  if(P && k.programa!==P) return false;
+  if(R && k.resolucion!==R) return false;
+  if(M && k.municipio!==M) return false;
+  return true;
+}
+function cuentasFiltradas(opt){
+  opt=opt||{};
+  const E=opt.sinEtapa?'':$('fEtapa').value, MES=$('fMes').value, PG=$('fPago').value;
+  const q=$('fQ').value.trim().toUpperCase();
+  return ST.cuentas.filter(c=>{
+    const k=c.k; if(!k || !k.activo) return false;
+    if(!filtrarContrato(k)) return false;
+    if(MES && (c.periodo_ini||'').slice(0,7)!==MES) return false;
+    if(PG && String(c.num_pago)!==PG) return false;
+    if(E==='_devueltas'){ if(!(c.etapa==='contratista'&&c.devuelta_desde)) return false; }
+    else if(E==='_vencidas'){ if(semaforo(c).nivel!=='alert') return false; }
+    else if(E && c.etapa!==E) return false;
+    if(q){ const hay=[k.cedula,k.nombre,k.numero_contrato,c.radicado,c.factura,c.nd,k.rol].join(' ').toUpperCase(); if(!hay.includes(q)) return false; }
+    return true;
+  });
+}
+
+function renderAll(){ renderTab(); actualizarContadorBandeja(); }
+function renderTab(){
+  ({dash:renderDashboard, bandeja:renderBandeja, cuentas:renderCuentas, contratos:renderContratos, cargue:renderCargue, admin:renderAdmin})[ST.tab]();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DASHBOARD
+   ═══════════════════════════════════════════════════════════════ */
+const C_PAG='#0f4c81', C_PEN='#9dbbd9', C_MID='#4f86bd';
+function estanciasCerradas(cuentas){
+  // devuelve {etapa:[dias,...]} con las permanencias ya terminadas
+  const ids=new Set(cuentas.map(c=>c.id)); const out={};
+  ids.forEach(id=>{
+    const ms=(ST.movsByCuenta.get(id)||[]).filter(m=>m.etapa_origen!==m.etapa_destino);
+    for(let i=0;i<ms.length;i++){
+      const ent=ms[i]; const sal=ms.slice(i+1).find(m=>m.etapa_origen===ent.etapa_destino);
+      if(!sal || ent.etapa_destino==='pagada') continue;
+      const d=diasEntre(new Date(ent.fecha),new Date(sal.fecha));
+      (out[ent.etapa_destino]=out[ent.etapa_destino]||[]).push(Math.max(0,d));
+    }
+  });
+  return out;
+}
+function mkChart(id,cfg){
+  if(ST.charts[id]) ST.charts[id].destroy();
+  cfg.options=Object.assign({responsive:true,maintainAspectRatio:false,animation:false,
+    plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},tooltip:{mode:'index',intersect:false}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'rgba(15,76,129,.08)'},ticks:{font:{size:11}},beginAtZero:true}}
+  },cfg.options||{});
+  ST.charts[id]=new Chart($(id),cfg);
+}
+function renderDashboard(){
+  const cs=cuentasFiltradas({sinEtapa:true});
+  const tot=cs.length, pag=cs.filter(c=>c.etapa==='pagada');
+  const vTot=cs.reduce((s,c)=>s+(+c.valor||0),0);
+  const vPag=pag.reduce((s,c)=>s+(+(c.tes_valor??c.valor)||0),0);
+  const tramite=cs.filter(c=>!['contratista','pagada'].includes(c.etapa));
+  const dev=cs.filter(c=>c.etapa==='contratista'&&c.devuelta_desde);
+  const venc=cs.filter(c=>semaforo(c).nivel==='alert');
+  const contratos=new Set(cs.map(c=>c.contrato_id)).size;
+  $('dashKpis').innerHTML=[
+    [tot,'Cuentas',contratos+' contratos'],
+    [tramite.length,'En trámite','entre Salud Pública y Tesorería'],
+    [pag.length,'Pagadas',tot?Math.round(pag.length*100/tot)+'% del total':''],
+    [moneyCorto(vPag),'Valor pagado',vTot?Math.round(vPag*100/vTot)+'% de '+moneyCorto(vTot):''],
+    [moneyCorto(vTot-vPag),'Valor pendiente',''],
+    [dev.length,'Devueltas al contratista',''],
+    [venc.length,'Vencidas','superan el plazo del proceso']
+  ].map(([n,l,d])=>`<div class="kpi"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div>${d?`<div class="d">${esc(d)}</div>`:''}</div>`).join('');
+
+  $('dashFlow').innerHTML=ETAPAS.map(e=>{
+    const en=cs.filter(c=>c.etapa===e); const s={ok:0,warn:0,alert:0};
+    en.forEach(c=>{const n=semaforo(c).nivel; if(s[n]!=null) s[n]++;});
+    const semHtml = e==='pagada' ? '' : `<div class="s"><span class="tag ok" title="a tiempo">${s.ok}</span><span class="tag warn" title="en el límite">${s.warn}</span><span class="tag alert" title="vencidas">${s.alert}</span></div>`;
+    return `<div class="st" onclick="irEtapa('${e}')"><div class="l">${ETAPA_LBL[e]}</div><div class="n">${en.length}</div><div class="small muted">${ETAPA_DET[e]}</div>${semHtml}</div>`;
+  }).join('<div style="align-self:center;color:var(--text2)">›</div>');
+
+  const agrupar=(fn)=>{ const m=new Map(); cs.forEach(c=>{ const g=fn(c)||'Sin dato'; if(!m.has(g)) m.set(g,{pag:0,pen:0}); const o=m.get(g); if(c.etapa==='pagada') o.pag+=+(c.tes_valor??c.valor)||0; else o.pen+=+c.valor||0; }); return m; };
+  const barPP=(id,m,lblFn)=>{ const ks=[...m.keys()]; mkChart(id,{type:'bar',data:{labels:ks.map(lblFn||(x=>x)),datasets:[
+      {label:'Pagado',data:ks.map(k=>m.get(k).pag),backgroundColor:C_PAG,borderRadius:4,borderSkipped:false},
+      {label:'Pendiente',data:ks.map(k=>m.get(k).pen),backgroundColor:C_PEN,borderRadius:4,borderSkipped:false}]},
+    options:{indexAxis:'y',scales:{x:{stacked:true,grid:{color:'rgba(15,76,129,.08)'},ticks:{callback:v=>moneyCorto(v),font:{size:10}}},y:{stacked:true,grid:{display:false}}},
+      plugins:{tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>ctx.dataset.label+': '+money(ctx.raw)}},legend:{position:'bottom',labels:{boxWidth:12}}}}}); };
+  barPP('chProg',agrupar(c=>c.k.programa));
+  barPP('chMun',agrupar(c=>c.k.municipio),munDisp);
+
+  const est=estanciasCerradas(cs); const procE=ETAPAS.filter(e=>e!=='pagada');
+  const prom=procE.map(e=>{ const a=est[e]||[]; return a.length? +(a.reduce((s,x)=>s+x,0)/a.length).toFixed(1) : 0; });
+  mkChart('chTiempo',{type:'bar',data:{labels:procE.map(e=>ETAPA_LBL[e]),datasets:[{label:'Días promedio',data:prom,backgroundColor:procE.map((e,i)=>{const u=ST.config.umbrales[e]; return u!=null&&prom[i]>u?'#b91c1c':C_MID;}),borderRadius:4}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const e=procE[ctx.dataIndex]; const n=(est[e]||[]).length; return ctx.raw+' días en promedio · '+n+' permanencias · plazo '+(ST.config.umbrales[e]??'—')+' d';}}}}}});
+
+  const nums=[...new Set(cs.map(c=>c.num_pago))].sort((a,b)=>a-b);
+  const cnt=(n,f)=>cs.filter(c=>c.num_pago===n&&f(c)).length;
+  mkChart('chPago',{type:'bar',data:{labels:nums.map(n=>'Pago '+n),datasets:[
+    {label:'Pagadas',data:nums.map(n=>cnt(n,c=>c.etapa==='pagada')),backgroundColor:C_PAG,borderRadius:4},
+    {label:'En trámite',data:nums.map(n=>cnt(n,c=>!['contratista','pagada'].includes(c.etapa))),backgroundColor:C_MID,borderRadius:4},
+    {label:'En el contratista',data:nums.map(n=>cnt(n,c=>c.etapa==='contratista')),backgroundColor:C_PEN,borderRadius:4}]},
+    options:{scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}}});
+
+  const ids=new Set(cs.map(c=>c.id));
+  const devs=ST.movs.filter(m=>m.accion==='devolver'&&ids.has(m.cuenta_id));
+  const porE=procE.filter(e=>e!=='contratista').map(e=>devs.filter(m=>m.etapa_origen===e).length);
+  mkChart('chDev',{type:'bar',data:{labels:procE.filter(e=>e!=='contratista').map(e=>ETAPA_LBL[e]),datasets:[{label:'Devoluciones',data:porE,backgroundColor:C_MID,borderRadius:4}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}},x:{grid:{display:false}}}}});
+
+  const ult=devs.slice().sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).slice(0,25);
+  const cById=new Map(cs.map(c=>[c.id,c]));
+  $('dashMotivos').innerHTML= ult.length? '<ul class="timeline">'+ult.map(m=>{const c=cById.get(m.cuenta_id); return `<li class="dev"><b>${esc(ETAPA_LBL[m.etapa_origen])}</b> → ${esc(ETAPA_LBL[m.etapa_destino])} · <span class="muted">${fechaHora(m.fecha)}</span><br>${esc(m.motivo)}<br><a href="#" onclick="abrirCuenta('${m.cuenta_id}');return false" class="small">${esc(c?c.k.numero_contrato+' · pago '+c.num_pago+' · '+nombreCorto(c.k.nombre):'')}</a></li>`;}).join('')+'</ul>' : '<div class="muted small">Sin devoluciones registradas.</div>';
+
+  $('dashTabla').innerHTML='<table><thead><tr><th>Proceso</th><th class="right">Cuentas</th><th class="right">Valor</th><th class="right">A tiempo</th><th class="right">En el límite</th><th class="right">Vencidas</th><th class="right">Días prom.</th><th class="right">Plazo</th><th class="right">Devoluciones hechas</th></tr></thead><tbody>'+
+    ETAPAS.map((e,i)=>{ const en=cs.filter(c=>c.etapa===e); const s={ok:0,warn:0,alert:0}; en.forEach(c=>{const n=semaforo(c).nivel; if(s[n]!=null)s[n]++;});
+      const pi=procE.indexOf(e);
+      return `<tr class="clk" onclick="irEtapa('${e}')"><td><b>${ETAPA_LBL[e]}</b></td><td class="right mono">${en.length}</td><td class="right mono">${money(en.reduce((a,c)=>a+(+c.valor||0),0))}</td><td class="right mono">${e==='pagada'?'—':s.ok}</td><td class="right mono">${e==='pagada'?'—':s.warn}</td><td class="right mono">${e==='pagada'?'—':s.alert}</td><td class="right mono">${pi>=0&&(est[e]||[]).length?prom[pi]:'—'}</td><td class="right mono">${ST.config.umbrales[e]??'—'}</td><td class="right mono">${devs.filter(m=>m.etapa_origen===e).length||'—'}</td></tr>`;}).join('')+'</tbody></table>';
+}
+function irEtapa(e){ $('fEtapa').value=e; cambiarTab('cuentas'); }
+
+/* ═══════════════════════════════════════════════════════════════
+   BANDEJA "MIS PENDIENTES"
+   ═══════════════════════════════════════════════════════════════ */
+function bandejaCuentas(){
+  const quien = esSuper()? $('bVerComo').value : ST.proceso;
+  const futuras=$('bFuturas').checked; const hoy=new Date();
+  return cuentasFiltradas().filter(c=>{
+    if(c.etapa==='pagada') return false;
+    if(quien!=='todas' && dueno(c)!==quien) return false;
+    if(c.etapa==='contratista' && !c.devuelta_desde && !futuras){ const f=parseISO(c.periodo_fin); if(f && f>=hoy) return false; }
+    return true;
+  }).sort((a,b)=>{ const o={alert:0,warn:1,ok:2,none:3}; return (o[semaforo(a).nivel]-o[semaforo(b).nivel]) || ((semaforo(b).dias||0)-(semaforo(a).dias||0)); });
+}
+function actualizarContadorBandeja(){
+  if(ST.proceso==='lector') return;
+  const quien=esSuper()?'todas':ST.proceso; const hoy=new Date();
+  const n=ST.cuentas.filter(c=>{
+    if(!c.k||!c.k.activo||c.etapa==='pagada') return false;
+    if(quien!=='todas' && dueno(c)!==quien) return false;
+    if(c.etapa==='contratista' && !c.devuelta_desde){ const f=parseISO(c.periodo_fin); if(f && f>=hoy) return false; }
+    return true;
+  }).length;
+  $('cntBandeja').textContent=n; $('cntBandeja').style.display=n?'':'none';
+}
+function renderBandeja(){
+  const quien = esSuper()? $('bVerComo').value : ST.proceso;
+  const cs=bandejaCuentas();
+  const txt={
+    salud_publica:'Aquí están las cuentas que debe recibir del contratista (periodo terminado o devueltas por Salud Pública) y las que esperan su primer filtro.',
+    contratacion:'Cuentas que esperan el segundo filtro de Contratación y las que usted devolvió al contratista.',
+    subgerencia:'Cuentas en tercer filtro (asigne radicado y factura electrónica antes de aprobar), en cargue a SECOP II y en supervisión.',
+    tesoreria:'Cuentas listas para pago. Registre el valor pagado, la fecha y el número ND (certificado de egreso).',
+    todas:'Todas las cuentas que no se han pagado, ordenadas por urgencia.'
+  }[quien]||'';
+  $('bandejaInfo').innerHTML=`<b>${esc(PROCESOS[quien]||'Todas')}</b> · ${cs.length} cuenta(s). ${esc(txt)} Haga clic en una fila para ver el detalle y actuar; use las casillas para acciones en lote.`;
+  $('bandejaTabla').innerHTML = cs.length ? tablaCuentas(cs,{check:true}) : '<div class="loading">🎉 No tiene cuentas pendientes con los filtros actuales.</div>';
+}
+function selTodo(v){ document.querySelectorAll('#bandejaTabla .ck').forEach(x=>x.checked=v); }
+async function accionLote(accion){
+  const ids=[...document.querySelectorAll('#bandejaTabla .ck:checked')].map(x=>x.value);
+  if(!ids.length){ toast('Seleccione al menos una cuenta','err'); return; }
+  const txt=accion==='recibir'?'registrar la recepción de':'aprobar y enviar al siguiente proceso';
+  if(!confirm(`¿Desea ${txt} ${ids.length} cuenta(s)?`)) return;
+  const {data,error}=await sb.rpc('cc_mover_lote',{p_cuentas:ids,p_accion:accion,p_destino:null,p_fecha:fechaMovimiento($('bFecha').value),p_motivo:null});
+  if(error){ toast(error.message,'err'); return; }
+  for(const id of ids) await recargarCuenta(id);
+  const errs=data.errores||[];
+  toast(`${data.ok} cuenta(s) actualizadas`+(errs.length?` · ${errs.length} con error`:''), errs.length?'err':'ok');
+  if(errs.length){ const byId=new Map(ST.cuentas.map(c=>[c.id,c])); alert('No se movieron:\n\n'+errs.slice(0,15).map(e=>{const c=byId.get(e.id); return '• '+(c?c.k.numero_contrato+' pago '+c.num_pago:'')+': '+e.error;}).join('\n')); }
+  renderAll();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABLA DE CUENTAS
+   ═══════════════════════════════════════════════════════════════ */
+function tablaCuentas(cs,opt){
+  opt=opt||{};
+  const filas=cs.map(c=>{
+    const k=c.k; const cert=k.programa==='EBS'?certDe(c):null;
+    return `<tr class="clk" onclick="if(event.target.type!=='checkbox')abrirCuenta('${c.id}')">
+      ${opt.check?`<td><input type="checkbox" class="ck" value="${c.id}" ${puedeActuar(c)?'':'disabled'}></td>`:''}
+      <td class="mono"><b>${esc(k.numero_contrato)}</b><div class="small muted">${esc(k.programa)}</div></td>
+      <td>${esc(k.nombre)}<div class="small muted">C.C. ${esc(k.cedula)} · ${esc(k.rol||'')} ${k.municipio?'· '+esc(munDisp(k.municipio)):''}</div></td>
+      <td class="mono">${c.num_pago}<div class="small muted">${fechaCorta(c.periodo_ini)} – ${fechaCorta(c.periodo_fin)}</div></td>
+      <td class="mono right">${money(c.valor)}</td>
+      <td>${etapaTag(c)}${c.devoluciones?`<div class="small" style="color:var(--red);margin-top:3px">↩ ${c.devoluciones} devol.</div>`:''}</td>
+      <td>${semTag(c)}</td>
+      <td class="mono small">${esc(c.radicado||'—')}<div class="muted">${esc(c.factura||'')}</div></td>
+      <td class="small">${c.etapa==='pagada'?`<b>${money(c.tes_valor)}</b><div class="muted">ND ${esc(c.nd||'')} · ${fechaCorta(c.tes_fecha)}</div>`:'—'}</td>
+      ${opt.check?'':`<td class="small">${k.programa==='EBS'?(cert?`<span class="tag ok" title="Certificado ${esc(cert.radicado)}">✔ ${esc(cert.radicado)}</span>`:'<span class="tag none">Sin emitir</span>'):'<span class="muted">—</span>'}</td>`}
+    </tr>`;
+  }).join('');
+  return `<table><thead><tr>${opt.check?'<th></th>':''}<th>Contrato</th><th>Contratista</th><th>Pago / periodo</th><th class="right">Valor</th><th>Proceso actual</th><th>Semáforo</th><th>Radicado / factura</th><th>Pago</th>${opt.check?'':'<th>Cert. cumplimiento</th>'}</tr></thead><tbody>${filas}</tbody></table>`;
+}
+function renderCuentas(){
+  const cs=cuentasFiltradas().sort((a,b)=>String(a.k.numero_contrato).localeCompare(String(b.k.numero_contrato))||a.num_pago-b.num_pago);
+  $('cuentasCount').textContent=cs.length+' cuenta(s) · '+money(cs.reduce((s,c)=>s+(+c.valor||0),0));
+  const lim=600; const mostrar=cs.slice(0,lim);
+  $('cuentasTabla').innerHTML= cs.length? tablaCuentas(mostrar)+(cs.length>lim?`<div class="small muted" style="padding:8px">Mostrando ${lim} de ${cs.length}. Use los filtros para acotar.</div>`:'') : '<div class="loading">No hay cuentas con los filtros actuales.</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DETALLE DE CUENTA + ACCIONES
+   ═══════════════════════════════════════════════════════════════ */
+function abrirModal(id){ $(id).classList.add('open'); }
+function cerrarModal(id){ $(id).classList.remove('open'); }
+function stepper(c){
+  const est=e=>{ if(e==='contratista') return c.etapa==='contratista'?(c.devuelta_desde?'Devuelta':'Por entregar'):'Entregada';
+    if(e==='pagada') return c.etapa==='pagada'?'Sí':'No';
+    const p=PREF[e]; return c[p+'_estado']; };
+  const fec=e=>{ const p=PREF[e]; if(!p) return ''; return c[p+'_fecha']?fechaCorta(c[p+'_fecha']):''; };
+  return '<div class="stepper">'+ETAPAS.map(e=>{
+    const s=est(e); const cls = c.etapa===e?'cur': (s==='Aprobado'||s==='Pagado'||s==='Entregada'||(e==='pagada'&&s==='Sí'))?'done': s==='Devuelto'||s==='Devuelta'?'dev':'';
+    return `<div class="step ${cls}"><div class="t">${ETAPA_LBL[e]}</div><div class="v">${esc(s||'')}</div><div class="small muted">${fec(e)}</div></div>`;
+  }).join('')+'</div>';
+}
+function abrirCuenta(id){
+  const c=ST.cuentas.find(x=>x.id===id); if(!c) return;
+  const k=c.k;
+  $('mcTitulo').textContent=`Contrato ${k.numero_contrato} · Pago ${c.num_pago}`;
+  $('mcSub').textContent=`${k.nombre} · C.C. ${k.cedula} · ${k.programa}${k.resolucion?' · Res. '+k.resolucion:''}${k.municipio?' · '+munDisp(k.municipio):''}`;
+  const cert=k.programa==='EBS'?certDe(c):null;
+  const ms=(ST.movsByCuenta.get(c.id)||[]).slice().reverse();
+  let h='';
+  h+=`<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+    <div class="kpi"><div class="n" style="font-size:17px">${money(c.valor)}</div><div class="l">Valor de la cuenta</div><div class="d">de ${money(k.valor_total)}</div></div>
+    <div class="kpi"><div class="n" style="font-size:15px">${fechaCorta(c.periodo_ini)} – ${fechaCorta(c.periodo_fin)}</div><div class="l">Periodo</div></div>
+    <div class="kpi"><div class="n" style="font-size:15px">${etapaTag(c)}</div><div class="l">Proceso actual</div><div class="d">desde ${fechaHora(c.etapa_desde)}</div></div>
+    <div class="kpi"><div class="n" style="font-size:15px">${semTag(c)}</div><div class="l">Semáforo</div><div class="d">Plazo ${ST.config.umbrales[c.etapa]??'—'} d</div></div>
+    ${k.programa==='EBS'?`<div class="kpi"><div class="n" style="font-size:14px">${cert?'✔ '+esc(cert.radicado):'Sin emitir'}</div><div class="l">Certificado de cumplimiento</div></div>`:''}
+  </div>`;
+  if(c.etapa==='contratista' && c.devuelta_desde) h+=`<div class="alertbox"><b>Devuelta al contratista por ${esc(ETAPA_LBL[c.devuelta_desde])}.</b> Motivo: ${esc(c.motivo_ult_dev||'—')}<br>Cuando el contratista la corrija, ${esc(PROCESOS[dueno(c)])} registra la recepción y la cuenta vuelve a ${esc(ETAPA_LBL[c.devuelta_desde])}.</div>`;
+  h+=stepper(c);
+  h+=`<div class="frm small" style="margin-bottom:12px">
+    <div><span class="muted">Radicado:</span> <b>${esc(c.radicado||'—')}</b></div>
+    <div><span class="muted">Factura electrónica:</span> <b>${esc(c.factura||'—')}</b></div>
+    <div><span class="muted">Estado SECOP II:</span> <b>${esc(c.secop_estado)}</b> ${c.secop_fecha?'· '+fechaCorta(c.secop_fecha):''}</div>
+    <div><span class="muted">Supervisión:</span> <b>${esc(c.sup_estado)}</b> ${c.sup_fecha?'· '+fechaCorta(c.sup_fecha):''}</div>
+    <div><span class="muted">Tesorería:</span> <b>${esc(c.tes_estado)}</b> ${c.tes_valor!=null?'· '+money(c.tes_valor):''} ${c.tes_fecha?'· '+fechaCorta(c.tes_fecha):''}</div>
+    <div><span class="muted">Número ND:</span> <b>${esc(c.nd||'—')}</b></div>
+    ${c.observaciones?`<div class="full"><span class="muted">Observaciones:</span> ${esc(c.observaciones)}</div>`:''}
+  </div>`;
+  h+=panelAcciones(c);
+  h+=`<h3 style="font-size:14px;color:var(--text3);margin:16px 0 8px">Historial</h3>`;
+  h+= ms.length? '<ul class="timeline">'+ms.map(m=>{
+    const cls=m.accion==='devolver'?'dev':m.accion==='pagar'?'pay':'';
+    const acc={recibir:'Recepción',aprobar:'Aprobada',devolver:'Devuelta',pagar:'Pagada',datos:'Datos actualizados',mover_admin:'Movida por superadministrador',editar:'Plan de pagos editado'}[m.accion]||m.accion;
+    const ruta=m.etapa_origen!==m.etapa_destino?` · ${esc(ETAPA_LBL[m.etapa_origen]||m.etapa_origen||'')} → ${esc(ETAPA_LBL[m.etapa_destino]||m.etapa_destino||'')}`:'';
+    const det=m.detalle&&Object.keys(m.detalle).length?`<div class="small muted">${esc(Object.entries(m.detalle).map(([a,b])=>a+': '+b).join(' · '))}</div>`:'';
+    return `<li class="${cls}"><b>${acc}</b>${ruta}<div class="small muted">${fechaHora(m.fecha)} · ${esc(m.usuario_nombre||'')} (${esc(PROCESOS[m.usuario_proceso]||m.usuario_proceso||'')})</div>${m.motivo?`<div>${esc(m.motivo)}</div>`:''}${det}</li>`;
+  }).join('')+'</ul>' : '<div class="small muted">Sin movimientos todavía.</div>';
+  $('mcBody').innerHTML=h;
+  abrirModal('mdCuenta');
+}
+function opcionesDevolucion(c){
+  const i=ETAPAS.indexOf(c.etapa);
+  return ETAPAS.slice(0,i).map(e=>`<option value="${e}">${e==='contratista'?'Al contratista':ETAPA_LBL[e]}</option>`).join('');
+}
+function panelAcciones(c){
+  if(ST.proceso==='lector') return '';
+  if(!puedeActuar(c)){
+    return c.etapa==='pagada'?'' : `<div class="infobox">Esta cuenta está en <b>${esc(ETAPA_LBL[c.etapa])}</b>; la acción le corresponde a <b>${esc(PROCESOS[dueno(c)]||'')}</b>.</div>`;
+  }
+  const fecha=`<div class="fld"><label>Fecha del movimiento</label><input type="date" class="inp" id="acFecha" value="${todayISO()}"></div>`;
+  const dev = !['contratista','pagada'].includes(c.etapa) ? `<div class="acc"><h4>↩ Devolver</h4><div class="row">
+      <div class="fld"><label>Devolver a</label><select class="inp" id="acDest">${opcionesDevolucion(c)}</select></div>
+      <div class="fld" style="flex:1;min-width:240px"><label>Motivo (obligatorio)</label><input class="inp" id="acMotivo" placeholder="Qué debe corregirse"></div>
+      <button class="btn bad" onclick="accion('${c.id}','devolver')">Devolver</button></div></div>` : '';
+  let h='<div class="acc"><h4>Acción de '+esc(PROCESOS[dueno(c)]||'')+'</h4><div class="row">'+fecha;
+  const e=c.etapa;
+  if(e==='contratista'){
+    h+=`<button class="btn pri" onclick="accion('${c.id}','recibir')">📥 Registrar recepción de la cuenta</button></div>
+      <div class="small muted">El contratista entregó la cuenta${c.devuelta_desde?' corregida; vuelve a '+esc(ETAPA_LBL[c.devuelta_desde]):' a Salud Pública'}.</div>`;
+  }else if(e==='salud_publica'||e==='contratacion'||e==='supervision'){
+    h+=`<button class="btn ok" onclick="accion('${c.id}','aprobar')">✔ Aprobar y enviar a ${esc(ETAPA_LBL[siguiente(e)])}</button></div>`;
+  }else if(e==='subgerencia'){
+    h+=`<div class="fld"><label>No. radicado *</label><input class="inp" id="acRad" value="${esc(c.radicado||'')}"></div>
+      <div class="fld"><label>No. factura electrónica *</label><input class="inp" id="acFac" value="${esc(c.factura||'')}"></div>
+      <button class="btn" onclick="guardarDatos('${c.id}',{radicado:$('acRad').value.trim(),factura:$('acFac').value.trim()})">Guardar</button>
+      <button class="btn ok" onclick="accion('${c.id}','aprobar')">✔ Aprobar y enviar soportes para SECOP II</button></div>
+      <div class="small muted">Al aprobar, los soportes y la factura van al contratista para el cargue en SECOP II.</div>`;
+  }else if(e==='secop'){
+    h+=`<div class="fld"><label>Estado SECOP II</label><select class="inp" id="acSecop">${['Pendiente','Publicado'].map(o=>`<option ${c.secop_estado===o?'selected':''}>${o}</option>`).join('')}</select></div>
+      <button class="btn" onclick="guardarDatos('${c.id}',{secop_estado:$('acSecop').value,secop_fecha:$('acFecha').value})">Guardar estado</button>
+      <button class="btn ok" onclick="accion('${c.id}','aprobar')">✔ Aprobado en SECOP II → Supervisión</button></div>
+      <div class="small muted">Registre «Publicado» cuando el contratista informe por correo que cargó en SECOP II.</div>`;
+  }else if(e==='tesoreria'){
+    h+=`<div class="fld"><label>Valor pagado *</label><input type="number" class="inp" id="acValor" value="${c.tes_valor??c.valor}"></div>
+      <div class="fld"><label>No. ND (certificado de egreso) *</label><input class="inp" id="acNd" value="${esc(c.nd||'')}"></div>
+      <button class="btn ok" onclick="accion('${c.id}','pagar')">💰 Registrar pago</button></div>
+      <div class="small muted">La fecha del movimiento se registra como fecha de pago.</div>`;
+  }else if(e==='pagada'){
+    h+='</div><div class="small muted">Cuenta pagada.</div>';
+  }
+  h+='</div>'+dev;
+  if(puedeGestionar()) h+=`<div class="acc"><h4>Observaciones</h4><div class="row"><input class="inp" id="acObs" style="flex:1" value="${esc(c.observaciones||'')}"><button class="btn" onclick="guardarDatos('${c.id}',{observaciones:$('acObs').value})">Guardar</button></div></div>`;
+  if(esSuper()) h+=panelSuper(c);
+  return h;
+}
+function panelSuper(c){
+  const campos=[['radicado','Radicado'],['factura','Factura'],['nd','Número ND'],['tes_valor','Valor pagado'],['tes_fecha','Fecha de pago','date'],['sp_fecha','Fecha 1er filtro','date'],['ct_fecha','Fecha 2do filtro','date'],['sg_fecha','Fecha 3er filtro','date'],['sup_fecha','Fecha supervisión','date'],['secop_fecha','Fecha SECOP','date']];
+  return `<div class="acc" style="border-color:rgba(124,29,111,.3)"><h4>🛠 Superadministrador · corrección</h4>
+    <div class="row"><div class="fld"><label>Mover a</label><select class="inp" id="saDest">${ETAPAS.map(e=>`<option value="${e}" ${e===c.etapa?'selected':''}>${ETAPA_LBL[e]}</option>`).join('')}</select></div>
+    <div class="fld" style="flex:1"><label>Motivo</label><input class="inp" id="saMot" placeholder="Por qué se corrige"></div>
+    <button class="btn" onclick="accion('${c.id}','mover_admin')">Mover</button></div>
+    <div class="frm">${campos.map(([f,l,t])=>`<div class="fld"><label>${l}</label><input class="inp sa-f" data-f="${f}" type="${t||'text'}" value="${esc(c[f]??'')}"></div>`).join('')}
+    <div class="fld"><label>Estado SECOP</label><select class="inp sa-f" data-f="secop_estado">${['Pendiente','Publicado','Aprobado'].map(o=>`<option ${c.secop_estado===o?'selected':''}>${o}</option>`).join('')}</select></div>
+    <div class="fld"><label>Estado supervisión</label><select class="inp sa-f" data-f="sup_estado">${['Pendiente','Aprobado','Devuelto'].map(o=>`<option ${c.sup_estado===o?'selected':''}>${o}</option>`).join('')}</select></div>
+    <div class="fld"><label>Estado Tesorería</label><select class="inp sa-f" data-f="tes_estado">${['No pagado','Pagado','Devuelto'].map(o=>`<option ${c.tes_estado===o?'selected':''}>${o}</option>`).join('')}</select></div>
+    </div><div style="margin-top:8px"><button class="btn" onclick="guardarSuper('${c.id}')">Guardar corrección</button></div></div>`;
+}
+async function accion(id,acc){
+  const c=ST.cuentas.find(x=>x.id===id);
+  const p={p_cuenta:id,p_accion:acc,p_destino:null,p_fecha:fechaMovimiento($('acFecha')?$('acFecha').value:null),p_motivo:null,p_datos:{}};
+  if(acc==='devolver'){ p.p_destino=$('acDest').value; p.p_motivo=$('acMotivo').value.trim(); if(!p.p_motivo){ toast('Escriba el motivo de la devolución','err'); return; } if(!confirm('¿Devolver la cuenta '+(p.p_destino==='contratista'?'al contratista':'a '+ETAPA_LBL[p.p_destino])+'?')) return; }
+  if(acc==='aprobar' && c.etapa==='subgerencia'){ p.p_datos={radicado:$('acRad').value.trim(),factura:$('acFac').value.trim()}; if(!p.p_datos.radicado||!p.p_datos.factura){ toast('Registre el número de radicado y de factura electrónica','err'); return; } }
+  if(acc==='pagar'){ p.p_datos={tes_valor:$('acValor').value,nd:$('acNd').value.trim()}; if(!p.p_datos.nd||!p.p_datos.tes_valor){ toast('Registre el valor pagado y el número ND','err'); return; } }
+  if(acc==='mover_admin'){ p.p_destino=$('saDest').value; p.p_motivo=$('saMot').value.trim()||'Corrección'; p.p_fecha=null; }
+  const {error}=await sb.rpc('cc_mover',p);
+  if(error){ toast(error.message,'err'); return; }
+  await recargarCuenta(id);
+  toast({recibir:'Recepción registrada',aprobar:'Cuenta aprobada y enviada',devolver:'Cuenta devuelta',pagar:'Pago registrado',mover_admin:'Cuenta movida'}[acc],'ok');
+  abrirCuenta(id); renderAll();
+}
+async function guardarDatos(id,datos){
+  const {error}=await sb.rpc('cc_datos',{p_cuenta:id,p_datos:datos,p_motivo:null});
+  if(error){ toast(error.message,'err'); return; }
+  await recargarCuenta(id); toast('Datos guardados','ok'); abrirCuenta(id); renderAll();
+}
+function guardarSuper(id){
+  const c=ST.cuentas.find(x=>x.id===id); const d={};
+  document.querySelectorAll('.sa-f').forEach(el=>{ const f=el.dataset.f; const v=el.value; if(String(c[f]??'')!==v) d[f]=v; });
+  if(!Object.keys(d).length){ toast('No hay cambios'); return; }
+  guardarDatos(id,d);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CONTRATOS
+   ═══════════════════════════════════════════════════════════════ */
+function renderContratos(){
+  const q=$('fQ').value.trim().toUpperCase(); const inact=$('cInactivos').checked;
+  const ks=ST.contratos.filter(k=>(inact||k.activo)&&filtrarContrato(k)&&(!q||[k.cedula,k.nombre,k.numero_contrato,k.rol].join(' ').toUpperCase().includes(q)));
+  const cuentasDe=id=>ST.cuentas.filter(c=>c.contrato_id===id);
+  $('contratosCount').textContent=ks.length+' contrato(s)';
+  $('contratosTabla').innerHTML= ks.length? '<table><thead><tr><th>Contrato</th><th>Contratista</th><th>Programa</th><th>Rol / municipio</th><th class="right">Valor</th><th>Acta · días</th><th>Pagos</th><th>Avance</th></tr></thead><tbody>'+
+    ks.map(k=>{ const cs=cuentasDe(k.id); const pg=cs.filter(c=>c.etapa==='pagada').length;
+      return `<tr class="clk" onclick="abrirContrato('${k.id}')"><td class="mono"><b>${esc(k.numero_contrato)}</b>${k.activo?'':' <span class="tag none">inactivo</span>'}</td><td>${esc(k.nombre)}<div class="small muted">C.C. ${esc(k.cedula)}</div></td><td>${esc(k.programa)}<div class="small muted">${esc(k.resolucion||'')}</div></td><td class="small">${esc(k.rol||'—')}<div class="muted">${esc(munDisp(k.municipio))}</div></td><td class="mono right">${money(k.valor_total)}</td><td class="mono small">${fechaCorta(k.fecha_acta)}<div class="muted">${k.tiempo_ejec||'—'} días</div></td><td class="mono">${cs.length}</td><td>${cs.length?`<span class="tag ${pg===cs.length?'paid':'et'}">${pg}/${cs.length} pagadas</span>`:'—'}</td></tr>`;}).join('')+'</tbody></table>' : '<div class="loading">No hay contratos con los filtros actuales.</div>';
+}
+let _plan=[]; // edición del plan en el modal
+function abrirContrato(id){
+  const k=id?ST.contratos.find(x=>x.id===id):{numero_contrato:'',programa:$('fPrograma').value||'',resolucion:'',cedula:'',nombre:'',rol:'',municipio:'',objeto:'',valor_total:0,tiempo_ejec:null,fecha_acta:null,correo:'',telefono:'',activo:true,vigencia:2026};
+  const edit=puedeGestionar();
+  const cs=id?ST.cuentas.filter(c=>c.contrato_id===id).sort((a,b)=>a.num_pago-b.num_pago):[];
+  _plan=cs.map(c=>({id:c.id,num_pago:c.num_pago,periodo_ini:c.periodo_ini,periodo_fin:c.periodo_fin,valor:+c.valor,etapa:c.etapa,libre:c.etapa==='contratista'&&!c.devuelta_desde&&!(ST.movsByCuenta.get(c.id)||[]).length}));
+  if(!id) _plan=[];
+  $('mkTitulo').textContent=id?`Contrato ${k.numero_contrato}`:'Nuevo contrato';
+  const dis=edit?'':'disabled';
+  const progs=[...new Set([...ST.config.programas,k.programa].filter(Boolean))];
+  $('mkBody').innerHTML=`<div class="frm">
+    <div class="fld"><label>No. contrato *</label><input class="inp" id="kNum" value="${esc(k.numero_contrato)}" ${dis}></div>
+    <div class="fld"><label>Programa *</label><select class="inp" id="kProg" ${dis}><option value="">—</option>${progs.map(p=>`<option ${p===k.programa?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
+    <div class="fld"><label>Resolución</label><input class="inp" id="kRes" value="${esc(k.resolucion||'')}" ${dis}></div>
+    <div class="fld"><label>Cédula *</label><input class="inp" id="kCed" value="${esc(k.cedula)}" ${dis}></div>
+    <div class="fld" style="grid-column:span 2"><label>Nombre completo *</label><input class="inp" id="kNom" value="${esc(k.nombre)}" ${dis}></div>
+    <div class="fld"><label>Rol / perfil</label><input class="inp" id="kRol" value="${esc(k.rol||'')}" ${dis}></div>
+    <div class="fld"><label>Municipio</label><input class="inp" id="kMun" list="dlMun" value="${esc(k.municipio||'')}" ${dis}><datalist id="dlMun">${Object.keys(MUN_DISPLAY).map(m=>`<option value="${m}">`).join('')}</datalist></div>
+    <div class="fld"><label>Valor total *</label><input type="number" class="inp" id="kVal" value="${k.valor_total||''}" ${dis}></div>
+    <div class="fld"><label>Tiempo de ejecución (días)</label><input type="number" class="inp" id="kDur" value="${k.tiempo_ejec||''}" ${dis}></div>
+    <div class="fld"><label>Fecha acta de inicio</label><input type="date" class="inp" id="kActa" value="${k.fecha_acta||''}" ${dis}></div>
+    <div class="fld"><label>Correo</label><input class="inp" id="kCorreo" value="${esc(k.correo||'')}" ${dis}></div>
+    <div class="fld"><label>Teléfono</label><input class="inp" id="kTel" value="${esc(k.telefono||'')}" ${dis}></div>
+    <div class="fld"><label>Estado</label><select class="inp" id="kAct" ${dis}><option value="1" ${k.activo?'selected':''}>Activo</option><option value="0" ${k.activo?'':'selected'}>Inactivo</option></select></div>
+    <div class="fld full"><label>Objeto</label><textarea class="inp" id="kObj" rows="2" ${dis}>${esc(k.objeto||'')}</textarea></div>
+  </div>
+  <h3 style="font-size:14px;color:var(--text3);margin:16px 0 6px">Plan de pagos</h3>
+  <div class="sub small muted" style="margin-bottom:8px">Se calcula un pago por mes calendario desde el acta de inicio, con el valor dividido en partes iguales. Puede ajustar fechas y valores de cada pago. Solo se pueden quitar pagos que el contratista aún no haya entregado.</div>
+  ${edit?`<div class="row" style="display:flex;gap:8px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap">
+    <div class="fld"><label>Número de pagos</label><input type="number" min="1" max="24" class="inp" id="kNPag" style="width:90px" placeholder="auto"></div>
+    <button class="btn" onclick="recalcularPlan()">↻ Recalcular automático</button>
+    <button class="btn" onclick="_plan.push({num_pago:(_plan.reduce((m,p)=>Math.max(m,p.num_pago),0)+1),periodo_ini:null,periodo_fin:null,valor:0,libre:true,etapa:'contratista'});pintarPlan()">＋ Agregar pago</button></div>`:''}
+  <div id="kPlan"></div>`;
+  pintarPlan();
+  $('mkFoot').innerHTML=(edit?`${id&&esSuper()?`<button class="btn bad" style="margin-right:auto" onclick="eliminarContrato('${id}')">Eliminar contrato</button>`:''}<button class="btn" onclick="cerrarModal('mdContrato')">Cancelar</button><button class="btn pri" onclick="guardarContrato(${id?`'${id}'`:'null'})">Guardar</button>`:'<button class="btn" onclick="cerrarModal(\'mdContrato\')">Cerrar</button>');
+  $('mkFoot').dataset.id=id||'';
+  if(!id && edit) recalcularPlan();
+  abrirModal('mdContrato');
+}
+function recalcularPlan(){
+  const n=+$('kNPag').value||null;
+  const nuevo=planAuto($('kActa').value,+$('kDur').value,+$('kVal').value,n);
+  const bloqueadas=_plan.filter(p=>!p.libre);
+  // conserva las cuentas que ya están en trámite; recalcula las demás
+  const res=nuevo.map(p=>{ const b=bloqueadas.find(x=>x.num_pago===p.num_pago); if(b) return b; const ex=_plan.find(x=>x.num_pago===p.num_pago); return Object.assign({id:ex?ex.id:undefined,libre:true,etapa:'contratista'},p); });
+  bloqueadas.forEach(b=>{ if(!res.some(r=>r.num_pago===b.num_pago)) res.push(b); });
+  _plan=res.sort((a,b)=>a.num_pago-b.num_pago);
+  pintarPlan();
+}
+function pintarPlan(){
+  const edit=puedeGestionar(); const total=+($('kVal')?$('kVal').value:0)||0;
+  const suma=_plan.reduce((s,p)=>s+(+p.valor||0),0);
+  $('kPlan').innerHTML= _plan.length? `<div class="tbl-wrap"><table><thead><tr><th>Pago</th><th>Inicio</th><th>Fin</th><th class="right">Valor</th><th>Estado</th><th></th></tr></thead><tbody>${_plan.map((p,i)=>`<tr>
+    <td class="mono">${p.num_pago}</td>
+    <td><input type="date" class="inp" value="${p.periodo_ini||''}" ${edit?'':'disabled'} onchange="_plan[${i}].periodo_ini=this.value"></td>
+    <td><input type="date" class="inp" value="${p.periodo_fin||''}" ${edit?'':'disabled'} onchange="_plan[${i}].periodo_fin=this.value"></td>
+    <td><input type="number" class="inp right" style="width:140px" value="${p.valor}" ${edit?'':'disabled'} onchange="_plan[${i}].valor=+this.value;pintarPlan()"></td>
+    <td class="small">${p.libre?'<span class="tag none">Sin entregar</span>':`<span class="tag et">${esc(ETAPA_LBL[p.etapa]||'')}</span>`}</td>
+    <td>${edit&&p.libre?`<button class="btn sm bad" onclick="_plan.splice(${i},1);pintarPlan()">Quitar</button>`:''}</td></tr>`).join('')}
+    <tr><td colspan="3" class="right"><b>Suma</b></td><td class="mono right"><b>${money(suma)}</b></td><td colspan="2" class="small" style="color:${Math.round(suma)===Math.round(total)?'var(--green)':'var(--red)'}">${Math.round(suma)===Math.round(total)?'✔ Coincide con el valor del contrato':'⚠ Diferencia de '+money(total-suma)}</td></tr>
+    </tbody></table></div>` : '<div class="small muted">Sin pagos. Complete el acta de inicio, la duración y el valor, y pulse «Recalcular automático».</div>';
+}
+async function guardarContrato(id){
+  const rec={
+    numero_contrato:$('kNum').value.trim(), programa:$('kProg').value, resolucion:$('kRes').value.trim()||null,
+    cedula:$('kCed').value.replace(/\D/g,''), nombre:$('kNom').value.trim().toUpperCase(), rol:$('kRol').value.trim().toUpperCase()||null,
+    municipio:$('kMun').value.trim().toUpperCase()||null, valor_total:+$('kVal').value||0, tiempo_ejec:+$('kDur').value||null,
+    fecha_acta:$('kActa').value||null, correo:$('kCorreo').value.trim()||null, telefono:$('kTel').value.trim()||null,
+    activo:$('kAct').value==='1', objeto:$('kObj').value.trim()||null, actualizado_en:new Date().toISOString()
+  };
+  if(!rec.numero_contrato||!rec.programa||!rec.cedula||!rec.nombre){ toast('Complete número de contrato, programa, cédula y nombre','err'); return; }
+  const nums=_plan.map(p=>p.num_pago); if(new Set(nums).size!==nums.length){ toast('Hay números de pago repetidos','err'); return; }
+  let kid=id;
+  if(id){ const {error}=await sb.from('cc_contratos').update(rec).eq('id',id); if(error){ toast(error.message,'err'); return; } }
+  else { rec.origen='manual'; const {data,error}=await sb.from('cc_contratos').insert(rec).select().single(); if(error){ toast(error.message.includes('duplicate')?'Ya existe un contrato con ese número':error.message,'err'); return; } kid=data.id; }
+  // plan de pagos
+  const actuales=ST.cuentas.filter(c=>c.contrato_id===kid);
+  const borrar=actuales.filter(c=>!_plan.some(p=>p.id===c.id));
+  for(const c of borrar){ const {error}=await sb.from('cc_cuentas').delete().eq('id',c.id); if(error){ toast('No se pudo quitar el pago '+c.num_pago+': '+error.message,'err'); } }
+  const cambios=[];
+  for(const p of _plan){
+    const row={periodo_ini:p.periodo_ini||null,periodo_fin:p.periodo_fin||null,valor:+p.valor||0,num_pago:p.num_pago};
+    if(p.id){ const a=actuales.find(c=>c.id===p.id); if(a && (a.periodo_ini!==row.periodo_ini||a.periodo_fin!==row.periodo_fin||+a.valor!==row.valor||a.num_pago!==row.num_pago)){
+        const {error}=await sb.from('cc_cuentas').update(row).eq('id',p.id); if(error){ toast(error.message,'err'); continue; }
+        cambios.push({cuenta_id:p.id,accion:'editar',etapa_origen:a.etapa,etapa_destino:a.etapa,detalle:{periodo:row.periodo_ini+' a '+row.periodo_fin,valor:row.valor},usuario_nombre:$('uNom').textContent,usuario_proceso:ST.proceso}); } }
+    else { const {error}=await sb.from('cc_cuentas').insert(Object.assign({contrato_id:kid},row)); if(error) toast(error.message,'err'); }
+  }
+  if(cambios.length) await sb.from('cc_movimientos').insert(cambios);
+  await cargarDatos(); poblarFiltros(); renderAll();
+  cerrarModal('mdContrato'); toast('Contrato guardado','ok');
+}
+async function eliminarContrato(id){
+  const k=ST.contratos.find(x=>x.id===id);
+  if(!confirm(`¿Eliminar el contrato ${k.numero_contrato} con todas sus cuentas e historial? Esta acción no se puede deshacer.`)) return;
+  const {error}=await sb.from('cc_contratos').delete().eq('id',id);
+  if(error){ toast(error.message,'err'); return; }
+  await cargarDatos(); poblarFiltros(); renderAll(); cerrarModal('mdContrato'); toast('Contrato eliminado','ok');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CARGUE MASIVO
+   ═══════════════════════════════════════════════════════════════ */
+function _cnorm(s){ return (s==null?'':String(s)).replace(/\s+/g,' ').trim().toUpperCase(); }
+function _ckey(s){ return _cnorm(s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9]/g,''); }
+function _sinTildes(s){ return _cnorm(s).normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function cgRol(o){
+  o=_sinTildes(o);
+  if(o.includes('GESTOR COMUNITARIO')) return 'GESTOR COMUNITARIO';
+  if(o.includes('MEDICO GENERAL')||/\bMEDICO\b/.test(o)) return 'MEDICO GENERAL';
+  if(o.includes('ODONTOLOG')) return 'ODONTOLOGO';
+  if(o.includes('PSICOLOG')) return 'PSICOLOGO';
+  if(o.includes('NUTRICIONISTA')) return 'NUTRICIONISTA';
+  if(o.includes('TRABAJADOR')&&o.includes('SOCIAL')) return 'TRABAJADORA SOCIAL';
+  if(o.includes('BACTERIOLOG')) return 'BACTERIOLOGA';
+  if(o.includes('AUXILIAR')&&o.includes('ENFERMER')) return 'AUXILIAR DE ENFERMERIA';
+  if(o.includes('VACUNADOR')) return 'VACUNADOR';
+  if(o.includes('ENFERMER')&&(o.includes('PROFESIONAL')||o.includes('JEFE'))) return 'ENFERMERA PROFESIONAL';
+  if(o.includes('TRANSPORTE')) return 'TRANSPORTE';
+  if(o.includes('SUMINISTRO')) return 'SUMINISTROS';
+  if(o.includes('COORDINADOR')) return 'COORDINADOR';
+  if(o.includes('INGENIERO')) return 'INGENIERO DE SISTEMAS';
+  if(o.includes('GESTION DE LA INFORMACION')) return 'GESTION DE LA INFORMACION';
+  if(o.includes('FACTURACION')||o.includes('ADMINISTRATIV')||o.includes('CONTRATACION')||o.includes('SERVICIOS TECNICOS')) return 'ADMINISTRATIVO';
+  return null;
+}
+function cgMuni(o){ o=_sinTildes(o); const seen=[];
+  [['ABREGO',['ABREGO','ABREO']],['EL CARMEN',['EL CARMEN']],['CONVENCION',['CONVENCION']],['TEORAMA',['TEORAMA']]].forEach(([c,keys])=>{ if(keys.some(x=>o.includes(x))&&!seen.includes(c)) seen.push(c); });
+  return seen.length===1?seen[0]:null; }
+// Toma la resolución del año de vigencia mencionada en el objeto (ej. "RESOLUCION 0272 DE 2026")
+function cgResol(o,anio){ const re=/RESOLUCION\s*(?:NO\.?\s*)?0*(\d{2,6})\s+DE\s+(?:[A-Z]+\s+\d{1,2}\s+DE\s+)?(\d{4})/g; const t=_sinTildes(o); let m, found=null;
+  let ultima=null;
+  while((m=re.exec(t))){ ultima=m[1].padStart(4,'0')+' de '+m[2]; if(+m[2]===anio){ found=ultima; break; } }
+  return found||ultima; }
+function cgSplit(s){ s=(s==null?'':String(s)).trim(); const m=s.match(/^\s*(\d[\d.]*)\s+(.*)$/); return m?{cedula:m[1].replace(/\D/g,''),nombre:_cnorm(m[2])}:{cedula:'',nombre:_cnorm(s)}; }
+function cgFecha(v){ if(v==null||v==='') return null; if(v instanceof Date&&!isNaN(v)) return fmtISO(v); const s=String(v).trim(); let m=s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/); if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'); m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/); if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'); return null; }
+function cgMoney(v){ if(v==null||v==='') return null; if(typeof v==='number') return Math.round(v); let s=String(v).replace(/[^\d,.-]/g,''); if(!s) return null; s=s.includes(',')?s.split(',')[0].replace(/\./g,''):s.replace(/\./g,''); const n=parseInt(s,10); return isNaN(n)?null:n; }
+function cgEntero(v){ if(v==null||v==='') return null; const n=parseInt(String(v).replace(/[^\d]/g,''),10); return isNaN(n)?null:n; }
+function cgHeader(rows){
+  for(let i=0;i<Math.min(rows.length,12);i++){ const cells=(rows[i]||[]).map(_ckey);
+    if(cells.some(c=>c.includes('CODIGOCONTRATO'))&&cells.some(c=>c.includes('CONTRATISTAS'))){ const idx={};
+      cells.forEach((c,j)=>{ if(idx.codigo==null&&c.includes('CODIGOCONTRATO')) idx.codigo=j; else if(idx.objeto==null&&c.includes('OBJETOCONTRATO')) idx.objeto=j; else if(idx.hide==null&&c.includes('HIDE')) idx.hide=j; else if(idx.valor==null&&c.includes('VALORINICCONTRATO')) idx.valor=j; else if(idx.tiempo==null&&c.includes('TIEMPOEJECUCION')) idx.tiempo=j; else if(idx.contratista==null&&c.includes('CONTRATISTAS')) idx.contratista=j; else if(idx.acta==null&&c.includes('FECHAACTAINICIO')) idx.acta=j; });
+      return {fila:i,idx}; } }
+  return null;
+}
+function leerCargue(ev){
+  const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+  if(!$('cgPrograma').value){ toast('Primero seleccione el programa','err'); ev.target.value=''; return; }
+  const rd=new FileReader();
+  rd.onload=e=>{ try{ const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true}); const ws=wb.Sheets[wb.SheetNames[0]];
+      procesarCargue(XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}),f.name); }catch(err){ toast('No se pudo leer el Excel: '+err.message,'err'); } };
+  rd.readAsArrayBuffer(f);
+}
+function procesarCargue(rows,archivo){
+  const map=cgHeader(rows); if(!map){ toast('No se encontraron las columnas CÓDIGOCONTRATO y CONTRATISTAS','err'); return; }
+  const {fila,idx}=map; const programa=$('cgPrograma').value; const resManual=$('cgResolucion').value.trim();
+  const vig=2026; const existentes=new Set(ST.contratos.filter(k=>k.vigencia===vig).map(k=>_cnorm(k.numero_contrato)));
+  const vistos=new Set(); const nuevos=[],dup=[],omit=[];
+  for(let i=fila+1;i<rows.length;i++){
+    const r=rows[i]||[]; const cod=_cnorm(r[idx.codigo]); const objeto=_cnorm(r[idx.objeto]); const {cedula,nombre}=cgSplit(r[idx.contratista]);
+    if(!cod&&!cedula&&!nombre) continue;
+    if(!cod||!cedula||!nombre){ omit.push({cod:cod||'—',nombre:nombre||'—',motivo:'Faltan datos (código, cédula o nombre)'}); continue; }
+    if(existentes.has(cod)){ dup.push({cod,nombre,motivo:'El contrato ya existe en la base'}); continue; }
+    if(vistos.has(cod)){ dup.push({cod,nombre,motivo:'Contrato repetido en el archivo'}); continue; }
+    vistos.add(cod);
+    const rol=cgRol(objeto); const valor=cgMoney(idx.hide!=null?r[idx.hide]:r[idx.valor])||cgMoney(r[idx.valor])||0;
+    const k={vigencia:vig,numero_contrato:cod,programa,resolucion:resManual||cgResol(objeto,vig),cedula,nombre,rol,municipio:cgMuni(objeto),objeto,valor_total:valor,tiempo_ejec:cgEntero(r[idx.tiempo]),fecha_acta:cgFecha(r[idx.acta]),activo:!INACTIVOS_ROL.includes(rol),origen:'cargue'};
+    k._plan=k.activo?planAuto(k.fecha_acta,k.tiempo_ejec,k.valor_total):[];
+    nuevos.push(k);
+  }
+  ST.cargue={nuevos,dup,omit,archivo,programa};
+  pintarCargue();
+}
+function pintarCargue(){
+  const p=ST.cargue; if(!p){ $('cgPrev').innerHTML=''; return; }
+  const nCuentas=p.nuevos.reduce((s,k)=>s+k._plan.length,0);
+  let h=`<div class="kpis"><div class="kpi"><div class="n" style="color:var(--green)">${p.nuevos.length}</div><div class="l">Contratos nuevos</div><div class="d">${nCuentas} cuentas a generar</div></div>
+    <div class="kpi"><div class="n">${p.nuevos.filter(k=>!k.activo).length}</div><div class="l">Proveedores (inactivos)</div></div>
+    <div class="kpi"><div class="n" style="color:var(--yellow)">${p.dup.length}</div><div class="l">Ya existen (omitidos)</div></div>
+    <div class="kpi"><div class="n">${p.omit.length}</div><div class="l">Sin datos</div></div></div>`;
+  if(p.nuevos.length){
+    h+=`<div class="card"><h3>Vista previa · ${esc(p.programa)}</h3><div class="tbl-wrap" style="max-height:420px"><table><thead><tr><th>Contrato</th><th>Contratista</th><th>Rol</th><th>Mun.</th><th>Resolución</th><th class="right">Valor</th><th>Acta · días</th><th>Pagos</th><th>Alertas</th></tr></thead><tbody>${p.nuevos.map(k=>{ const a=[]; if(!k.rol)a.push('sin rol'); if(!k.municipio)a.push('sin municipio'); if(!k.fecha_acta)a.push('sin acta'); if(!k.resolucion)a.push('sin resolución'); if(k.activo&&!k._plan.length)a.push('sin plan de pagos');
+      return `<tr><td class="mono">${esc(k.numero_contrato)}</td><td>${esc(k.nombre)}<div class="small muted">C.C. ${esc(k.cedula)}</div></td><td class="small">${esc(k.rol||'—')}</td><td class="small">${esc(munDisp(k.municipio))}</td><td class="small">${esc(k.resolucion||'—')}</td><td class="mono right">${money(k.valor_total)}</td><td class="mono small">${fechaCorta(k.fecha_acta)} · ${k.tiempo_ejec||'—'}</td><td class="mono">${k.activo?k._plan.length:'<span class="tag none">inactivo</span>'}</td><td class="small" style="color:var(--yellow)">${esc(a.join(', '))}</td></tr>`;}).join('')}</tbody></table></div>
+      <div style="margin-top:10px"><button class="btn ok" id="btnImp" onclick="importarCargue()">⬆ Importar ${p.nuevos.length} contrato(s) y ${nCuentas} cuenta(s)</button></div></div>`;
+  }
+  if(p.dup.length||p.omit.length) h+=`<div class="card"><h3>Omitidos</h3><div class="tbl-wrap" style="max-height:260px"><table><thead><tr><th>Contrato</th><th>Contratista</th><th>Motivo</th></tr></thead><tbody>${p.dup.concat(p.omit).map(d=>`<tr><td class="mono">${esc(d.cod)}</td><td>${esc(d.nombre)}</td><td class="small">${esc(d.motivo)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  $('cgPrev').innerHTML=h;
+}
+async function importarCargue(){
+  const p=ST.cargue; if(!p||!p.nuevos.length) return;
+  const b=$('btnImp'); b.disabled=true; b.textContent='Importando…';
+  const recs=p.nuevos.map(k=>{ const r=Object.assign({},k); delete r._plan; return r; });
+  const ins=[]; for(let i=0;i<recs.length;i+=200){ const {data,error}=await sb.from('cc_contratos').insert(recs.slice(i,i+200)).select('id,numero_contrato'); if(error){ toast('Error importando contratos: '+error.message,'err'); b.disabled=false; b.textContent='Reintentar'; return; } ins.push(...data); }
+  const idPor=new Map(ins.map(x=>[_cnorm(x.numero_contrato),x.id]));
+  const cuentas=[]; p.nuevos.forEach(k=>k._plan.forEach(pl=>cuentas.push(Object.assign({contrato_id:idPor.get(k.numero_contrato)},pl))));
+  for(let i=0;i<cuentas.length;i+=500){ const {error}=await sb.from('cc_cuentas').insert(cuentas.slice(i,i+500)); if(error){ toast('Error creando cuentas: '+error.message,'err'); break; } }
+  const hist={fecha:new Date().toISOString(),archivo:p.archivo,programa:p.programa,usuario:$('uNom').textContent,nuevos:p.nuevos.length,cuentas:cuentas.length,duplicados:p.dup.length,omitidos:p.omit.length,contratos:p.nuevos.map(k=>k.numero_contrato)};
+  ST.config.cargues=[hist].concat(ST.config.cargues).slice(0,200);
+  await sb.from('cc_config').upsert({clave:'cargues_historial',valor:{items:ST.config.cargues},actualizado_en:new Date().toISOString()},{onConflict:'clave'});
+  ST.cargue=null; $('cgFile').value='';
+  await cargarDatos(); poblarFiltros(); renderAll();
+  toast(`Importados ${hist.nuevos} contratos y ${hist.cuentas} cuentas`,'ok');
+}
+function renderCargue(){
+  pintarCargue();
+  const hs=ST.config.cargues;
+  $('cgHist').innerHTML= hs.length? `<div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Archivo</th><th>Programa</th><th>Usuario</th><th class="right">Nuevos</th><th class="right">Cuentas</th><th class="right">Duplicados</th><th class="right">Omitidos</th></tr></thead><tbody>${hs.map(x=>`<tr><td class="mono small">${fechaHora(x.fecha)}</td><td class="small">${esc(x.archivo)}</td><td>${esc(x.programa)}</td><td class="small">${esc(x.usuario)}</td><td class="right mono">${x.nuevos}</td><td class="right mono">${x.cuentas}</td><td class="right mono">${x.duplicados}</td><td class="right mono">${x.omitidos}</td></tr>`).join('')}</tbody></table></div>` : '<div class="small muted">Aún no hay cargues.</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADMINISTRACIÓN (superadmin)
+   ═══════════════════════════════════════════════════════════════ */
+async function renderAdmin(){
+  if(!esSuper()) return;
+  const [{data:us,error:e1},{data:cc,error:e2}]=await Promise.all([
+    sb.from('portal_usuarios').select('id,nombre,email,rol_base,activo').order('nombre'),
+    sb.from('cc_usuarios').select('*')
+  ]);
+  if(e1||e2){ $('admUsuarios').innerHTML='<div class="alertbox">'+esc((e1||e2).message)+'</div>'; return; }
+  ST.usuarios=us||[]; ST.cc_usuarios=cc||[];
+  const byId=new Map(ST.cc_usuarios.map(x=>[x.usuario_id,x]));
+  const opts=[['','Sin acceso'],['lector','Lector'],['salud_publica','Editor · Salud Pública'],['contratacion','Editor · Contratación'],['subgerencia','Editor · Subgerencia'],['tesoreria','Editor · Tesorería']];
+  $('admUsuarios').innerHTML='<table><thead><tr><th>Usuario del portal</th><th>Nombre completo (se muestra en el historial)</th><th>Cargo</th><th>Rol en el módulo</th><th></th></tr></thead><tbody>'+
+    ST.usuarios.map(u=>{ const c=byId.get(u.id); const sup=u.rol_base==='superadmin';
+      return `<tr data-uid="${u.id}"><td>${esc(u.nombre||'')}<div class="small muted">${esc(u.email||'')}${u.activo?'':' · inactivo en el portal'}</div></td>
+      <td><input class="inp u-nom" style="width:100%" value="${esc(c?c.nombre_completo:(u.nombre||''))}"></td>
+      <td><input class="inp u-car" value="${esc(c&&c.cargo||'')}" placeholder="Ej: Profesional universitario"></td>
+      <td>${sup?'<span class="tag et">Superadministrador</span>':`<select class="inp u-proc">${opts.map(([v,l])=>`<option value="${v}" ${(c&&c.activo?c.proceso:'')===v?'selected':''}>${l}</option>`).join('')}</select>`}</td>
+      <td><button class="btn sm pri" onclick="guardarUsuario('${u.id}')">Guardar</button></td></tr>`;}).join('')+'</tbody></table>';
+  const um=ST.config.umbrales;
+  $('admUmbrales').innerHTML=ETAPAS.filter(e=>e!=='pagada').map(e=>`<div class="fld"><label>${ETAPA_LBL[e]}${e==='contratista'?' (tras fin del periodo)':''}</label><input type="number" min="0" class="inp um" data-e="${e}" value="${um[e]??''}"></div>`).join('');
+  $('admProgramas').value=ST.config.programas.join('\n');
+}
+async function guardarUsuario(uid){
+  const tr=document.querySelector(`tr[data-uid="${uid}"]`); const sel=tr.querySelector('.u-proc');
+  const nom=tr.querySelector('.u-nom').value.trim(); const cargo=tr.querySelector('.u-car').value.trim()||null;
+  const proc=sel?sel.value:'lector';
+  const u=ST.usuarios.find(x=>x.id===uid);
+  let error;
+  if(!proc && !(u.rol_base==='superadmin')){ ({error}=await sb.from('cc_usuarios').delete().eq('usuario_id',uid)); }
+  else { if(!nom){ toast('Escriba el nombre completo','err'); return; }
+    ({error}=await sb.from('cc_usuarios').upsert({usuario_id:uid,nombre_completo:nom,cargo,proceso:proc||'lector',activo:true},{onConflict:'usuario_id'})); }
+  if(error){ toast(error.message,'err'); return; }
+  toast('Usuario actualizado','ok'); renderAdmin();
+}
+async function guardarUmbrales(){
+  const v={}; document.querySelectorAll('.um').forEach(i=>{ if(i.value!=='') v[i.dataset.e]=+i.value; });
+  const {error}=await sb.from('cc_config').upsert({clave:'umbrales',valor:v,actualizado_en:new Date().toISOString()},{onConflict:'clave'});
+  if(error){ toast(error.message,'err'); return; } ST.config.umbrales=v; toast('Plazos guardados','ok'); renderAll();
+}
+async function guardarProgramas(){
+  const v=$('admProgramas').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const {error}=await sb.from('cc_config').upsert({clave:'programas',valor:v,actualizado_en:new Date().toISOString()},{onConflict:'clave'});
+  if(error){ toast(error.message,'err'); return; } ST.config.programas=v; poblarFiltros(); toast('Programas guardados','ok');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EXPORTAR EXCEL (formato de seguimiento + historial + resumen)
+   ═══════════════════════════════════════════════════════════════ */
+function exportarExcel(){
+  if(!esSuper()){ toast('Solo el superadministrador puede descargar datos','err'); return; }
+  const cs=cuentasFiltradas().sort((a,b)=>String(a.k.numero_contrato).localeCompare(String(b.k.numero_contrato))||a.num_pago-b.num_pago);
+  if(!cs.length){ toast('No hay cuentas con los filtros actuales','err'); return; }
+  const hdr=['No.','Identificación','Nombre','Contrato','No. Pago','Periodo','Programa','Resolución','Municipio','Valor del Contrato','Valor de la Cuenta',
+    'Radicado (Subgerencia)','Factura Electrónica (Subgerencia)','Primer Filtro (Salud Pública)','Fecha','Segundo Filtro (Contratación)','Fecha',
+    'Tercer Filtro (Subgerencia)','Fecha','Supervisor (Subgerencia)','Fecha','Estado SECOP II','Fecha','Pagos (Tesorería)','Valor Pagado','Fecha de Pago','Número ND',
+    'Proceso actual','Días en el proceso','Semáforo','Devoluciones','Cert. cumplimiento EBS','Observaciones'];
+  const f=s=>s?parseISO(s):null;
+  const filas=cs.map((c,i)=>{ const k=c.k; const s=semaforo(c); const cert=k.programa==='EBS'?certDe(c):null;
+    return [i+1,k.cedula,k.nombre,k.numero_contrato,c.num_pago,(c.periodo_ini?fechaCorta(c.periodo_ini):'')+' a '+(c.periodo_fin?fechaCorta(c.periodo_fin):''),k.programa,k.resolucion||'',munDisp(k.municipio),+k.valor_total||0,+c.valor||0,
+      c.radicado||'',c.factura||'',c.sp_estado,f(c.sp_fecha),c.ct_estado,f(c.ct_fecha),c.sg_estado,f(c.sg_fecha),c.sup_estado,f(c.sup_fecha),c.secop_estado,f(c.secop_fecha),
+      c.tes_estado,c.tes_valor!=null?+c.tes_valor:'',f(c.tes_fecha),c.nd||'',
+      c.etapa==='contratista'&&c.devuelta_desde?'Devuelta al contratista':ETAPA_LBL[c.etapa],s.dias??'',{ok:'A tiempo',warn:'En el límite',alert:'Vencida',none:'Sin plazo',paid:'Pagada'}[s.nivel],c.devoluciones,cert?cert.radicado:'',c.observaciones||''];
+  });
+  const ws=XLSX.utils.aoa_to_sheet([hdr].concat(filas),{cellDates:true,dateNF:'dd/mm/yyyy'});
+  ws['!cols']=hdr.map((h,i)=>({wch:[5,13,34,10,8,24,16,14,12,15,15,16,16,14,11,14,11,14,11,14,11,14,11,12,14,11,12,22,10,12,10,16,30][i]||12}));
+  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:filas.length,c:hdr.length-1}})};
+  for(let r=1;r<=filas.length;r++){ [9,10,24].forEach(ci=>{ const a=XLSX.utils.encode_cell({r,c:ci}); if(ws[a]&&ws[a].t==='n') ws[a].z='"$"#,##0'; }); }
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Seguimiento');
+
+  const ids=new Set(cs.map(c=>c.id)); const byId=new Map(cs.map(c=>[c.id,c]));
+  const hist=ST.movs.filter(m=>ids.has(m.cuenta_id)).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).map(m=>{ const c=byId.get(m.cuenta_id);
+    return {Contrato:c.k.numero_contrato,'No. Pago':c.num_pago,Contratista:c.k.nombre,Acción:m.accion,Desde:ETAPA_LBL[m.etapa_origen]||m.etapa_origen||'',Hacia:ETAPA_LBL[m.etapa_destino]||m.etapa_destino||'',Fecha:new Date(m.fecha),Motivo:m.motivo||'',Usuario:m.usuario_nombre||'',Proceso:PROCESOS[m.usuario_proceso]||m.usuario_proceso||'',Detalle:m.detalle&&Object.keys(m.detalle).length?JSON.stringify(m.detalle):''}; });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(hist,{cellDates:true,dateNF:'dd/mm/yyyy hh:mm'}),'Historial');
+
+  const res=[]; const progs=[...new Set(cs.map(c=>c.k.programa))];
+  progs.forEach(p=>{ const g=cs.filter(c=>c.k.programa===p); const row={Programa:p,Cuentas:g.length};
+    ETAPAS.forEach(e=>row[ETAPA_LBL[e]]=g.filter(c=>c.etapa===e).length);
+    row['Valor total']=g.reduce((s,c)=>s+(+c.valor||0),0); row['Valor pagado']=g.filter(c=>c.etapa==='pagada').reduce((s,c)=>s+(+(c.tes_valor??c.valor)||0),0);
+    row['Valor pendiente']=row['Valor total']-row['Valor pagado']; row['Vencidas']=g.filter(c=>semaforo(c).nivel==='alert').length; res.push(row); });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(res),'Resumen');
+
+  const partes=[$('fPrograma').value,$('fEtapa').value&&(ETAPA_LBL[$('fEtapa').value]||$('fEtapa').value.replace('_','')),$('fMes').value].filter(Boolean).map(s=>String(s).replace(/[^\wÁÉÍÓÚáéíóúÑñ-]+/g,'_'));
+  XLSX.writeFile(wb,'Seguimiento_Cuentas_'+(partes.length?partes.join('_')+'_':'')+todayISO()+'.xlsx');
+  if(typeof portalLog==='function') portalLog('cuentas_cobro','exportar',{filas:filas.length});
+}
+</script>
+</body>
+</html>
