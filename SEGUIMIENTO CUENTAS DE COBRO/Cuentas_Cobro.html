@@ -264,6 +264,24 @@ tr.clk:hover td{background:var(--surface2)}
     <!-- ADMIN -->
     <section class="panel" id="p-admin">
       <div class="card">
+        <h3>Crear usuario</h3>
+        <div class="sub">Crea la cuenta de acceso al portal y le asigna su rol en este módulo. Si el correo ya tiene cuenta en el portal, se conserva su contraseña y solo se le asigna el rol. Si deja la contraseña vacía se genera una provisional.</div>
+        <div class="frm">
+          <div class="fld" style="grid-column:span 2"><label>Nombre completo *</label><input class="inp" id="nuNombre" placeholder="Como aparecerá en el historial"></div>
+          <div class="fld"><label>Correo *</label><input class="inp" id="nuCorreo" type="email" placeholder="usuario@correo.com"></div>
+          <div class="fld"><label>Cargo</label><input class="inp" id="nuCargo" placeholder="Ej: Profesional universitario"></div>
+          <div class="fld"><label>Rol en el módulo *</label><select class="inp" id="nuProceso">
+            <option value="">— Seleccione —</option>
+            <option value="salud_publica">Editor · Salud Pública</option>
+            <option value="contratacion">Editor · Contratación</option>
+            <option value="subgerencia">Editor · Subgerencia</option>
+            <option value="tesoreria">Editor · Tesorería</option>
+            <option value="lector">Lector</option></select></div>
+          <div class="fld"><label>Contraseña (opcional, mín. 8)</label><input class="inp" id="nuClave" type="text" autocomplete="off" placeholder="Vacío = generar"></div>
+        </div>
+        <div style="margin-top:10px"><button class="btn pri" id="btnCrearUsuario" onclick="crearUsuario()">＋ Crear usuario</button></div>
+      </div>
+      <div class="card">
         <h3>Usuarios del módulo</h3>
         <div class="sub">Todos los usuarios del portal aparecen aquí. Asigne a cada uno su proceso (editor) o el rol de lector. «Sin acceso» impide ver el módulo. El superadministrador del portal tiene acceso total siempre.</div>
         <div class="tbl-wrap" id="admUsuarios"></div>
@@ -299,6 +317,15 @@ tr.clk:hover td{background:var(--surface2)}
     <div class="mhead"><h2 id="mkTitulo">Contrato</h2><button class="xbtn" onclick="cerrarModal('mdContrato')">×</button></div>
     <div class="mbody" id="mkBody"></div>
     <div class="mfoot" id="mkFoot"></div>
+  </div>
+</div>
+
+<!-- Modal acceso creado -->
+<div class="modal-bg" id="mdAcceso" onclick="if(event.target===this)cerrarModal('mdAcceso')">
+  <div class="modal narrow">
+    <div class="mhead"><h2>Datos de acceso</h2><button class="xbtn" onclick="cerrarModal('mdAcceso')">×</button></div>
+    <div class="mbody" id="accBody"></div>
+    <div class="mfoot"><button class="btn" onclick="copiarAcceso()">📋 Copiar</button><button class="btn pri" onclick="cerrarModal('mdAcceso')">Listo</button></div>
   </div>
 </div>
 
@@ -1111,7 +1138,7 @@ async function renderAdmin(){
       <td><input class="inp u-nom" style="width:100%" value="${esc(c?c.nombre_completo:(u.nombre||''))}"></td>
       <td><input class="inp u-car" value="${esc(c&&c.cargo||'')}" placeholder="Ej: Profesional universitario"></td>
       <td>${sup?'<span class="tag et">Superadministrador</span>':`<select class="inp u-proc">${opts.map(([v,l])=>`<option value="${v}" ${(c&&c.activo?c.proceso:'')===v?'selected':''}>${l}</option>`).join('')}</select>`}</td>
-      <td><button class="btn sm pri" onclick="guardarUsuario('${u.id}')">Guardar</button></td></tr>`;}).join('')+'</tbody></table>';
+      <td style="white-space:nowrap"><button class="btn sm pri" onclick="guardarUsuario('${u.id}')">Guardar</button>${sup?'':` <button class="btn sm" title="Asignar una contraseña provisional" onclick="nuevaClave('${u.id}')">🔑 Nueva clave</button>`}</td></tr>`;}).join('')+'</tbody></table>';
   const um=ST.config.umbrales;
   $('admUmbrales').innerHTML=ETAPAS.filter(e=>e!=='pagada').map(e=>`<div class="fld"><label>${ETAPA_LBL[e]}${e==='contratista'?' (tras fin del periodo)':''}</label><input type="number" min="0" class="inp um" data-e="${e}" value="${um[e]??''}"></div>`).join('');
   $('admProgramas').value=ST.config.programas.join('\n');
@@ -1128,6 +1155,43 @@ async function guardarUsuario(uid){
   if(error){ toast(error.message,'err'); return; }
   toast('Usuario actualizado','ok'); renderAdmin();
 }
+// Alta de cuentas: la hace la función del servidor cc-usuarios (usa la llave de servicio)
+async function llamarUsuarios(body){
+  const {data,error}=await sb.functions.invoke('cc-usuarios',{body});
+  if(error){ let msg=error.message; try{ const j=await error.context.json(); if(j&&j.error) msg=j.error; }catch(e){} throw new Error(msg); }
+  if(data&&data.error) throw new Error(data.error);
+  return data;
+}
+async function crearUsuario(){
+  const body={accion:'crear',nombre_completo:$('nuNombre').value.trim(),correo:$('nuCorreo').value.trim(),cargo:$('nuCargo').value.trim(),proceso:$('nuProceso').value,clave:$('nuClave').value.trim()};
+  if(!body.nombre_completo||!body.correo||!body.proceso){ toast('Complete nombre, correo y rol','err'); return; }
+  if(body.clave && body.clave.length<8){ toast('La contraseña debe tener al menos 8 caracteres','err'); return; }
+  const b=$('btnCrearUsuario'); b.disabled=true; b.textContent='Creando…';
+  try{
+    const r=await llamarUsuarios(body);
+    ['nuNombre','nuCorreo','nuCargo','nuClave'].forEach(id=>$(id).value=''); $('nuProceso').value='';
+    mostrarAcceso(body.nombre_completo.toUpperCase(),r.correo,r.clave,r.creada?'Usuario creado':'La cuenta ya existía en el portal; se le asignó el rol'+(r.clave?' y la nueva contraseña':' y conserva su contraseña actual'));
+    renderAdmin();
+  }catch(e){ toast(e.message,'err'); }
+  finally{ b.disabled=false; b.textContent='＋ Crear usuario'; }
+}
+async function nuevaClave(uid){
+  const u=ST.usuarios.find(x=>x.id===uid);
+  if(!confirm(`¿Asignar una contraseña provisional nueva a ${u.nombre||u.email}? La contraseña actual dejará de funcionar.`)) return;
+  try{ const r=await llamarUsuarios({accion:'clave',usuario_id:uid}); mostrarAcceso(u.nombre,u.email,r.clave,'Contraseña provisional asignada'); }
+  catch(e){ toast(e.message,'err'); }
+}
+function mostrarAcceso(nombre,correo,clave,titulo){
+  const url=new URL('../login.html',location.href).href;
+  ST.accesoTxt=`Acceso al Portal de Salud Pública HRNO\nMódulo: Seguimiento de Cuentas de Cobro\nUsuario: ${correo}${clave?'\nContraseña: '+clave:''}\nIngreso: ${url}`;
+  $('accBody').innerHTML=`<div class="infobox"><b>${esc(titulo)}</b></div>
+    <div class="frm small"><div><span class="muted">Nombre:</span> <b>${esc(nombre)}</b></div><div><span class="muted">Usuario:</span> <b>${esc(correo)}</b></div>
+    ${clave?`<div><span class="muted">Contraseña:</span> <b class="mono" style="font-size:15px">${esc(clave)}</b></div>`:''}
+    <div class="full"><span class="muted">Ingreso:</span> ${esc(url)}</div></div>
+    ${clave?'<p class="small muted" style="margin-top:10px">Comparta estos datos solo con la persona. La contraseña no se vuelve a mostrar; si se pierde, use «Nueva clave».</p>':''}`;
+  abrirModal('mdAcceso');
+}
+function copiarAcceso(){ navigator.clipboard.writeText(ST.accesoTxt||'').then(()=>toast('Copiado','ok'),()=>toast('No se pudo copiar','err')); }
 async function guardarUmbrales(){
   const v={}; document.querySelectorAll('.um').forEach(i=>{ if(i.value!=='') v[i.dataset.e]=+i.value; });
   const {error}=await sb.from('cc_config').upsert({clave:'umbrales',valor:v,actualizado_en:new Date().toISOString()},{onConflict:'clave'});

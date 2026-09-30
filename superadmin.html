@@ -469,11 +469,11 @@ function renderUsuarios() {
   }
   const ROL_BADGE = {
     superadmin:'badge-sa',admin:'badge-admin',coordinador:'badge-coord',
-    auxiliar_campo:'badge-aux',administrativo:'badge-adm'
+    auxiliar:'badge-aux',auxiliar_campo:'badge-aux',administrativo:'badge-adm'
   };
   const ROL_LABEL = {
     superadmin:'Superadmin',admin:'Admin',coordinador:'Coordinador',
-    auxiliar_campo:'Aux. Campo',administrativo:'Administrativo'
+    auxiliar:'Aux. Campo',auxiliar_campo:'Aux. Campo',administrativo:'Administrativo'
   };
   tbody.innerHTML = usuariosCache.map(u => `
     <tr>
@@ -583,27 +583,21 @@ async function guardarUsuario() {
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Guardando...';
 
   try {
-    // 1. Crear en Supabase Auth
-    const { data: authData, error: authErr } = await portalSb.auth.admin.createUser({
-      email, password: pass, email_confirm: true
-    });
-    if (authErr) throw new Error('Auth: ' + authErr.message);
-    const uid = authData.user.id;
-
-    // 2. Insertar en portal_usuarios
-    const { error: uErr } = await portalSb.from('portal_usuarios')
-      .insert({ id: uid, nombre, email, rol_base: rol, activo: true });
-    if (uErr) throw new Error('Perfil: ' + uErr.message);
-
-    // 3. Insertar permisos (solo los que no son 'ninguno')
+    // La cuenta se crea en la función del servidor portal-usuarios: crear usuarios
+    // exige la llave de servicio, que no puede ir en el navegador.
     const perms = leerPermisosDesdGrid('permGrid');
-    const rows = Object.entries(perms)
+    const permisos = Object.entries(perms)
       .filter(([, niv]) => niv !== 'ninguno')
-      .map(([mid, niv]) => ({ usuario_id: uid, modulo_id: mid, nivel: niv, activo: true }));
-    if (rows.length) {
-      const { error: pErr } = await portalSb.from('portal_permisos').insert(rows);
-      if (pErr) throw new Error('Permisos: ' + pErr.message);
+      .map(([modulo_id, nivel]) => ({ modulo_id, nivel }));
+    const { data, error } = await portalSb.functions.invoke('portal-usuarios', {
+      body: { accion: 'crear', nombre, correo: email, clave: pass, rol_base: rol, permisos }
+    });
+    if (error) {
+      let msg = error.message;
+      try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (_) {}
+      throw new Error(msg);
     }
+    if (data && data.error) throw new Error(data.error);
 
     cerrarModal();
     showOk('Usuario ' + nombre + ' creado correctamente.');
