@@ -1,0 +1,40 @@
+ASUNTO: Nueva plataforma de Seguimiento de Cuentas de Cobro – Oficina de Salud Pública
+
+Cordial saludo,
+
+Desde la Coordinación de Salud Pública les presentamos el aplicativo Seguimiento de Cuentas de Cobro, disponible en el Portal de Salud Pública de la ESE Hospital Regional Noroccidental. A partir de ahora, el trámite de las cuentas de cobro de los contratistas de EBS, Jóvenes en Paz, PIC Departamental, PIC Municipal y Vacunación se registrará en esta plataforma, que reemplaza el seguimiento en hojas de Excel separadas por oficina.
+
+¿Para qué sirve?
+- Saber en todo momento en qué proceso está cada cuenta (cada pago del contrato).
+- Llevar las cuentas en el orden establecido: Salud Pública → Contratación → Subgerencia → Supervisión → SECOP II → Tesorería.
+- Registrar devoluciones con su motivo y fecha, y el historial completo de cada cuenta.
+- Ver en "Mis pendientes" solo lo que le corresponde a cada oficina, con un semáforo de días en el proceso.
+- Consultar un dashboard con cuentas por proceso, valores pagados y pendientes, tiempos y devoluciones.
+
+¿Cómo ingresar?
+1. Abra el Portal de Salud Pública: https://danto0702.github.io/portal-salud-publica-hrno/
+2. Inicie sesión con su correo y la contraseña que le llegará en un mensaje aparte.
+3. Abra la tarjeta "Seguimiento de Cuentas de Cobro" → "Seguimiento y dashboard".
+
+¿Qué le corresponde a cada oficina?
+- Salud Pública: registrar la recepción de la cuenta que entrega el contratista y hacer el 1er filtro.
+- Contratación: hacer el 2do filtro y, cuando aplique, liquidar contratos.
+- Subgerencia: hacer el 3er filtro (número de radicado y factura electrónica), la supervisión y el registro del estado en SECOP II.
+- Tesorería: registrar el pago con el valor pagado, la fecha y el número ND (certificado de egreso).
+
+Cada oficina solo puede actuar sobre las cuentas que están en su proceso. Las cuentas que ya estaban en trámite fueron cargadas en la plataforma a partir de la relación de pagos de Subgerencia.
+
+Consulta para contratistas
+Los contratistas pueden ver en qué va su cuenta escribiendo su número de cédula, sin necesidad de usuario:
+https://danto0702.github.io/portal-salud-publica-hrno/SEGUIMIENTO%20CUENTAS%20DE%20COBRO/Consulta_Cuenta.html
+Les agradecemos compartir este enlace cuando un contratista pregunte por el estado de su pago.
+
+Adjuntamos el manual de uso con el paso a paso de cada proceso. Si al ingresar ve el mensaje "Sin acceso al módulo", no recuerda su contraseña o tiene cualquier duda, comuníquese con la Coordinación de Salud Pública.
+
+Agradecemos su colaboración para que todas las cuentas se registren en la plataforma.
+
+Atentamente,
+
+Danilo Torrado Blanco
+Coordinador de Salud Pública
+ESE Hospital Regional Noroccidental
