@@ -320,6 +320,23 @@ tr.clk:hover td{background:var(--surface2)}
   </div>
 </div>
 
+<!-- Modal liquidar contrato -->
+<div class="modal-bg" id="mdLiquidar" onclick="if(event.target===this)cerrarModal('mdLiquidar')">
+  <div class="modal narrow">
+    <div class="mhead"><h2 id="lqTitulo">Liquidar contrato</h2><button class="xbtn" onclick="cerrarModal('mdLiquidar')">×</button></div>
+    <div class="mbody">
+      <div class="infobox" id="lqInfo"></div>
+      <div class="frm">
+        <div class="fld"><label>Fecha de liquidación *</label><input type="date" class="inp" id="lqFecha"></div>
+        <div class="fld"><label>Valor de liquidación * (puede ser 0)</label><input type="number" min="0" class="inp" id="lqValor" value="0" oninput="previsualizarLiquidacion()"></div>
+        <div class="fld full"><label>Motivo *</label><textarea class="inp" id="lqMotivo" rows="2" placeholder="Ej: incumplimiento del objeto contractual, terminación anticipada…"></textarea></div>
+      </div>
+      <div class="small" id="lqPrev" style="margin-top:10px"></div>
+    </div>
+    <div class="mfoot"><button class="btn" onclick="cerrarModal('mdLiquidar')">Cancelar</button><button class="btn bad" id="btnLiquidar" onclick="liquidar()">Liquidar contrato</button></div>
+  </div>
+</div>
+
 <!-- Modal acceso creado -->
 <div class="modal-bg" id="mdAcceso" onclick="if(event.target===this)cerrarModal('mdAcceso')">
   <div class="modal narrow">
@@ -339,7 +356,7 @@ tr.clk:hover td{background:var(--surface2)}
 const ETAPAS = ['contratista','salud_publica','contratacion','subgerencia','supervision','secop','tesoreria','pagada'];
 const ETAPA_LBL = {
   contratista:'Contratista', salud_publica:'Salud Pública', contratacion:'Contratación',
-  subgerencia:'Subgerencia', secop:'SECOP II', supervision:'Supervisión', tesoreria:'Tesorería', pagada:'Pagada'
+  subgerencia:'Subgerencia', secop:'SECOP II', supervision:'Supervisión', tesoreria:'Tesorería', pagada:'Pagada', anulada:'Anulada'
 };
 const ETAPA_DET = {
   contratista:'En manos del contratista', salud_publica:'1er filtro', contratacion:'2do filtro',
@@ -395,6 +412,7 @@ const siguiente = e => ETAPAS[ETAPAS.indexOf(e)+1];
 /* ── Semáforo ── */
 function semaforo(c){
   const hoy=new Date();
+  if(c.etapa==='anulada') return {nivel:'none', dias:null, txt:'Anulada'};
   if(c.etapa==='pagada') return {nivel:'paid', dias:null, txt:'Pagada'};
   const um=ST.config.umbrales||{};
   let dias, limite;
@@ -412,10 +430,11 @@ function semaforo(c){
 }
 function semTag(c){ const s=semaforo(c); if(s.nivel==='paid') return '<span class="tag paid">✔ Pagada</span>'; const ic={ok:'●',warn:'▲',alert:'■',none:'○'}[s.nivel]; return `<span class="tag ${s.nivel}" title="Días en el proceso actual">${ic} ${esc(s.txt)}</span>`; }
 function etapaTag(c){
+  if(c.etapa==='anulada') return '<span class="tag none">✕ Anulada por liquidación</span>';
   let t=ETAPA_LBL[c.etapa];
   if(c.etapa==='contratista') t = c.devuelta_desde ? 'Devuelta al contratista' : 'Por entregar';
   const cls = c.etapa==='pagada'?'paid': (c.etapa==='contratista'&&c.devuelta_desde)?'alert':'et';
-  return `<span class="tag ${cls}">${esc(t)}</span>`;
+  return `<span class="tag ${cls}">${esc(t)}</span>`+(c.es_liquidacion?' <span class="tag warn">Liquidación</span>':'');
 }
 
 /* ── Plan de pagos automático: un mes calendario por pago desde el acta ── */
@@ -548,7 +567,7 @@ function poblarFiltros(){
   opts('fPrograma',progs.map(p=>[p,p]),'Todos');
   opts('fResolucion',[...new Set(ST.contratos.map(k=>k.resolucion).filter(Boolean))].sort().map(r=>[r,r]),'Todas');
   opts('fMunicipio',[...new Set(ST.contratos.map(k=>k.municipio).filter(Boolean))].sort().map(m=>[m,munDisp(m)]),'Todos');
-  opts('fEtapa',ETAPAS.map(e=>[e,ETAPA_LBL[e]]).concat([['_devueltas','Devueltas al contratista'],['_vencidas','Vencidas (semáforo rojo)']]),'Todos');
+  opts('fEtapa',ETAPAS.map(e=>[e,ETAPA_LBL[e]]).concat([['_devueltas','Devueltas al contratista'],['_vencidas','Vencidas (semáforo rojo)'],['anulada','Anuladas por liquidación']]),'Todos');
   opts('fMes',[...new Set(ST.cuentas.map(c=>(c.periodo_ini||'').slice(0,7)).filter(Boolean))].sort().map(m=>[m,mesLbl(m)]),'Todos');
   opts('fPago',[...new Set(ST.cuentas.map(c=>c.num_pago))].sort((a,b)=>a-b).map(n=>[n,'Pago '+n]),'Todos');
   const sel=$('cgPrograma'); const v=sel.value; sel.innerHTML='<option value="">— Seleccione —</option>'+progs.map(p=>`<option>${esc(p)}</option>`).join(''); sel.value=v;
@@ -576,6 +595,7 @@ function cuentasFiltradas(opt){
   const q=$('fQ').value.trim().toUpperCase();
   return ST.cuentas.filter(c=>{
     const k=c.k; if(!k || !k.activo) return false;
+    if(c.etapa==='anulada' && E!=='anulada') return false;
     if(!filtrarContrato(k)) return false;
     if(MES && (c.periodo_ini||'').slice(0,7)!==MES) return false;
     if(PG && String(c.num_pago)!==PG) return false;
@@ -690,7 +710,7 @@ function bandejaCuentas(){
   const quien = esSuper()? $('bVerComo').value : ST.proceso;
   const futuras=$('bFuturas').checked; const hoy=new Date();
   return cuentasFiltradas().filter(c=>{
-    if(c.etapa==='pagada') return false;
+    if(c.etapa==='pagada'||c.etapa==='anulada') return false;
     if(quien!=='todas' && dueno(c)!==quien) return false;
     if(c.etapa==='contratista' && !c.devuelta_desde && !futuras){ const f=parseISO(c.periodo_fin); if(f && f>=hoy) return false; }
     return true;
@@ -700,7 +720,7 @@ function actualizarContadorBandeja(){
   if(ST.proceso==='lector') return;
   const quien=esSuper()?'todas':ST.proceso; const hoy=new Date();
   const n=ST.cuentas.filter(c=>{
-    if(!c.k||!c.k.activo||c.etapa==='pagada') return false;
+    if(!c.k||!c.k.activo||c.etapa==='pagada'||c.etapa==='anulada') return false;
     if(quien!=='todas' && dueno(c)!==quien) return false;
     if(c.etapa==='contratista' && !c.devuelta_desde){ const f=parseISO(c.periodo_fin); if(f && f>=hoy) return false; }
     return true;
@@ -792,8 +812,10 @@ function abrirCuenta(id){
     <div class="kpi"><div class="n" style="font-size:15px">${fechaCorta(c.periodo_ini)} – ${fechaCorta(c.periodo_fin)}</div><div class="l">Periodo</div></div>
     <div class="kpi"><div class="n" style="font-size:15px">${etapaTag(c)}</div><div class="l">Proceso actual</div><div class="d">desde ${fechaHora(c.etapa_desde)}</div></div>
     <div class="kpi"><div class="n" style="font-size:15px">${semTag(c)}</div><div class="l">Semáforo</div><div class="d">Plazo ${ST.config.umbrales[c.etapa]??'—'} d</div></div>
-    ${k.programa==='EBS'?`<div class="kpi"><div class="n" style="font-size:14px">${cert?'✔ '+esc(cert.radicado):'Sin emitir'}</div><div class="l">Certificado de cumplimiento</div></div>`:''}
+    ${k.programa==='EBS'?`<div class="kpi"><div class="n" style="font-size:14px">${cert?'✔ '+esc(cert.radicado):'Sin emitir'}</div><div class="l">Certificado de cumplimiento</div>${cert&&esSuper()?`<div class="d"><a href="#" style="color:var(--red)" onclick="borrarCertificado('${c.id}');return false">🗑 Borrar certificado</a></div>`:''}</div>`:''}
   </div>`;
+  if(c.etapa==='anulada') h+=`<div class="alertbox"><b>Cuenta anulada por liquidación del contrato</b> el ${fechaCorta(k.liq_fecha)}. Motivo: ${esc(k.liq_motivo||'—')}. No se cobra ni se paga.</div>`;
+  if(c.es_liquidacion) h+=`<div class="infobox"><b>Cuenta de liquidación del contrato.</b> Valor de liquidación ${money(k.liq_valor)} · ${fechaCorta(k.liq_fecha)}. Motivo: ${esc(k.liq_motivo||'—')}. Sigue el flujo normal hasta Tesorería.</div>`;
   if(c.etapa==='contratista' && c.devuelta_desde) h+=`<div class="alertbox"><b>Devuelta al contratista por ${esc(ETAPA_LBL[c.devuelta_desde])}.</b> Motivo: ${esc(c.motivo_ult_dev||'—')}<br>Cuando el contratista la corrija, ${esc(PROCESOS[dueno(c)])} registra la recepción y la cuenta vuelve a ${esc(ETAPA_LBL[c.devuelta_desde])}.</div>`;
   h+=stepper(c);
   h+=`<div class="frm small" style="margin-bottom:12px">
@@ -810,7 +832,7 @@ function abrirCuenta(id){
   h+=`<h3 style="font-size:14px;color:var(--text3);margin:16px 0 8px">Historial</h3>`;
   h+= ms.length? '<ul class="timeline">'+ms.map(m=>{
     const cls=m.accion==='devolver'?'dev':m.accion==='pagar'?'pay':'';
-    const acc={recibir:'Recepción',aprobar:'Aprobada',devolver:'Devuelta',pagar:'Pagada',datos:'Datos actualizados',mover_admin:'Movida por superadministrador',editar:'Plan de pagos editado',migracion:'Migración desde Excel de Subgerencia'}[m.accion]||m.accion;
+    const acc={recibir:'Recepción',aprobar:'Aprobada',devolver:'Devuelta',pagar:'Pagada',datos:'Datos actualizados',mover_admin:'Movida por superadministrador',editar:'Plan de pagos editado',migracion:'Migración desde Excel de Subgerencia',liquidacion:'Cuenta de liquidación',anular:'Anulada por liquidación'}[m.accion]||m.accion;
     const ruta=m.etapa_origen!==m.etapa_destino?` · ${esc(ETAPA_LBL[m.etapa_origen]||m.etapa_origen||'')} → ${esc(ETAPA_LBL[m.etapa_destino]||m.etapa_destino||'')}`:'';
     const det=m.detalle&&Object.keys(m.detalle).length?`<div class="small muted">${esc(Object.entries(m.detalle).map(([a,b])=>a+': '+b).join(' · '))}</div>`:'';
     return `<li class="${cls}"><b>${acc}</b>${ruta}<div class="small muted">${fechaHora(m.fecha)} · ${esc(m.usuario_nombre||'')} (${esc(PROCESOS[m.usuario_proceso]||m.usuario_proceso||'')})</div>${m.motivo?`<div>${esc(m.motivo)}</div>`:''}${det}</li>`;
@@ -914,20 +936,22 @@ function renderContratos(){
   const cuentasDe=id=>ST.cuentas.filter(c=>c.contrato_id===id);
   $('contratosCount').textContent=ks.length+' contrato(s)';
   $('contratosTabla').innerHTML= ks.length? '<table><thead><tr><th>Contrato</th><th>Contratista</th><th>Programa</th><th>Rol / municipio</th><th class="right">Valor</th><th>Acta · días</th><th>Pagos</th><th>Avance</th></tr></thead><tbody>'+
-    ks.map(k=>{ const cs=cuentasDe(k.id); const pg=cs.filter(c=>c.etapa==='pagada').length;
-      return `<tr class="clk" onclick="abrirContrato('${k.id}')"><td class="mono"><b>${esc(k.numero_contrato)}</b>${k.activo?'':' <span class="tag none">inactivo</span>'}</td><td>${esc(k.nombre)}<div class="small muted">C.C. ${esc(k.cedula)}</div></td><td>${esc(k.programa)}<div class="small muted">${esc(k.resolucion||'')}</div></td><td class="small">${esc(k.rol||'—')}<div class="muted">${esc(munDisp(k.municipio))}</div></td><td class="mono right">${money(k.valor_total)}</td><td class="mono small">${fechaCorta(k.fecha_acta)}<div class="muted">${k.tiempo_ejec||'—'} días</div></td><td class="mono">${cs.length}</td><td>${cs.length?`<span class="tag ${pg===cs.length?'paid':'et'}">${pg}/${cs.length} pagadas</span>`:'—'}</td></tr>`;}).join('')+'</tbody></table>' : '<div class="loading">No hay contratos con los filtros actuales.</div>';
+    ks.map(k=>{ const cs=cuentasDe(k.id).filter(c=>c.etapa!=='anulada'); const pg=cs.filter(c=>c.etapa==='pagada').length;
+      return `<tr class="clk" onclick="abrirContrato('${k.id}')"><td class="mono"><b>${esc(k.numero_contrato)}</b>${k.activo?'':' <span class="tag none">inactivo</span>'}${k.liquidado?' <span class="tag warn">liquidado</span>':''}</td><td>${esc(k.nombre)}<div class="small muted">C.C. ${esc(k.cedula)}</div></td><td>${esc(k.programa)}<div class="small muted">${esc(k.resolucion||'')}</div></td><td class="small">${esc(k.rol||'—')}<div class="muted">${esc(munDisp(k.municipio))}</div></td><td class="mono right">${money(k.valor_total)}</td><td class="mono small">${fechaCorta(k.fecha_acta)}<div class="muted">${k.tiempo_ejec||'—'} días</div></td><td class="mono">${cs.length}</td><td>${cs.length?`<span class="tag ${pg===cs.length?'paid':'et'}">${pg}/${cs.length} pagadas</span>`:'—'}</td></tr>`;}).join('')+'</tbody></table>' : '<div class="loading">No hay contratos con los filtros actuales.</div>';
 }
 let _plan=[]; // edición del plan en el modal
+let _kActual=null;
 function abrirContrato(id){
   const k=id?ST.contratos.find(x=>x.id===id):{numero_contrato:'',programa:$('fPrograma').value||'',resolucion:'',cedula:'',nombre:'',rol:'',municipio:'',objeto:'',valor_total:0,tiempo_ejec:null,fecha_acta:null,correo:'',telefono:'',activo:true,vigencia:2026};
-  const edit=puedeGestionar();
+  const edit=puedeGestionar(); _kActual=k;
   const cs=id?ST.cuentas.filter(c=>c.contrato_id===id).sort((a,b)=>a.num_pago-b.num_pago):[];
-  _plan=cs.map(c=>({id:c.id,num_pago:c.num_pago,periodo_ini:c.periodo_ini,periodo_fin:c.periodo_fin,valor:+c.valor,etapa:c.etapa,libre:c.etapa==='contratista'&&!c.devuelta_desde&&!(ST.movsByCuenta.get(c.id)||[]).length}));
+  _plan=cs.map(c=>({id:c.id,num_pago:c.num_pago,periodo_ini:c.periodo_ini,periodo_fin:c.periodo_fin,valor:+c.valor,etapa:c.etapa,liq:c.es_liquidacion,libre:c.etapa==='contratista'&&!c.devuelta_desde&&!(ST.movsByCuenta.get(c.id)||[]).length}));
   if(!id) _plan=[];
   $('mkTitulo').textContent=id?`Contrato ${k.numero_contrato}`:'Nuevo contrato';
   const dis=edit?'':'disabled';
   const progs=[...new Set([...ST.config.programas,k.programa].filter(Boolean))];
-  $('mkBody').innerHTML=`<div class="frm">
+  const avisoLiq=k.liquidado?`<div class="alertbox"><b>Contrato liquidado</b> el ${fechaCorta(k.liq_fecha)} por <b>${money(k.liq_valor)}</b>. Motivo: ${esc(k.liq_motivo||'—')}<br><span class="small">Registró: ${esc(k.liq_por||'')} · ${fechaHora(k.liq_en)}</span></div>`:'';
+  $('mkBody').innerHTML=avisoLiq+`<div class="frm">
     <div class="fld"><label>No. contrato *</label><input class="inp" id="kNum" value="${esc(k.numero_contrato)}" ${dis}></div>
     <div class="fld"><label>Programa *</label><select class="inp" id="kProg" ${dis}><option value="">—</option>${progs.map(p=>`<option ${p===k.programa?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
     <div class="fld"><label>Resolución</label><input class="inp" id="kRes" value="${esc(k.resolucion||'')}" ${dis}></div>
@@ -951,7 +975,13 @@ function abrirContrato(id){
     <button class="btn" onclick="_plan.push({num_pago:(_plan.reduce((m,p)=>Math.max(m,p.num_pago),0)+1),periodo_ini:null,periodo_fin:null,valor:0,libre:true,etapa:'contratista'});pintarPlan()">＋ Agregar pago</button></div>`:''}
   <div id="kPlan"></div>`;
   pintarPlan();
-  $('mkFoot').innerHTML=(edit?`${id&&esSuper()?`<button class="btn bad" style="margin-right:auto" onclick="eliminarContrato('${id}')">Eliminar contrato</button>`:''}<button class="btn" onclick="cerrarModal('mdContrato')">Cancelar</button><button class="btn pri" onclick="guardarContrato(${id?`'${id}'`:'null'})">Guardar</button>`:'<button class="btn" onclick="cerrarModal(\'mdContrato\')">Cerrar</button>');
+  let foot='';
+  if(id&&esSuper()) foot+=`<button class="btn bad" style="margin-right:auto" onclick="eliminarContrato('${id}')">Eliminar contrato</button>`;
+  if(id&&!k.liquidado&&(esSuper()||ST.proceso==='contratacion')) foot+=`<button class="btn" onclick="abrirLiquidar('${id}')">⚖ Liquidar contrato</button>`;
+  if(id&&k.liquidado&&esSuper()) foot+=`<button class="btn" onclick="revertirLiquidacion('${id}')">↶ Revertir liquidación</button>`;
+  foot+= edit ? `<button class="btn" onclick="cerrarModal('mdContrato')">Cancelar</button><button class="btn pri" onclick="guardarContrato(${id?`'${id}'`:'null'})">Guardar</button>`
+              : `<button class="btn" onclick="cerrarModal('mdContrato')">Cerrar</button>`;
+  $('mkFoot').innerHTML=foot;
   $('mkFoot').dataset.id=id||'';
   if(!id && edit) recalcularPlan();
   abrirModal('mdContrato');
@@ -968,15 +998,16 @@ function recalcularPlan(){
 }
 function pintarPlan(){
   const edit=puedeGestionar(); const total=+($('kVal')?$('kVal').value:0)||0;
-  const suma=_plan.reduce((s,p)=>s+(+p.valor||0),0);
+  const suma=_plan.filter(p=>p.etapa!=='anulada').reduce((s,p)=>s+(+p.valor||0),0);
+  const kLiq=_kActual&&_kActual.liquidado;
   $('kPlan').innerHTML= _plan.length? `<div class="tbl-wrap"><table><thead><tr><th>Pago</th><th>Inicio</th><th>Fin</th><th class="right">Valor</th><th>Estado</th><th></th></tr></thead><tbody>${_plan.map((p,i)=>`<tr>
     <td class="mono">${p.num_pago}</td>
-    <td><input type="date" class="inp" value="${p.periodo_ini||''}" ${edit?'':'disabled'} onchange="_plan[${i}].periodo_ini=this.value"></td>
-    <td><input type="date" class="inp" value="${p.periodo_fin||''}" ${edit?'':'disabled'} onchange="_plan[${i}].periodo_fin=this.value"></td>
-    <td><input type="number" class="inp right" style="width:140px" value="${p.valor}" ${edit?'':'disabled'} onchange="_plan[${i}].valor=+this.value;pintarPlan()"></td>
-    <td class="small">${p.libre?'<span class="tag none">Sin entregar</span>':`<span class="tag et">${esc(ETAPA_LBL[p.etapa]||'')}</span>`}</td>
+    <td><input type="date" class="inp" value="${p.periodo_ini||''}" ${edit&&p.etapa!=='anulada'?'':'disabled'} onchange="_plan[${i}].periodo_ini=this.value"></td>
+    <td><input type="date" class="inp" value="${p.periodo_fin||''}" ${edit&&p.etapa!=='anulada'?'':'disabled'} onchange="_plan[${i}].periodo_fin=this.value"></td>
+    <td><input type="number" class="inp right" style="width:140px" value="${p.valor}" ${edit&&p.etapa!=='anulada'?'':'disabled'} onchange="_plan[${i}].valor=+this.value;pintarPlan()"></td>
+    <td class="small">${p.etapa==='anulada'?'<span class="tag none">✕ Anulada</span>':p.libre?'<span class="tag none">Sin entregar</span>':`<span class="tag et">${esc(p.etapa==='contratista'?'Por entregar':ETAPA_LBL[p.etapa]||'')}</span>`}${p.liq?' <span class="tag warn">Liquidación</span>':''}</td>
     <td>${edit&&p.libre?`<button class="btn sm bad" onclick="_plan.splice(${i},1);pintarPlan()">Quitar</button>`:''}</td></tr>`).join('')}
-    <tr><td colspan="3" class="right"><b>Suma</b></td><td class="mono right"><b>${money(suma)}</b></td><td colspan="2" class="small" style="color:${Math.round(suma)===Math.round(total)?'var(--green)':'var(--red)'}">${Math.round(suma)===Math.round(total)?'✔ Coincide con el valor del contrato':'⚠ Diferencia de '+money(total-suma)}</td></tr>
+    <tr><td colspan="3" class="right"><b>Suma</b></td><td class="mono right"><b>${money(suma)}</b></td><td colspan="2" class="small" style="color:${kLiq?'var(--yellow)':Math.round(suma)===Math.round(total)?'var(--green)':'var(--red)'}">${kLiq?'Contrato liquidado: no se ejecutan '+money(total-suma):Math.round(suma)===Math.round(total)?'✔ Coincide con el valor del contrato':'⚠ Diferencia de '+money(total-suma)}</td></tr>
     </tbody></table></div>` : '<div class="small muted">Sin pagos. Complete el acta de inicio, la duración y el valor, y pulse «Recalcular automático».</div>';
 }
 async function guardarContrato(id){
@@ -1007,6 +1038,58 @@ async function guardarContrato(id){
   if(cambios.length) await sb.from('cc_movimientos').insert(cambios);
   await cargarDatos(); poblarFiltros(); renderAll();
   cerrarModal('mdContrato'); toast('Contrato guardado','ok');
+}
+/* ── Liquidación de contratos (superadmin y Contratación) ── */
+let _liqId=null;
+function pagosLibres(id){ return ST.cuentas.filter(c=>c.contrato_id===id&&c.etapa==='contratista'&&!c.devuelta_desde&&!(ST.movsByCuenta.get(c.id)||[]).length).sort((a,b)=>a.num_pago-b.num_pago); }
+function abrirLiquidar(id){
+  _liqId=id; const k=ST.contratos.find(x=>x.id===id);
+  const cs=ST.cuentas.filter(c=>c.contrato_id===id); const tram=cs.filter(c=>!['anulada'].includes(c.etapa)).length-pagosLibres(id).length;
+  $('lqTitulo').textContent='Liquidar contrato '+k.numero_contrato;
+  $('lqInfo').innerHTML=`<b>${esc(k.nombre)}</b> · valor del contrato ${money(k.valor_total)}<br>${tram} cuenta(s) ya entregadas o en trámite: <b>no se modifican</b>. ${pagosLibres(id).length} pago(s) sin entregar.`;
+  $('lqFecha').value=todayISO(); $('lqValor').value=0; $('lqMotivo').value='';
+  previsualizarLiquidacion(); abrirModal('mdLiquidar');
+}
+function previsualizarLiquidacion(){
+  const libres=pagosLibres(_liqId); const v=+$('lqValor').value||0;
+  let t;
+  if(v>0) t = libres.length ? `El pago ${libres[0].num_pago} queda como <b>cuenta de liquidación por ${money(v)}</b> y sigue el flujo normal hasta Tesorería. Se anulan ${libres.length-1} pago(s) restantes.`
+                           : `Se crea una <b>cuenta de liquidación por ${money(v)}</b> que sigue el flujo normal hasta Tesorería.`;
+  else t = `Liquidación en <b>$ 0</b>: se anulan los ${libres.length} pago(s) sin entregar y no queda nada por pagar.`;
+  $('lqPrev').innerHTML=t;
+}
+async function liquidar(){
+  const fecha=$('lqFecha').value, valor=$('lqValor').value, motivo=$('lqMotivo').value.trim();
+  if(!fecha||valor===''||+valor<0){ toast('Indique la fecha y un valor de liquidación válido (puede ser 0)','err'); return; }
+  if(!motivo){ toast('Escriba el motivo de la liquidación','err'); return; }
+  const k=ST.contratos.find(x=>x.id===_liqId);
+  if(!confirm(`¿Liquidar el contrato ${k.numero_contrato} de ${k.nombre} por ${money(+valor)}?`)) return;
+  const b=$('btnLiquidar'); b.disabled=true;
+  const {data,error}=await sb.rpc('cc_liquidar',{p_contrato:_liqId,p_fecha:fecha,p_valor:+valor,p_motivo:motivo});
+  b.disabled=false;
+  if(error){ toast(error.message,'err'); return; }
+  await cargarDatos(); poblarFiltros(); renderAll();
+  cerrarModal('mdLiquidar'); abrirContrato(_liqId);
+  toast(`Contrato liquidado · ${data.anuladas} pago(s) anulados`,'ok');
+}
+async function revertirLiquidacion(id){
+  const k=ST.contratos.find(x=>x.id===id);
+  if(!confirm(`¿Revertir la liquidación del contrato ${k.numero_contrato}? Los pagos anulados vuelven a quedar como no entregados.`)) return;
+  const {data,error}=await sb.rpc('cc_revertir_liquidacion',{p_contrato:id});
+  if(error){ toast(error.message,'err'); return; }
+  await cargarDatos(); poblarFiltros(); renderAll(); abrirContrato(id);
+  toast(`Liquidación revertida · ${data.restauradas} pago(s) restaurados`,'ok');
+}
+/* ── Borrar certificado de cumplimiento EBS (solo superadmin) ── */
+async function borrarCertificado(cuentaId){
+  const c=ST.cuentas.find(x=>x.id===cuentaId); const cert=c&&certDe(c); if(!cert) return;
+  const motivo=prompt(`Borrar el certificado de cumplimiento ${cert.radicado} (contrato ${c.k.numero_contrato}).\nSi el certificado cubre varias cuentas, se borra completo. El número no se volverá a usar.\n\nEscriba el motivo:`);
+  if(motivo===null) return;
+  if(!motivo.trim()){ toast('El motivo es obligatorio','err'); return; }
+  const {error}=await sb.rpc('cc_borrar_certificado',{p_radicado:cert.radicado,p_motivo:motivo.trim()});
+  if(error){ toast(error.message,'err'); return; }
+  await cargarCertificados(); abrirCuenta(cuentaId); renderAll();
+  toast('Certificado '+cert.radicado+' borrado','ok');
 }
 async function eliminarContrato(id){
   const k=ST.contratos.find(x=>x.id===id);

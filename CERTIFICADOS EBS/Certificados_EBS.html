@@ -587,6 +587,7 @@ async function boot(){
       if(row.clave==='cuentas') ST.diasPorCuenta=(row.valor&&row.valor.dias)||30;
       if(row.clave==='cargues_historial') ST.cargues=(row.valor&&row.valor.items)||[];
     });
+    await detectarSuperadmin();
     initFilters();
     renderAll();
     toast('Datos cargados: '+ST.contratistas.length+' contratistas','ok');
@@ -1367,6 +1368,7 @@ function renderEmitidos(){
       <td style="white-space:nowrap">
         <button class="btn btn-ghost btn-sm" onclick="descargarEmitido('${esc(g.radicado)}')" title="Volver a descargar">⬇</button>
         <button class="btn btn-primary btn-sm" onclick="openCorregir('${esc(g.radicado)}')" title="Corregir y descargar">✎ Corregir</button>
+        ${ST.esSuper?`<button class="btn btn-ghost btn-sm" style="color:#e94560" onclick="borrarEmitido('${esc(g.radicado)}')" title="Borrar el número del certificado (solo superadministrador)">🗑</button>`:''}
       </td></tr>`;
   }).join('') || '<tr><td colspan="8" class="muted" style="text-align:center;padding:20px">Sin certificados emitidos.</td></tr>';
   const sum=ST.emitidos.reduce((s,e)=>s+(+e.total||0),0);
@@ -1375,6 +1377,33 @@ function renderEmitidos(){
     <div class="kpi"><div class="n">${ST.emitidos.length}</div><div class="l">Cuentas certificadas</div></div>
     <div class="kpi"><div class="n">${new Set(ST.emitidos.map(e=>e.cedula)).size}</div><div class="l">Contratistas</div></div>
     <div class="kpi"><div class="n" style="font-size:16px">${money(sum)}</div><div class="l">Valor certificado</div></div>`;
+}
+// El superadministrador del portal (sesión compartida en este navegador) puede borrar certificados.
+// El borrado lo hace la función cc_borrar_certificado: guarda el registro en certeb_anulados y el
+// consecutivo del radicador no retrocede, así que el número no se vuelve a usar.
+async function detectarSuperadmin(){
+  ST.esSuper=false;
+  try{
+    const {data:{session}}=await supa.auth.getSession();
+    if(!session) return;
+    const {data}=await supa.rpc('es_superadmin');
+    ST.esSuper=data===true;
+  }catch(e){ ST.esSuper=false; }
+}
+async function borrarEmitido(radicado){
+  const g=emitidosAgrupados().find(x=>x.radicado===radicado); if(!g) return;
+  const cuentas=g.filas.map(f=>f.cuenta_num?('cuenta '+f.cuenta_num):(f.periodo_etiqueta||'')).join(', ');
+  const motivo=prompt(`Borrar el certificado ${radicado}
+${g.nombre} · contrato ${g.codigo_contrato||''} · ${cuentas}
+
+El número no se volverá a usar y quedará registrado como anulado.
+Escriba el motivo:`);
+  if(motivo===null) return;
+  if(!motivo.trim()){ toast('El motivo es obligatorio','err'); return; }
+  const {error}=await supa.rpc('cc_borrar_certificado',{p_radicado:radicado,p_motivo:motivo.trim()});
+  if(error){ toast('No se pudo borrar: '+error.message,'err'); return; }
+  ST.emitidos=ST.emitidos.filter(e=>e.radicado!==radicado);
+  renderEmitidos(); toast('Certificado '+radicado+' borrado','ok');
 }
 // Reconstruye el objeto {c, opts, rows, fechaExp} de un certificado emitido para regenerar el PDF
 function reconstruirCert(g){
