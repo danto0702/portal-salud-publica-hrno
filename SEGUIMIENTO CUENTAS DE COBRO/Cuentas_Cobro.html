@@ -336,14 +336,14 @@ tr.clk:hover td{background:var(--surface2)}
 /* ═══════════════════════════════════════════════════════════════
    CONSTANTES
    ═══════════════════════════════════════════════════════════════ */
-const ETAPAS = ['contratista','salud_publica','contratacion','subgerencia','secop','supervision','tesoreria','pagada'];
+const ETAPAS = ['contratista','salud_publica','contratacion','subgerencia','supervision','secop','tesoreria','pagada'];
 const ETAPA_LBL = {
   contratista:'Contratista', salud_publica:'Salud Pública', contratacion:'Contratación',
   subgerencia:'Subgerencia', secop:'SECOP II', supervision:'Supervisión', tesoreria:'Tesorería', pagada:'Pagada'
 };
 const ETAPA_DET = {
   contratista:'En manos del contratista', salud_publica:'1er filtro', contratacion:'2do filtro',
-  subgerencia:'3er filtro · radicado y factura', secop:'Cargue del contratista', supervision:'Subgerencia',
+  subgerencia:'3er filtro · radicado y factura', supervision:'Subgerencia', secop:'Cargue del contratista',
   tesoreria:'Pago', pagada:'Proceso terminado'
 };
 const PROCESOS = {salud_publica:'Salud Pública', contratacion:'Contratación', subgerencia:'Subgerencia', tesoreria:'Tesorería', lector:'Lector', superadmin:'Superadministrador'};
@@ -803,13 +803,14 @@ function abrirCuenta(id){
     <div><span class="muted">Supervisión:</span> <b>${esc(c.sup_estado)}</b> ${c.sup_fecha?'· '+fechaCorta(c.sup_fecha):''}</div>
     <div><span class="muted">Tesorería:</span> <b>${esc(c.tes_estado)}</b> ${c.tes_valor!=null?'· '+money(c.tes_valor):''} ${c.tes_fecha?'· '+fechaCorta(c.tes_fecha):''}</div>
     <div><span class="muted">Número ND:</span> <b>${esc(c.nd||'—')}</b></div>
+    <div class="full"><span class="muted">Control Subgerencia:</span> ${[['sg_notificado','Notificado al contratista'],['sg_presupuesto','Informado a presupuesto'],['sg_correo','Contratista envió correo']].map(([f,l])=>`<span class="tag ${c[f]?'ok':'none'}">${c[f]?'✔':'○'} ${l}</span>`).join(' ')}</div>
     ${c.observaciones?`<div class="full"><span class="muted">Observaciones:</span> ${esc(c.observaciones)}</div>`:''}
   </div>`;
   h+=panelAcciones(c);
   h+=`<h3 style="font-size:14px;color:var(--text3);margin:16px 0 8px">Historial</h3>`;
   h+= ms.length? '<ul class="timeline">'+ms.map(m=>{
     const cls=m.accion==='devolver'?'dev':m.accion==='pagar'?'pay':'';
-    const acc={recibir:'Recepción',aprobar:'Aprobada',devolver:'Devuelta',pagar:'Pagada',datos:'Datos actualizados',mover_admin:'Movida por superadministrador',editar:'Plan de pagos editado'}[m.accion]||m.accion;
+    const acc={recibir:'Recepción',aprobar:'Aprobada',devolver:'Devuelta',pagar:'Pagada',datos:'Datos actualizados',mover_admin:'Movida por superadministrador',editar:'Plan de pagos editado',migracion:'Migración desde Excel de Subgerencia'}[m.accion]||m.accion;
     const ruta=m.etapa_origen!==m.etapa_destino?` · ${esc(ETAPA_LBL[m.etapa_origen]||m.etapa_origen||'')} → ${esc(ETAPA_LBL[m.etapa_destino]||m.etapa_destino||'')}`:'';
     const det=m.detalle&&Object.keys(m.detalle).length?`<div class="small muted">${esc(Object.entries(m.detalle).map(([a,b])=>a+': '+b).join(' · '))}</div>`:'';
     return `<li class="${cls}"><b>${acc}</b>${ruta}<div class="small muted">${fechaHora(m.fecha)} · ${esc(m.usuario_nombre||'')} (${esc(PROCESOS[m.usuario_proceso]||m.usuario_proceso||'')})</div>${m.motivo?`<div>${esc(m.motivo)}</div>`:''}${det}</li>`;
@@ -837,18 +838,17 @@ function panelAcciones(c){
     h+=`<button class="btn pri" onclick="accion('${c.id}','recibir')">📥 Registrar recepción de la cuenta</button></div>
       <div class="small muted">El contratista entregó la cuenta${c.devuelta_desde?' corregida; vuelve a '+esc(ETAPA_LBL[c.devuelta_desde]):' a Salud Pública'}.</div>`;
   }else if(e==='salud_publica'||e==='contratacion'||e==='supervision'){
-    h+=`<button class="btn ok" onclick="accion('${c.id}','aprobar')">✔ Aprobar y enviar a ${esc(ETAPA_LBL[siguiente(e)])}</button></div>`;
+    h+=`<button class="btn ok" onclick="accion('${c.id}','aprobar')">✔ Aprobar y enviar a ${esc(ETAPA_LBL[siguiente(e)])}</button></div>`+(e==='supervision'?checksSubgerencia(c):'');
   }else if(e==='subgerencia'){
     h+=`<div class="fld"><label>No. radicado *</label><input class="inp" id="acRad" value="${esc(c.radicado||'')}"></div>
       <div class="fld"><label>No. factura electrónica *</label><input class="inp" id="acFac" value="${esc(c.factura||'')}"></div>
       <button class="btn" onclick="guardarDatos('${c.id}',{radicado:$('acRad').value.trim(),factura:$('acFac').value.trim()})">Guardar</button>
-      <button class="btn ok" onclick="accion('${c.id}','aprobar')">✔ Aprobar y enviar soportes para SECOP II</button></div>
-      <div class="small muted">Al aprobar, los soportes y la factura van al contratista para el cargue en SECOP II.</div>`;
+      <button class="btn ok" onclick="accion('${c.id}','aprobar')">✔ Aprobar y enviar a Supervisión</button></div>`+checksSubgerencia(c);
   }else if(e==='secop'){
     h+=`<div class="fld"><label>Estado SECOP II</label><select class="inp" id="acSecop">${['Pendiente','Publicado'].map(o=>`<option ${c.secop_estado===o?'selected':''}>${o}</option>`).join('')}</select></div>
       <button class="btn" onclick="guardarDatos('${c.id}',{secop_estado:$('acSecop').value,secop_fecha:$('acFecha').value})">Guardar estado</button>
-      <button class="btn ok" onclick="accion('${c.id}','aprobar')">✔ Aprobado en SECOP II → Supervisión</button></div>
-      <div class="small muted">Registre «Publicado» cuando el contratista informe por correo que cargó en SECOP II.</div>`;
+      <button class="btn ok" onclick="accion('${c.id}','aprobar')">✔ Aprobado en SECOP II → Tesorería</button></div>
+      <div class="small muted">Registre «Publicado» cuando el contratista informe por correo que cargó en SECOP II.</div>`+checksSubgerencia(c);
   }else if(e==='tesoreria'){
     h+=`<div class="fld"><label>Valor pagado *</label><input type="number" class="inp" id="acValor" value="${c.tes_valor??c.valor}"></div>
       <div class="fld"><label>No. ND (certificado de egreso) *</label><input class="inp" id="acNd" value="${esc(c.nd||'')}"></div>
@@ -862,6 +862,11 @@ function panelAcciones(c){
   if(esSuper()) h+=panelSuper(c);
   return h;
 }
+// Casillas de control de Subgerencia (notificación, presupuesto, correo del contratista)
+function checksSubgerencia(c){
+  const it=[['sg_notificado','Notificado al contratista'],['sg_presupuesto','Informado a presupuesto'],['sg_correo','Contratista envió correo del cargue']];
+  return `<div class="row" style="margin-top:8px">${it.map(([f,l])=>`<label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" ${c[f]?'checked':''} onchange="guardarDatos('${c.id}',{${f}:this.checked})"> ${l}</label>`).join('')}</div>`;
+}
 function panelSuper(c){
   const campos=[['radicado','Radicado'],['factura','Factura'],['nd','Número ND'],['tes_valor','Valor pagado'],['tes_fecha','Fecha de pago','date'],['sp_fecha','Fecha 1er filtro','date'],['ct_fecha','Fecha 2do filtro','date'],['sg_fecha','Fecha 3er filtro','date'],['sup_fecha','Fecha supervisión','date'],['secop_fecha','Fecha SECOP','date']];
   return `<div class="acc" style="border-color:rgba(124,29,111,.3)"><h4>🛠 Superadministrador · corrección</h4>
@@ -872,6 +877,7 @@ function panelSuper(c){
     <div class="fld"><label>Estado SECOP</label><select class="inp sa-f" data-f="secop_estado">${['Pendiente','Publicado','Aprobado'].map(o=>`<option ${c.secop_estado===o?'selected':''}>${o}</option>`).join('')}</select></div>
     <div class="fld"><label>Estado supervisión</label><select class="inp sa-f" data-f="sup_estado">${['Pendiente','Aprobado','Devuelto'].map(o=>`<option ${c.sup_estado===o?'selected':''}>${o}</option>`).join('')}</select></div>
     <div class="fld"><label>Estado Tesorería</label><select class="inp sa-f" data-f="tes_estado">${['No pagado','Pagado','Devuelto'].map(o=>`<option ${c.tes_estado===o?'selected':''}>${o}</option>`).join('')}</select></div>
+    ${[['sg_notificado','Notificado al contratista'],['sg_presupuesto','Informado a presupuesto'],['sg_correo','Contratista envió correo']].map(([f,l])=>`<div class="fld"><label>${l}</label><select class="inp sa-f" data-f="${f}"><option value="true" ${c[f]?'selected':''}>Sí</option><option value="false" ${c[f]?'':'selected'}>No</option></select></div>`).join('')}
     </div><div style="margin-top:8px"><button class="btn" onclick="guardarSuper('${c.id}')">Guardar corrección</button></div></div>`;
 }
 async function accion(id,acc){
@@ -1028,8 +1034,9 @@ function cgRol(o){
   if(o.includes('AUXILIAR')&&o.includes('ENFERMER')) return 'AUXILIAR DE ENFERMERIA';
   if(o.includes('VACUNADOR')) return 'VACUNADOR';
   if(o.includes('ENFERMER')&&(o.includes('PROFESIONAL')||o.includes('JEFE'))) return 'ENFERMERA PROFESIONAL';
-  if(o.includes('TRANSPORTE')) return 'TRANSPORTE';
-  if(o.includes('SUMINISTRO')) return 'SUMINISTROS';
+  // proveedor solo si el objeto es el servicio/suministro (no si lo menciona, p. ej. "revisión de cuentas de suministros")
+  if(/^SERVICIO (DE )?TRANSPORTE/.test(o)||o.includes('TRANSPORTE TERRESTRE')) return 'TRANSPORTE';
+  if(/^SUMINISTRO/.test(o)) return 'SUMINISTROS';
   if(o.includes('COORDINADOR')) return 'COORDINADOR';
   if(o.includes('INGENIERO')) return 'INGENIERO DE SISTEMAS';
   if(o.includes('GESTION DE LA INFORMACION')) return 'GESTION DE LA INFORMACION';
@@ -1212,19 +1219,19 @@ function exportarExcel(){
   if(!cs.length){ toast('No hay cuentas con los filtros actuales','err'); return; }
   const hdr=['No.','Identificación','Nombre','Contrato','No. Pago','Periodo','Programa','Resolución','Municipio','Valor del Contrato','Valor de la Cuenta',
     'Radicado (Subgerencia)','Factura Electrónica (Subgerencia)','Primer Filtro (Salud Pública)','Fecha','Segundo Filtro (Contratación)','Fecha',
-    'Tercer Filtro (Subgerencia)','Fecha','Supervisor (Subgerencia)','Fecha','Estado SECOP II','Fecha','Pagos (Tesorería)','Valor Pagado','Fecha de Pago','Número ND',
+    'Tercer Filtro (Subgerencia)','Fecha','Supervisor (Subgerencia)','Fecha','Estado SECOP II','Fecha','Notificación al Contratista','Informado a Presupuesto','Contratista Envió Correo','Pagos (Tesorería)','Valor Pagado','Fecha de Pago','Número ND',
     'Proceso actual','Días en el proceso','Semáforo','Devoluciones','Cert. cumplimiento EBS','Observaciones'];
   const f=s=>s?parseISO(s):null;
   const filas=cs.map((c,i)=>{ const k=c.k; const s=semaforo(c); const cert=k.programa==='EBS'?certDe(c):null;
     return [i+1,k.cedula,k.nombre,k.numero_contrato,c.num_pago,(c.periodo_ini?fechaCorta(c.periodo_ini):'')+' a '+(c.periodo_fin?fechaCorta(c.periodo_fin):''),k.programa,k.resolucion||'',munDisp(k.municipio),+k.valor_total||0,+c.valor||0,
-      c.radicado||'',c.factura||'',c.sp_estado,f(c.sp_fecha),c.ct_estado,f(c.ct_fecha),c.sg_estado,f(c.sg_fecha),c.sup_estado,f(c.sup_fecha),c.secop_estado,f(c.secop_fecha),
+      c.radicado||'',c.factura||'',c.sp_estado,f(c.sp_fecha),c.ct_estado,f(c.ct_fecha),c.sg_estado,f(c.sg_fecha),c.sup_estado,f(c.sup_fecha),c.secop_estado,f(c.secop_fecha),c.sg_notificado?'SI':'NO',c.sg_presupuesto?'SI':'NO',c.sg_correo?'SI':'NO',
       c.tes_estado,c.tes_valor!=null?+c.tes_valor:'',f(c.tes_fecha),c.nd||'',
       c.etapa==='contratista'&&c.devuelta_desde?'Devuelta al contratista':ETAPA_LBL[c.etapa],s.dias??'',{ok:'A tiempo',warn:'En el límite',alert:'Vencida',none:'Sin plazo',paid:'Pagada'}[s.nivel],c.devoluciones,cert?cert.radicado:'',c.observaciones||''];
   });
   const ws=XLSX.utils.aoa_to_sheet([hdr].concat(filas),{cellDates:true,dateNF:'dd/mm/yyyy'});
-  ws['!cols']=hdr.map((h,i)=>({wch:[5,13,34,10,8,24,16,14,12,15,15,16,16,14,11,14,11,14,11,14,11,14,11,12,14,11,12,22,10,12,10,16,30][i]||12}));
+  ws['!cols']=hdr.map((h,i)=>({wch:[5,13,34,10,8,24,16,14,12,15,15,16,16,14,11,14,11,14,11,14,11,14,11,12,12,12,12,14,11,12,22,10,12,10,16,30][i]||12}));
   ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:filas.length,c:hdr.length-1}})};
-  for(let r=1;r<=filas.length;r++){ [9,10,24].forEach(ci=>{ const a=XLSX.utils.encode_cell({r,c:ci}); if(ws[a]&&ws[a].t==='n') ws[a].z='"$"#,##0'; }); }
+  for(let r=1;r<=filas.length;r++){ [9,10,27].forEach(ci=>{ const a=XLSX.utils.encode_cell({r,c:ci}); if(ws[a]&&ws[a].t==='n') ws[a].z='"$"#,##0'; }); }
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Seguimiento');
 
   const ids=new Set(cs.map(c=>c.id)); const byId=new Map(cs.map(c=>[c.id,c]));
