@@ -146,6 +146,11 @@ tr.clk:hover td{background:var(--surface2)}
 .center-msg{max-width:520px;margin:80px auto;text-align:center;background:var(--surface);padding:30px;border-radius:14px;border:1px solid var(--border)}
 .center-msg h2{color:var(--primary);margin-bottom:10px}
 .loading{padding:60px;text-align:center;color:var(--text2)}
+/* Firma de quien desarrolla (misma del módulo de Flota): pie de la aplicación y pantallas de ingreso */
+.pie{display:flex;align-items:center;justify-content:center;gap:.45rem;padding:16px;border-top:1px solid var(--border);background:var(--surface)}
+.credito{display:flex;align-items:center;justify-content:center;gap:.45rem;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
+.pie span,.credito span{font-size:11px;font-weight:600;color:var(--text2);letter-spacing:.02em}
+.pie img,.credito img{width:104px;height:auto;display:block;opacity:.92}
 .bulkbar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px}
 .legend-sem{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-bottom:8px}
 @media (max-width:640px){
@@ -299,6 +304,10 @@ tr.clk:hover td{background:var(--surface2)}
       </div>
     </section>
   </main>
+  <footer class="pie">
+    <span>By</span>
+    <img src="assets/pascalia.png" alt="PascalIA" width="454" height="120">
+  </footer>
 </div>
 
 <div id="gate" class="loading">Cargando…</div>
@@ -523,7 +532,7 @@ async function recargarCuenta(id){
     ST.proceso = proc;
     if(!proc){
       $('gate').className='center-msg';
-      $('gate').innerHTML='<h2>Sin acceso al módulo</h2><p class="muted">Su usuario del portal todavía no tiene un rol en Seguimiento de Cuentas de Cobro. Solicite al superadministrador que le asigne su proceso o el rol de lector.</p><p style="margin-top:16px"><a class="btn" href="../index.html">← Volver al portal</a></p>';
+      $('gate').innerHTML='<h2>Sin acceso al módulo</h2><p class="muted">Su usuario del portal todavía no tiene un rol en Seguimiento de Cuentas de Cobro. Solicite al superadministrador que le asigne su proceso o el rol de lector.</p><p style="margin-top:16px"><a class="btn" href="../index.html">← Volver al portal</a></p><div class="credito"><span>By</span><img src="assets/pascalia.png" alt="PascalIA" width="454" height="120"></div>';
       return;
     }
     const {data:yo} = await sb.from('cc_usuarios').select('*').eq('usuario_id',ST.me.id).maybeSingle();
