@@ -151,6 +151,12 @@ tr.clk:hover td{background:var(--surface2)}
 .credito{display:flex;align-items:center;justify-content:center;gap:.45rem;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
 .pie span,.credito span{font-size:11px;font-weight:600;color:var(--text2);letter-spacing:.02em}
 .pie img,.credito img{width:104px;height:auto;display:block;opacity:.92}
+/* Logotipo de PascalIA al cambiar de pantalla: breve, no bloquea clics */
+.splash{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.94);backdrop-filter:blur(2px);z-index:450;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s ease,visibility 0s linear .2s}
+.splash.on{opacity:1;visibility:visible;transition:opacity .2s ease}
+.splash img{width:240px;max-width:64vw;height:auto;transform:scale(.9);transition:transform .55s cubic-bezier(.2,.8,.2,1)}
+.splash.on img{transform:scale(1)}
+@media (prefers-reduced-motion: reduce){.splash,.splash.on,.splash img{transition:none}.splash img{transform:none}}
 .bulkbar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px}
 .legend-sem{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-bottom:8px}
 @media (max-width:640px){
@@ -311,6 +317,8 @@ tr.clk:hover td{background:var(--surface2)}
 </div>
 
 <div id="gate" class="loading">Cargando…</div>
+
+<div class="splash" id="splash" aria-hidden="true"><img src="assets/pascalia.png" alt="" width="454" height="120"></div>
 
 <!-- Modal cuenta -->
 <div class="modal-bg" id="mdCuenta" onclick="if(event.target===this)cerrarModal('mdCuenta')">
@@ -583,7 +591,13 @@ function poblarFiltros(){
 }
 function limpiarFiltros(){ ['fPrograma','fResolucion','fMunicipio','fEtapa','fMes','fPago','fQ'].forEach(id=>$(id).value=''); renderAll(); }
 let _deb; function debRender(){ clearTimeout(_deb); _deb=setTimeout(renderAll,220); }
+let _splash;
+function mostrarLogo(){
+  const el=$('splash'); clearTimeout(_splash);
+  el.classList.add('on'); _splash=setTimeout(()=>el.classList.remove('on'),700);
+}
 function cambiarTab(t){
+  if(t!==ST.tab) mostrarLogo();
   ST.tab=t;
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='p-'+t));
