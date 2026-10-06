@@ -1261,6 +1261,7 @@ async function _accion(accion, p){
     case 'borrar_archivo':     return _borrarArchivo(p);
     case 'borrar_todo':        return _borrarTodo(p);
     case 'guardar_lote':       return _guardarLote(p);
+    case 'registros':          return _registros(p);
     case 'alias':              return _alias();
     case 'guardar_alias':      return _guardarAlias(p);
     case 'normalizar_nombres': return _normalizarNombres();
@@ -1336,71 +1337,100 @@ async function _archivos(){
 
 // ── Borrar archivo (CASCADE elimina sus registros) ────────────────────
 async function _borrarArchivo(p){
-  await sbDelete('certivac_archivos',{'id_archivo':'eq.'+p.id_archivo});
+  await sbDelete('certivac_archivos',{'id':'eq.'+p.id_archivo});
   return {ok:true, registrosBorrados:'(cascade)'};
 }
 
 // ── Borrar todo ────────────────────────────────────────────────────────
 async function _borrarTodo(p){
   if(p.confirmacion!=='BORRAR_TODO') throw new Error('Confirmación incorrecta');
-  await sbDelete('certivac_registros',{'id_registro':'not.is.null'});
-  await sbDelete('certivac_archivos',{'id_archivo':'not.is.null'});
+  await sbDelete('certivac_registros',{'id':'not.is.null'});
+  await sbDelete('certivac_archivos',{'id':'not.is.null'});
   return {ok:true};
 }
 
 // ── Guardar lote (archivo + registros) ────────────────────────────────
+// El parser entrega campos en camelCase (idPaciente, tipoEdad, dosis, grupoCiclo...).
+// Aquí se mapean a las columnas snake_case de certivac_registros, igual que hacía
+// el backend anterior (CertiVac_Backend.gs). La PK de ambas tablas es "id".
+const MESES_REG=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 async function _guardarLote(p){
   const{archivo,registros}=p;
   let idArchivo=archivo.idArchivoExistente||'';
 
-  if(!idArchivo || archivo.chunkIndex===0){
+  if(!idArchivo){
+    if(archivo.chunkIndex>0) throw new Error('Lote '+(archivo.chunkIndex+1)+' sin id de archivo');
+    const previos=await sbAll('certivac_archivos',{'nombre_archivo':'eq.'+archivo.nombre,'estado':'eq.OK'},'id');
+    if(previos.length) throw new Error(`"${archivo.nombre}" ya fue cargado. Elimínelo primero desde el historial.`);
     const archivoRow={
       nombre_archivo:archivo.nombre,
       fecha_carga:new Date().toISOString(),
       tamaño:archivo.tamaño||'',
       mes_archivo:String(archivo.mes||''),
-      año_archivo:String(archivo.año||''),
+      año_archivo:parseInt(archivo.año)||null,
       municipio:archivo.municipio||'',
       departamento:archivo.departamento||'Norte de Santander',
       institucion:archivo.institucion||'ESE Hospital Regional Noroccidental - PAI',
       total_registros:0, en_ciclo:0, fuera_ciclo:0, estado:'PROCESANDO'
     };
     const res=await sbPost('certivac_archivos',archivoRow,'return=representation');
-    idArchivo=res[0].id_archivo;
+    idArchivo=res[0].id;
   }
+
+  const aliasRows=await sbAll('certivac_alias_vacunadoras',{},'alias_raw,nombre_canonical');
+  const aliasMap={}; aliasRows.forEach(a=>{ aliasMap[(a.alias_raw||'').toUpperCase()]=a.nombre_canonical; });
+  const anioArch=parseInt(archivo.año)||null;
+  const num=v=>{ const n=parseFloat(v); return isNaN(n)?null:n; };
 
   // Insertar registros en sub-lotes de 500
   const CHUNK_SB=500;
   const ahora=new Date().toISOString();
   let guardados=0;
   for(let i=0;i<registros.length;i+=CHUNK_SB){
-    const lote=registros.slice(i,i+CHUNK_SB).map(r=>({
-      fecha_carga:ahora, id_archivo:idArchivo,
-      nombre_archivo:r.nombre_archivo||archivo.nombre,
-      dia:r.dia||null, año:r.año||null, mes_num:r.mes_num||null,
-      mes_nombre:r.mes_nombre||'', trimestre:r.trimestre||'', semestre:r.semestre||'',
-      vacunadora:r.vacunadora||'', id_paciente:String(r.id_paciente||''),
-      tipo_edad:r.tipo_edad||'', edad_num:r.edad_num||0, edad_meses:r.edad_meses||0,
-      poblacion:r.poblacion||'', biologico:r.biologico||'', texto_dosis:r.texto_dosis||'',
-      ciclo:r.ciclo||'', grupo_ciclo:r.grupo_ciclo||'', en_ciclo:r.en_ciclo||false,
-      valor_unitario:r.valor_unitario||0, meta_ciclo:r.meta_ciclo||0,
-      municipio:r.municipio||'', departamento:r.departamento||'Norte de Santander',
-      institucion:r.institucion||'ESE Hospital Regional Noroccidental - PAI'
-    }));
-    await sbPost('certivac_registros',lote);
+    const lote=registros.slice(i,i+CHUNK_SB).map(r=>{
+      const dia=/^\d{4}-\d{2}-\d{2}$/.test(String(r.dia||''))?r.dia:null;
+      const anio=dia?parseInt(dia.substring(0,4)):anioArch;
+      const mesN=dia?parseInt(dia.substring(5,7)):(archivo.mesNum||null);
+      const vac=r.vacunadora||'';
+      return {
+        fecha_carga:ahora, id_archivo:idArchivo,
+        nombre_archivo:archivo.nombre,
+        dia, año:anio, mes_num:mesN,
+        mes_nombre:MESES_REG[mesN]||'', trimestre:mesN?'T'+Math.ceil(mesN/3):'', semestre:mesN?'S'+(mesN<=6?1:2):'',
+        vacunadora:aliasMap[vac.toUpperCase()]||vac, id_paciente:String(r.idPaciente||''),
+        tipo_edad:String(r.tipoEdad||'').trim().charAt(0).toUpperCase(), edad_num:num(r.edadNum), edad_meses:num(r.edadMeses)||0,
+        poblacion:r.poblacion||'', biologico:r.biologico||'', texto_dosis:r.dosis||'',
+        ciclo:r.ciclo||'', grupo_ciclo:r.grupoCiclo||'', en_ciclo:!!r.ciclo,
+        valor_unitario:8000, meta_ciclo:r.metaCiclo||11,
+        municipio:archivo.municipio||'', departamento:archivo.departamento||'Norte de Santander',
+        institucion:archivo.institucion||'ESE Hospital Regional Noroccidental - PAI'
+      };
+    });
+    try{ await sbPost('certivac_registros',lote); }
+    catch(e){
+      // Si el archivo se creó en esta llamada, deshacerlo (CASCADE elimina sus registros)
+      if(!archivo.idArchivoExistente){ try{ await sbDelete('certivac_archivos',{'id':'eq.'+idArchivo}); }catch(x){} }
+      throw e;
+    }
     guardados+=lote.length;
   }
 
   // En el último chunk actualizar estadísticas del archivo
   if(archivo.chunkIndex===archivo.totalChunks-1){
-    const tots=await sbAll('certivac_registros',{'id_archivo':'eq.'+idArchivo},'id_registro,en_ciclo');
+    const tots=await sbAll('certivac_registros',{'id_archivo':'eq.'+idArchivo},'id,en_ciclo');
     const enCiclo=tots.filter(r=>r.en_ciclo).length;
-    await sbPatch('certivac_archivos',{'id_archivo':'eq.'+idArchivo},{
+    await sbPatch('certivac_archivos',{'id':'eq.'+idArchivo},{
       total_registros:tots.length, en_ciclo:enCiclo, fuera_ciclo:tots.length-enCiclo, estado:'OK'
     });
   }
   _ciclosCache=null;
   return {ok:true, idArchivo, registrosGuardados:guardados};
+}
+
+// ── Exportar registros completos ──────────────────────────────────────
+async function _registros(p){
+  const rows=await sbAll('certivac_registros',{},'*','año.desc,mes_num.desc,dia.desc');
+  return {ok:true, registros:p.limite?rows.slice(0,p.limite):rows};
 }
 
 // ── Alias de vacunadoras ───────────────────────────────────────────────
@@ -1725,7 +1755,7 @@ async function cargarHistorial(){
       <td class="td-m">${a.total_registros||0}</td>
       <td class="td-m" style="color:var(--teal-d)">${a.en_ciclo||0}</td>
       <td class="td-m" style="color:var(--orange)">${a.fuera_ciclo||0}</td>
-      <td><button class="bc-btn b-da" style="background:var(--crimson);color:#fff" onclick="borrarArchivoHist('${escJ(a.id_archivo)}','${escJ(a.nombre_archivo)}')">🗑️</button></td>
+      <td><button class="bc-btn b-da" style="background:var(--crimson);color:#fff" onclick="borrarArchivoHist('${escJ(a.id)}','${escJ(a.nombre_archivo)}')">🗑️</button></td>
     </tr>`).join('');
   }catch(e){
     tb.innerHTML=`<tr><td colspan="9"><div class="es"><div class="ei">❌</div><p>${e.message}</p></div></td></tr>`;
@@ -1952,7 +1982,7 @@ async function procesarYGuardar(file){
         const archivoMeta = {
           nombre:file.name, tamaño:fmtSz(file.size),
           mes:meta.mes||String(mesNum), año:meta.año||String(anioNum),
-          municipio:municipioFinal, departamento:meta.departamento,
+          mesNum, municipio:municipioFinal, departamento:meta.departamento,
           institucion:meta.institucion||'ESE Hospital Regional Noroccidental - PAI'
         };
         let totalGuardados=0;
@@ -1968,7 +1998,13 @@ async function procesarYGuardar(file){
             archivo:{...archivoMeta, esChunk:true, chunkIndex:ci, totalChunks, idArchivoExistente:idArchivoGuardado},
             registros:chunk
           };
-          const res=await apiPost(body);
+          let res;
+          try{ res=await apiPost(body,0); }
+          catch(e){
+            // Deshacer lo guardado (CASCADE elimina los registros del archivo)
+            if(idArchivoGuardado){ try{ await apiPost({accion:'borrar_archivo',id_archivo:idArchivoGuardado},0); }catch(x){} }
+            throw e;
+          }
           if(!res.ok) throw new Error(res.error||'Error al guardar lote '+(ci+1));
           totalGuardados+=res.registrosGuardados||chunk.length;
           if(ci===0) idArchivoGuardado=res.idArchivo||'';
