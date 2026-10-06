@@ -7,6 +7,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Lora:ital,wght@0,400;0,600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../auth.js"></script>
 
 <script>
 // ╔══════════════════════════════════════════════════════════════╗
@@ -1178,6 +1180,11 @@ function hideLoad(){$('lo').classList.remove('show')}
 // BACKEND — SUPABASE SI-APS HRNO
 // ═══════════════════════════════════════════════════════════════════════
 const SB_H = { apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json' };
+// Las tablas certivac_* solo aceptan usuarios del portal con permiso en el módulo
+// "certivac" (RLS). Todas las peticiones viajan con el token de la sesión.
+function sbUsarToken(session){
+  if(session&&session.access_token) SB_H.Authorization='Bearer '+session.access_token;
+}
 let _ciclosCache = null;
 
 // Fetch con paginación automática (Supabase devuelve máx 1000 por defecto)
@@ -4320,6 +4327,19 @@ function descargarPDFInformeMun(){
 }
 
 window.onload=async ()=>{
+  const ses=await portalVerificarSesion();
+  if(!ses) return;
+  if(!portalTienePermiso('certivac','lectura')){
+    document.querySelector('.main').innerHTML=`<div style="padding:60px 28px;text-align:center">
+      <div style="font-size:42px">🔒</div>
+      <h2 style="margin:12px 0 8px">Sin acceso a CertiVac</h2>
+      <p style="color:var(--s4)">Su usuario no tiene permiso en el módulo CertiVac / PAI. Solicítelo al administrador del portal.</p>
+      <p style="margin-top:18px"><a href="../index.html" class="btn b-co">Volver al portal</a></p></div>`;
+    return;
+  }
+  const{data:{session}}=await portalSb.auth.getSession();
+  sbUsarToken(session);
+  portalSb.auth.onAuthStateChange((_ev,s)=>sbUsarToken(s));
   renderMetas();
   // Verificar conexión Supabase y cargar datos
   const ok = await verificarConexion();
