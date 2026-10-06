@@ -208,6 +208,15 @@ td{padding:10px 13px;color:var(--ink);vertical-align:middle}
 .ct-l{font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;opacity:.65}
 .ct-v{font-family:'Lora',serif;font-size:22px;color:var(--teal)}
 .ct-v-ext{font-family:'Lora',serif;font-size:18px;color:var(--orange)}
+.ctot-sum{grid-column:1/-1;background:linear-gradient(135deg,var(--teal-d),var(--cobalt));color:#fff}.ctot-sum .ct-v{color:#fff}
+.sum-row td{background:rgba(27,79,216,.08)!important;font-weight:800;color:var(--cobalt)!important}
+.chk-sumar{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--s6);cursor:pointer;white-space:nowrap}
+.chk-sumar input{width:15px;height:15px;accent-color:var(--cobalt);cursor:pointer}
+.solo-sumar{display:none!important}
+body.sumar-fuera .ctot.solo-sumar{display:flex!important}
+body.sumar-fuera tr.solo-sumar{display:table-row!important}
+body.sumar-fuera th.solo-sumar,body.sumar-fuera td.solo-sumar{display:table-cell!important}
+body.sumar-fuera span.solo-sumar{display:inline-flex!important}
 .cfirmas{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:32px;padding-top:24px;border-top:1px solid var(--s2)}
 .fb{text-align:center}.fl{border-top:1.5px solid var(--ink);margin-bottom:5px;margin-top:34px}
 .flbl{font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:var(--s4);font-weight:600}
@@ -372,6 +381,7 @@ td{padding:10px 13px;color:var(--ink);vertical-align:middle}
             oninput="recalcAllCertRows()" placeholder="8000">
         </label>
         <span style="font-size:11px;color:var(--s4)">· Cambie el valor para recalcular toda la tabla automáticamente</span>
+        <label class="chk-sumar no-print" title="Suma el subtotal a pagar y el valor de las dosis fuera de meta"><input type="checkbox" class="inp-sumar-fuera" onchange="setSumarFuera(this.checked)"> Sumar fuera de meta al total</label>
       </div>
       <table class="ctbl">
         <thead><tr>
@@ -389,7 +399,8 @@ td{padding:10px 13px;color:var(--ink);vertical-align:middle}
       </table>
       <div class="ctot-wrap">
         <div class="ctot ctot-main"><div><div class="ct-l">Subtotal a Pagar</div><div style="font-size:10px;opacity:.4;margin-top:1px">MIN(aplicadas,meta)×$8.000</div></div><div class="ct-v" id="c-gran">$0</div></div>
-        <div class="ctot ctot-ext"><div><div class="ct-l" style="color:var(--orange)">Fuera de Meta (ref.)</div><div style="font-size:10px;opacity:.6;color:var(--orange);margin-top:1px">No se paga</div></div><div class="ct-v-ext" id="c-ext">$0</div></div>
+        <div class="ctot ctot-ext"><div><div class="ct-l" style="color:var(--orange)">Fuera de Meta</div><div style="font-size:10px;opacity:.6;color:var(--orange);margin-top:1px">MAX(aplicadas−meta,0)×$8.000</div></div><div class="ct-v-ext" id="c-ext">$0</div></div>
+        <div class="ctot ctot-sum solo-sumar"><div><div class="ct-l">Total a Pagar</div><div style="font-size:10px;opacity:.7;margin-top:1px">Subtotal en meta + fuera de meta</div></div><div class="ct-v" id="c-total">$0</div></div>
       </div>
       <div class="cfirmas">
         <!-- Firma 1: Vacunadora -->
@@ -454,6 +465,7 @@ td{padding:10px 13px;color:var(--ink);vertical-align:middle}
             oninput="recalcAllOmRows()" placeholder="8000">
         </label>
         <span style="font-size:11px;color:var(--s4)">· Cambie el valor para recalcular toda la tabla automáticamente</span>
+        <label class="chk-sumar no-print" title="Suma el subtotal a pagar y el valor de las dosis fuera de meta"><input type="checkbox" class="inp-sumar-fuera" onchange="setSumarFuera(this.checked)"> Sumar fuera de meta al total</label>
       </div>
       <table class="ctbl">
         <thead><tr>
@@ -471,7 +483,8 @@ td{padding:10px 13px;color:var(--ink);vertical-align:middle}
       </table>
       <div class="ctot-wrap">
         <div class="ctot ctot-main"><div><div class="ct-l">Subtotal a Pagar</div><div style="font-size:10px;opacity:.4;margin-top:1px">MIN(aplicadas,meta)×precio/dosis</div></div><div class="ct-v" id="om-gran">$0</div></div>
-        <div class="ctot ctot-ext"><div><div class="ct-l" style="color:var(--orange)">Fuera de Meta (ref.)</div><div style="font-size:10px;opacity:.6;color:var(--orange);margin-top:1px">No se paga</div></div><div class="ct-v-ext" id="om-ext">$0</div></div>
+        <div class="ctot ctot-ext"><div><div class="ct-l" style="color:var(--orange)">Fuera de Meta</div><div style="font-size:10px;opacity:.6;color:var(--orange);margin-top:1px">MAX(aplicadas−meta,0)×precio/dosis</div></div><div class="ct-v-ext" id="om-ext">$0</div></div>
+        <div class="ctot ctot-sum solo-sumar"><div><div class="ct-l">Total a Pagar</div><div style="font-size:10px;opacity:.7;margin-top:1px">Subtotal en meta + fuera de meta</div></div><div class="ct-v" id="om-total">$0</div></div>
       </div>
       <div class="cfirmas">
         <div class="fb">
@@ -558,7 +571,7 @@ td{padding:10px 13px;color:var(--ink);vertical-align:middle}
         <div class="sc"><div class="sc-bar" style="background:var(--cobalt)"></div><div class="sc-lbl">Vacunadoras</div><div class="sc-val" id="s-v">0</div><div class="sc-sub">Personal activo</div><div class="sc-ico">👩‍⚕️</div></div>
         <div class="sc"><div class="sc-bar" style="background:var(--amber)"></div><div class="sc-lbl">Archivos en BD</div><div class="sc-val" id="s-a">0</div><div class="sc-sub">XLS importados</div><div class="sc-ico">📂</div></div>
         <div class="sc"><div class="sc-bar" style="background:var(--teal)"></div><div class="sc-lbl">A Pagar (en meta)</div><div class="sc-val" id="s-t" style="font-size:16px;color:var(--teal-d)">$0</div><div class="sc-sub">Subtotal Vacunación</div><div class="sc-ico">💰</div></div>
-        <div class="sc"><div class="sc-bar" style="background:var(--orange)"></div><div class="sc-lbl">Fuera de Meta</div><div class="sc-val" id="s-ext" style="font-size:16px;color:var(--orange)">$0</div><div class="sc-sub">No liquidable</div><div class="sc-ico">⚠️</div></div>
+        <div class="sc"><div class="sc-bar" style="background:var(--orange)"></div><div class="sc-lbl">Fuera de Meta</div><div class="sc-val" id="s-ext" style="font-size:16px;color:var(--orange)">$0</div><div class="sc-sub">Valor dosis fuera de meta</div><div class="sc-ico">⚠️</div></div>
       </div>
       <div class="card">
         <div class="card-h"><div class="card-t">👩‍⚕️ Resumen por Vacunadora</div><button class="btn b-co b-sm" onclick="nav('liquidacion',null)">Ver completo →</button></div>
@@ -643,10 +656,12 @@ td{padding:10px 13px;color:var(--ink);vertical-align:middle}
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <span class="bdg b-g" id="lq-tot">$0</span>
             <span class="bdg b-o" id="lq-ext">$0 fuera</span>
+            <span class="bdg b-g solo-sumar" id="lq-sum" style="background:rgba(27,79,216,.12);color:var(--cobalt)">$0 total</span>
+            <label class="chk-sumar no-print" title="Suma el subtotal a pagar y el valor de las dosis fuera de meta"><input type="checkbox" class="inp-sumar-fuera" onchange="setSumarFuera(this.checked)"> Sumar fuera de meta al total</label>
           </div>
         </div>
         <div class="tw"><table>
-          <thead><tr><th>#</th><th>Vacunadora</th><th>Dosis aplicadas</th><th>En meta</th><th>Fuera meta</th><th>Eficiencia</th><th>A Pagar</th><th>Fuera (ref.)</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>#</th><th>Vacunadora</th><th>Dosis aplicadas</th><th>En meta</th><th>Fuera meta</th><th>Eficiencia</th><th>A Pagar</th><th>Fuera meta</th><th class="solo-sumar">Total a pagar</th><th>Acciones</th></tr></thead>
           <tbody id="tb-l"><tr><td colspan="9"><div class="es"><div class="ei">📊</div><p>Cargando liquidación…</p></div></td></tr></tbody>
         </table></div>
       </div>
@@ -696,7 +711,7 @@ td{padding:10px 13px;color:var(--ink);vertical-align:middle}
       <div class="sg" id="im-stats" style="display:none">
         <div class="sc"><div class="sc-bar" style="background:var(--cobalt)"></div><div class="sc-lbl">Total Dosis</div><div class="sc-val" id="im-s-total" style="font-size:22px">—</div><div class="sc-sub">Aplicadas</div><div class="sc-ico">💉</div></div>
         <div class="sc"><div class="sc-bar" style="background:var(--teal)"></div><div class="sc-lbl">En Meta</div><div class="sc-val" id="im-s-meta" style="font-size:22px;color:var(--teal-d)">—</div><div class="sc-sub">Dosis pagables</div><div class="sc-ico">✅</div></div>
-        <div class="sc"><div class="sc-bar" style="background:var(--orange)"></div><div class="sc-lbl">Fuera Meta</div><div class="sc-val" id="im-s-fuera" style="font-size:22px;color:var(--orange)">—</div><div class="sc-sub">No liquidables</div><div class="sc-ico">⚠️</div></div>
+        <div class="sc"><div class="sc-bar" style="background:var(--orange)"></div><div class="sc-lbl">Fuera Meta</div><div class="sc-val" id="im-s-fuera" style="font-size:22px;color:var(--orange)">—</div><div class="sc-sub">Dosis sobre la meta</div><div class="sc-ico">⚠️</div></div>
         <div class="sc"><div class="sc-bar" style="background:var(--teal)"></div><div class="sc-lbl">Valor a Pagar</div><div class="sc-val" id="im-s-valor" style="font-size:15px;color:var(--teal-d)">$0</div><div class="sc-sub">Subtotal</div><div class="sc-ico">💰</div></div>
         <div class="sc"><div class="sc-bar" style="background:var(--amber)"></div><div class="sc-lbl">Ciclos activos</div><div class="sc-val" id="im-s-ciclos" style="font-size:22px">—</div><div class="sc-sub">Con dosis</div><div class="sc-ico">🎯</div></div>
       </div>
@@ -1873,6 +1888,7 @@ async function cargarLiquidacion(){
     $('lq-per').textContent=lb;
     $('lq-tot').textContent=fmt(liq.granTotal)+' en meta';
     $('lq-ext').textContent=fmt(liq.granExt||0)+' fuera';
+    $('lq-sum').textContent=fmt(liq.granTotal+(liq.granExt||0))+' total';
 
     if(!liq.vacs.length){
       tb.innerHTML=`<tr><td colspan="9"><div class="es"><div class="ei">📊</div><p>Sin datos para el período seleccionado</p></div></td></tr>`;
@@ -1890,6 +1906,7 @@ async function cargarLiquidacion(){
         <td>${b}</td>
         <td class="td-val">${fmt(v.tVal)}</td>
         <td class="td-ext">${fmt(v.tValExt||0)}</td>
+        <td class="td-val solo-sumar" style="color:var(--cobalt)">${fmt(v.tVal+(v.tValExt||0))}</td>
         <td><button class="bc-btn" onclick="verCert('${escJ(v.vac)}')">📄 Cert.</button></td>
       </tr>`;
     }).join('');
@@ -2455,6 +2472,7 @@ async function verCert(nombre){
   $('c-dext').textContent=v.tFuera.toLocaleString('es-CO')+' dosis';
   $('c-gran').textContent=fmt(v.tVal);
   $('c-ext').textContent=fmt(v.tValExt||0);
+  $('c-total').textContent=fmt(v.tVal+(v.tValExt||0));
   $('c-fuente').textContent='Fuente: Supabase — certivac_registros';
   // Campos de firma
   $('f1-nombre').value=v.vac;
@@ -2530,9 +2548,14 @@ async function verCert(nombre){
   </tr>`;
   const extVal=v.tValExt||0;
   html+=`<tr class="sub-row-ext" id="cert-ext-row" style="${extVal>0?'':'display:none'}">
-    <td colspan="7" style="text-align:right;font-size:10.5px">⚠️ FUERA DE META (no se paga) →</td>
+    <td colspan="7" style="text-align:right;font-size:10.5px">⚠️ FUERA DE META →</td>
     <td></td>
     <td id="c-ext-sub" style="font-family:'JetBrains Mono',monospace">${fmt(extVal)}</td>
+  </tr>`;
+  html+=`<tr class="sum-row solo-sumar">
+    <td colspan="7" style="text-align:right;font-size:10.5px">TOTAL A PAGAR (EN META + FUERA DE META) →</td>
+    <td id="c-total-sub" style="font-family:'JetBrains Mono',monospace">${fmt(v.tVal+extVal)}</td>
+    <td></td>
   </tr>`;
   tbody.innerHTML=html;
   $('co').classList.add('show');
@@ -2639,6 +2662,8 @@ function recalcCertTotals(){
   $('c-dext').textContent=totFuera.toLocaleString('es-CO')+' dosis';
   $('c-gran').textContent=fmt(totVal);
   $('c-ext').textContent =fmt(totValExt);
+  $('c-total').textContent=fmt(totVal+totValExt);
+  const totSub=$('c-total-sub'); if(totSub)totSub.textContent=fmt(totVal+totValExt);
 }
 
 // Imprimir: solo el certificado (el CSS @media print oculta todo lo demás)
@@ -3331,11 +3356,12 @@ async function exportarLiquidacion(){
     const liq=await apiGet({accion:'liquidacion'});
     hideLoad();if(!liq.ok)throw new Error(liq.error);
     const wb=XLSXO.utils.book_new();
-    const filas=[['Vacunadora','Dosis Aplicadas','En Meta','Fuera Meta','% Eficiencia','A Pagar COP','Fuera COP']];
-    liq.vacs.forEach(v=>{const p=v.tAp>0?Math.round((v.tEnMeta/v.tAp)*100):0;filas.push([v.vac,v.tAp,v.tEnMeta,v.tFuera,p+'%',v.tVal,v.tValExt||0]);});
+    const sumar=document.body.classList.contains('sumar-fuera');
+    const filas=[['Vacunadora','Dosis Aplicadas','En Meta','Fuera Meta','% Eficiencia','A Pagar COP','Fuera COP',...(sumar?['Total a Pagar COP']:[])]];
+    liq.vacs.forEach(v=>{const p=v.tAp>0?Math.round((v.tEnMeta/v.tAp)*100):0;filas.push([v.vac,v.tAp,v.tEnMeta,v.tFuera,p+'%',v.tVal,v.tValExt||0,...(sumar?[v.tVal+(v.tValExt||0)]:[])]);});
     filas.push(['','','','','','','']);
-    filas.push(['TOTAL','',liq.vacs.reduce((s,v)=>s+v.tEnMeta,0),'','',liq.granTotal,liq.granExt||0]);
-    const ws=XLSXO.utils.aoa_to_sheet(filas);setW(ws,[32,16,16,16,12,18,18]);
+    filas.push(['TOTAL','',liq.vacs.reduce((s,v)=>s+v.tEnMeta,0),'','',liq.granTotal,liq.granExt||0,...(sumar?[liq.granTotal+(liq.granExt||0)]:[])]);
+    const ws=XLSXO.utils.aoa_to_sheet(filas);setW(ws,[32,16,16,16,12,18,18,20]);
     XLSXO.utils.book_append_sheet(wb,ws,'Liquidación');
     dl(wb,$('exp-nombre').value||'CertiVac_Liquidacion');
   }catch(e){hideLoad();toast('❌ '+e.message,'err');}
@@ -4182,9 +4208,14 @@ function verInformeMun(){
     <td></td>
   </tr>`;
   html+=`<tr class="sub-row-ext" id="om-ext-row" style="${totVext>0?'':'display:none'}">
-    <td colspan="7" style="text-align:right;font-size:10.5px">⚠️ FUERA DE META (no se paga) →</td>
+    <td colspan="7" style="text-align:right;font-size:10.5px">⚠️ FUERA DE META →</td>
     <td></td>
     <td id="om-ext-sub" style="font-family:'JetBrains Mono',monospace">${fmt(totVext)}</td>
+  </tr>`;
+  html+=`<tr class="sum-row solo-sumar">
+    <td colspan="7" style="text-align:right;font-size:10.5px">TOTAL A PAGAR (EN META + FUERA DE META) →</td>
+    <td id="om-total-sub" style="font-family:'JetBrains Mono',monospace">${fmt(totV+totVext)}</td>
+    <td></td>
   </tr>`;
   $('om-tbody').innerHTML=html;
 
@@ -4193,6 +4224,7 @@ function verInformeMun(){
   $('om-dext').textContent=totFuera.toLocaleString('es-CO')+' dosis';
   $('om-gran').textContent=fmt(totV);
   $('om-ext').textContent=fmt(totVext);
+  $('om-total').textContent=fmt(totV+totVext);
   $('om-fuente').textContent=`Fuente: Supabase — certivac_registros · ${perLbl}`;
   $('om').classList.add('show');
 }
@@ -4305,6 +4337,8 @@ function recalcOmTotals(){
   $('om-dext').textContent=totFuera.toLocaleString('es-CO')+' dosis';
   $('om-gran').textContent=fmt(totVal);
   $('om-ext').textContent=fmt(totValExt);
+  $('om-total').textContent=fmt(totVal+totValExt);
+  const omTotSub=$('om-total-sub'); if(omTotSub)omTotSub.textContent=fmt(totVal+totValExt);
 }
 
 function syncOmHeader(){
@@ -4326,7 +4360,16 @@ function descargarPDFInformeMun(){
   setTimeout(()=>{ document.title=tituloOrig; },1000);
 }
 
+// ── Opción: sumar el valor fuera de meta al total a pagar ──
+function setSumarFuera(on){
+  document.body.classList.toggle('sumar-fuera',!!on);
+  document.querySelectorAll('.inp-sumar-fuera').forEach(i=>{ i.checked=!!on; });
+  try{ localStorage.setItem('certivac-sumar-fuera',on?'1':'0'); }catch(e){}
+}
+
 window.onload=async ()=>{
+  let sumarIni=false; try{ sumarIni=localStorage.getItem('certivac-sumar-fuera')==='1'; }catch(e){}
+  setSumarFuera(sumarIni);
   const ses=await portalVerificarSesion();
   if(!ses) return;
   if(!portalTienePermiso('certivac','lectura')){
