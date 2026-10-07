@@ -95,7 +95,7 @@ const totalRutas = () => rutas.length;
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 11;
+const VERSION_API = 12;
 
 /**
  * Juegos de roles que usan las rutas.
@@ -278,6 +278,14 @@ async function asegurarEsquema(db) {
     'CREATE INDEX IF NOT EXISTS idx_fs_veh ON fuera_servicio(vehiculo_id, fecha_inicio)').run();
   await db.prepare(
     'CREATE INDEX IF NOT EXISTS idx_fs_abierto ON fuera_servicio(fecha_fin, vehiculo_id)').run();
+
+  // Columnas de anulación de viajes (D35). SQLite no tiene
+  // ADD COLUMN IF NOT EXISTS: se intenta y se ignora el error de «ya existe»,
+  // que es lo que pasa en todos los arranques menos el primero.
+  for (const col of ['anulado_por INTEGER', 'anulado_en TEXT', 'motivo_anulacion TEXT']) {
+    try { await db.prepare(`ALTER TABLE trayectos ADD COLUMN ${col}`).run(); }
+    catch { /* ya estaba */ }
+  }
   esquemaListo = true;
 }
 
@@ -1730,12 +1738,17 @@ ruta('PUT', '/api/trayectos/:id', async ({ db, sesion, params, cuerpo }) => {
 const TOPE_TRAYECTOS = 20000;
 
 ruta('GET', '/api/trayectos', async ({ db, url, sesion }) => {
+  await asegurarEsquema(db);
   const desde = url.searchParams.get('desde') || hoyISO();
   const hasta = url.searchParams.get('hasta') || desde;
   const vehiculo = url.searchParams.get('vehiculo_id');
   const limite = Math.min(Number(url.searchParams.get('limite')) || 2000, TOPE_TRAYECTOS);
 
-  const cond = ['t.fecha_operacion BETWEEN ? AND ?', "t.estado != 'anulado'"];
+  // Un viaje anulado no aparece: dejó de existir para todo lo que cuenta. El
+  // administrador puede pedirlos para revisar qué se anuló y por qué.
+  const verAnulados = url.searchParams.get('anulados') === '1' && sesion.rol === 'principal';
+  const cond = ['t.fecha_operacion BETWEEN ? AND ?'];
+  if (!verAnulados) cond.push("t.estado != 'anulado'");
   const args = [desde, hasta];
   if (vehiculo) { cond.push('t.vehiculo_id = ?'); args.push(vehiculo); }
   if (sesion.rol === 'conductor') { cond.push('t.conductor_id = ?'); args.push(sesion.persona_id); }
@@ -1745,6 +1758,7 @@ ruta('GET', '/api/trayectos', async ({ db, url, sesion }) => {
            p.nombres || ' ' || IFNULL(p.apellidos,'') AS conductor,
            ms.nombre AS municipio_salida, ml.nombre AS municipio_llegada,
            u.usuario AS registrado_por,
+           ua.usuario AS anulado_por_usuario,
            CASE WHEN t.ts_llegada IS NOT NULL AND t.ts_salida IS NOT NULL
                 THEN ROUND((julianday(t.ts_llegada) - julianday(t.ts_salida)) * 24, 2)
                 END AS horas,
@@ -1756,6 +1770,7 @@ ruta('GET', '/api/trayectos', async ({ db, url, sesion }) => {
       LEFT JOIN cat_municipios ms ON ms.id = t.municipio_salida_id
       LEFT JOIN cat_municipios ml ON ml.id = t.municipio_llegada_id
       LEFT JOIN usuarios u ON u.id = t.creado_por
+      LEFT JOIN usuarios ua ON ua.id = t.anulado_por
      WHERE ${cond.join(' AND ')}
      ORDER BY t.fecha_operacion DESC, t.ts_salida DESC
      LIMIT ?`).bind(...args, limite).all();
@@ -1793,6 +1808,99 @@ ruta('GET', '/api/trayectos/:id/fotos', async ({ db, sesion, params }) => {
      WHERE trayecto_id = ? ORDER BY momento DESC`).bind(params.id).all();
   return r.results;
 }, TODOS);
+
+/**
+ * Anular o borrar un viaje. Solo el administrador (D35).
+ *
+ * Un viaje es el soporte de un día de operación: quitarlo cambia lo que se le
+ * paga a un contratista. Por eso son dos cosas distintas, igual que en el
+ * itinerario (D15):
+ *
+ *   · ANULAR (por omisión) deja el registro con estado 'anulado'. Deja de
+ *     contar en todas partes —la lista, el día de operación, el dashboard y
+ *     la liquidación ya filtran `estado != 'anulado'`—, pero el viaje, sus
+ *     fotografías y el motivo siguen ahí para quien revise la cuenta. Es lo
+ *     que se debe usar casi siempre.
+ *   · BORRAR (?definitivo=1) lo elimina de veras, con sus fotografías y su
+ *     checklist. Para lo que se registró por error y no debe dejar rastro.
+ *
+ * El motivo es obligatorio en los dos casos: es dinero.
+ *
+ * Las novedades que colgaban del viaje NO se borran, se desenganchan. Un
+ * retén o un derrumbe ocurrió de verdad, aunque el viaje al que se asoció
+ * estuviera mal registrado.
+ *
+ * En ambos casos se recalcula el día: sin eso el contador de días y el día
+ * pagable se quedarían diciendo lo de antes, en silencio.
+ */
+ruta('DELETE', '/api/trayectos/:id', async ({ db, sesion, params, cuerpo, url }) => {
+  await asegurarEsquema(db);
+  const t = await db.prepare('SELECT * FROM trayectos WHERE id = ?').bind(params.id).first();
+  if (!t) throw noEncontrado('Trayecto no encontrado');
+
+  const motivo = (cuerpo && cuerpo.motivo || '').trim();
+  if (motivo.length < 5) {
+    throw malaPeticion('Escriba por qué se quita este viaje: queda registrado y ' +
+      'es lo que explica el cambio en la liquidación.');
+  }
+
+  const definitivo = url.searchParams.get('definitivo') === '1';
+
+  if (definitivo) {
+    // Las novedades sobreviven al viaje: lo que pasó en la vía pasó.
+    await db.prepare('UPDATE eventos SET trayecto_id = NULL WHERE trayecto_id = ?')
+      .bind(t.id).run();
+    await db.prepare(`DELETE FROM checklist_items WHERE checklist_id IN
+      (SELECT id FROM checklists WHERE trayecto_id = ?)`).bind(t.id).run();
+    await db.prepare('DELETE FROM checklists WHERE trayecto_id = ?').bind(t.id).run();
+    await db.prepare('DELETE FROM trayecto_fotos WHERE trayecto_id = ?').bind(t.id).run();
+    await db.prepare('DELETE FROM trayectos WHERE id = ?').bind(t.id).run();
+  } else {
+    await db.prepare(`
+      UPDATE trayectos SET estado = 'anulado', anulado_por = ?, anulado_en = ?,
+                           motivo_anulacion = ?
+       WHERE id = ?`).bind(sesion.id, ahora(), motivo, t.id).run();
+  }
+
+  await recalcularDia(db, t.fecha_operacion, t.vehiculo_id);
+  await auditar(db, sesion, definitivo ? 'eliminar' : 'anular', 'trayectos', t.id,
+                { consecutivo: t.consecutivo, fecha: t.fecha_operacion,
+                  vehiculo_id: t.vehiculo_id, estado: t.estado },
+                { motivo, definitivo });
+
+  const dia = await db.prepare(
+    'SELECT dia_pagable, estado_dia FROM dias_operacion WHERE fecha = ? AND vehiculo_id = ?')
+    .bind(t.fecha_operacion, t.vehiculo_id).first();
+  return { ok: true, definitivo, fecha: t.fecha_operacion, dia: dia || null };
+}, ['principal']);
+
+/** Deshacer una anulación. También solo el administrador. */
+ruta('POST', '/api/trayectos/:id/restaurar', async ({ db, sesion, params }) => {
+  await asegurarEsquema(db);
+  const t = await db.prepare('SELECT * FROM trayectos WHERE id = ?').bind(params.id).first();
+  if (!t) throw noEncontrado('Trayecto no encontrado');
+  if (t.estado !== 'anulado') throw malaPeticion('Ese viaje no está anulado');
+
+  // No puede volver si entretanto se registró otro viaje abierto del mismo
+  // vehículo ese día y este también estaba abierto: quedarían dos en curso.
+  if (t.ts_llegada == null) {
+    const abierto = await db.prepare(`
+      SELECT id FROM trayectos WHERE vehiculo_id = ? AND estado = 'en_curso' AND id != ?`)
+      .bind(t.vehiculo_id, t.id).first();
+    if (abierto) {
+      throw malaPeticion('Ese vehículo ya tiene otro viaje en curso. Ciérrelo primero.');
+    }
+  }
+
+  await db.prepare(`
+    UPDATE trayectos SET estado = ?, anulado_por = NULL, anulado_en = NULL,
+                         motivo_anulacion = NULL
+     WHERE id = ?`).bind(t.ts_llegada ? 'cerrado' : 'en_curso', t.id).run();
+  await recalcularDia(db, t.fecha_operacion, t.vehiculo_id);
+  await auditar(db, sesion, 'restaurar', 'trayectos', t.id,
+                { estado: 'anulado' }, { estado: t.ts_llegada ? 'cerrado' : 'en_curso' });
+  return { ok: true };
+}, ['principal']);
 
 /** Agregar o reemplazar una fotografía, p. ej. la que no se pudo subir sin señal. */
 ruta('POST', '/api/trayectos/:id/foto', async ({ db, sesion, params, cuerpo }) => {
@@ -1983,6 +2091,8 @@ ruta('POST', '/api/eventos', async ({ db, sesion, cuerpo }) => {
 ruta('GET', '/api/eventos', async ({ db, url, sesion }) => {
   const desde = url.searchParams.get('desde') || '0000-01-01';
   const hasta = url.searchParams.get('hasta') || '9999-12-31';
+  // Mismo tope que los viajes, y por lo mismo: el período es libre.
+  const limite = Math.min(Number(url.searchParams.get('limite')) || 500, 5000);
   const cond = ['date(e.ts_evento) BETWEEN ? AND ?'];
   const args = [desde, hasta];
   if (sesion.rol === 'conductor') { cond.push('e.persona_id = ?'); args.push(sesion.persona_id); }
@@ -1994,8 +2104,20 @@ ruta('GET', '/api/eventos', async ({ db, url, sesion }) => {
       LEFT JOIN cat_municipios m ON m.id = e.municipio_id
       LEFT JOIN personas p ON p.id = e.persona_id
      WHERE ${cond.join(' AND ')}
-     ORDER BY e.ts_evento DESC LIMIT 500`).bind(...args).all();
+     ORDER BY e.ts_evento DESC LIMIT ?`).bind(...args, limite).all();
   return r.results;
+}, TODOS);
+
+/** La primera novedad registrada, para el atajo de «toda la operación». */
+ruta('GET', '/api/eventos/rango', async ({ db, sesion }) => {
+  const cond = ['1 = 1'];
+  const args = [];
+  if (sesion.rol === 'conductor') { cond.push('persona_id = ?'); args.push(sesion.persona_id); }
+  const r = await db.prepare(`
+    SELECT MIN(date(ts_evento)) AS primera, MAX(date(ts_evento)) AS ultima,
+           COUNT(*) AS total
+      FROM eventos WHERE ${cond.join(' AND ')}`).bind(...args).first();
+  return r || { primera: null, ultima: null, total: 0 };
 }, TODOS);
 
 ruta('PUT', '/api/eventos/:id', async ({ db, sesion, params, cuerpo }) => {

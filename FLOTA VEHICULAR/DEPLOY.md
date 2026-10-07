@@ -145,6 +145,12 @@ ficha de un viaje y la descarga:
 node pruebas/prueba_viajes.mjs
 ```
 
+Y la de Novedades, que recorre su período libre y sus filtros:
+
+```bash
+node pruebas/prueba_novedades.mjs
+```
+
 Y la de los días fuera de servicio, que registra un período, comprueba que los
 días marcados se vean en la matriz y que el conductor pueda declarar su vehículo
 averiado desde el teléfono:

@@ -13,7 +13,7 @@
  * Estrategia: red primero, caché de respaldo. Así, con señal siempre se ve la
  * última versión publicada, y sin señal se ve la última que se alcanzó a ver.
  */
-const CACHE = 'flota-v16';
+const CACHE = 'flota-v17';
 
 const ARMAZON = [
   './', './index.html', './app.js', './manifest.json',

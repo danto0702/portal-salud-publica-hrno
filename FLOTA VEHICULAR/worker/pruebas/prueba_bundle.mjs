@@ -991,6 +991,113 @@ verificar('y sale en la lista de los que siguen parados',
 r = await api('GET', '/api/fuera-servicio/resumen', null, tCondFS);
 verificar('el conductor no ve el resumen de toda la flota', r.estado === 403, r.estado);
 
+console.log('\n── Anular y borrar viajes (solo el administrador) ────────────');
+
+// Un viaje propio para esta sección, con su día programado, para poder ver
+// cómo se mueve el día pagable al quitarlo.
+await api('POST', '/api/itinerario', {
+  fecha: '2026-11-25', vehiculo_id: vehiculo, conductor_id: personaConductor,
+  municipio_id: 1, destino_nombre: 'LA PLAYA', tipo_jornada: 'ebs',
+}, tCoord);
+r = await api('POST', '/api/sync', {
+  marcas: [
+    { local_id: 'b1', hito: 'salida', vehiculo_id: vehiculo, conductor_id: personaConductor,
+      fecha_operacion: '2026-11-25', ts_dispositivo: '2026-11-25T06:00:00Z',
+      municipio_id: 1, lugar: 'BASE', km: 200000, num_tripulantes: 2,
+      tripulantes: 'UNO, DOS', lat: 8.07, lon: -73.22 },
+  ],
+}, tCondFS);
+const idSalida = r.datos.resultados[0].id;
+await api('POST', '/api/sync', {
+  marcas: [
+    { local_id: 'b2', hito: 'llegada', trayecto_id: idSalida, vehiculo_id: vehiculo,
+      conductor_id: personaConductor, fecha_operacion: '2026-11-25',
+      ts_dispositivo: '2026-11-25T14:00:00Z', municipio_id: 1, lugar: 'LA PLAYA',
+      km: 200080, lat: 8.15, lon: -73.19 },
+  ],
+}, tCondFS);
+
+r = await api('GET', '/api/dias?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+verificar('el día del viaje queda pagable', r.datos[0] && r.datos[0].dia_pagable === 1, r.datos[0]);
+
+r = await api('DELETE', `/api/trayectos/${idSalida}`, { motivo: 'Se registró mal' }, tCoord);
+verificar('coordinación NO puede quitar un viaje', r.estado === 403, r.datos);
+r = await api('DELETE', `/api/trayectos/${idSalida}`, { motivo: 'Se registró mal' }, tCondFS);
+verificar('el conductor tampoco', r.estado === 403, r.datos);
+
+r = await api('DELETE', `/api/trayectos/${idSalida}`, { motivo: 'ups' }, tokenPrincipal);
+verificar('exige un motivo de verdad, no dos letras', r.estado === 400, r.datos);
+
+r = await api('DELETE', `/api/trayectos/${idSalida}`,
+  { motivo: 'Lo registró el conductor equivocado' }, tokenPrincipal);
+verificar('el administrador lo anula', r.estado === 200 && r.datos.definitivo === false, r.datos);
+verificar('y responde cómo quedó el día',
+  r.datos.dia && r.datos.dia.dia_pagable === 0, r.datos.dia);
+
+r = await api('GET', '/api/dias?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+verificar('el día deja de ser pagable al anular el viaje',
+  r.datos[0] && r.datos[0].dia_pagable === 0 && r.datos[0].ejecutado === 0, r.datos[0]);
+
+r = await api('GET', '/api/trayectos?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+verificar('el viaje anulado desaparece de la lista', r.datos.length === 0, r.datos.length);
+
+r = await api('GET', '/api/trayectos?desde=2026-11-25&hasta=2026-11-25&anulados=1', null, tCoord);
+verificar('y coordinación no puede destaparlo', r.datos.length === 0, r.datos.length);
+r = await api('GET', '/api/trayectos?desde=2026-11-25&hasta=2026-11-25&anulados=1',
+              null, tokenPrincipal);
+const anulado = r.datos[0];
+verificar('pero el administrador sí lo ve', !!anulado && anulado.estado === 'anulado', r.datos.length);
+verificar('con el motivo en el propio registro, no solo en la auditoría',
+  anulado && anulado.motivo_anulacion === 'Lo registró el conductor equivocado',
+  anulado && anulado.motivo_anulacion);
+verificar('y quién lo anuló',
+  anulado && anulado.anulado_por_usuario === 'danilo', anulado && anulado.anulado_por_usuario);
+
+// Deshacer
+r = await api('POST', `/api/trayectos/${idSalida}/restaurar`, {}, tCoord);
+verificar('coordinación NO puede deshacer la anulación', r.estado === 403, r.datos);
+r = await api('POST', `/api/trayectos/${idSalida}/restaurar`, {}, tokenPrincipal);
+verificar('el administrador deshace la anulación', r.estado === 200, r.datos);
+r = await api('GET', '/api/dias?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+verificar('y el día vuelve a ser pagable', r.datos[0] && r.datos[0].dia_pagable === 1, r.datos[0]);
+r = await api('POST', `/api/trayectos/${idSalida}/restaurar`, {}, tokenPrincipal);
+verificar('no se puede deshacer dos veces', r.estado === 400, r.datos);
+
+// Una novedad colgada del viaje: tiene que sobrevivir al borrado.
+r = await api('POST', '/api/eventos', {
+  tipo: 'reten', descripcion: 'Retén en la vía', trayecto_id: idSalida,
+  vehiculo_id: vehiculo, ts_evento: '2026-11-25T10:00:00Z',
+}, tCondFS);
+const idEvento = r.datos.id;
+
+r = await api('DELETE', `/api/trayectos/${idSalida}?definitivo=1`,
+  { motivo: 'Viaje de prueba que nunca existió' }, tokenPrincipal);
+verificar('el administrador lo borra de verdad',
+  r.estado === 200 && r.datos.definitivo === true, r.datos);
+
+r = await api('GET', '/api/trayectos?desde=2026-11-25&hasta=2026-11-25&anulados=1',
+              null, tokenPrincipal);
+verificar('ya no está ni destapando los anulados', r.datos.length === 0, r.datos.length);
+r = await api('GET', '/api/dias?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+verificar('el día vuelve a quedar sin ejecutar',
+  r.datos[0] && r.datos[0].ejecutado === 0 && r.datos[0].dia_pagable === 0, r.datos[0]);
+
+r = await api('GET', '/api/eventos?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+const ev = r.datos.find(x => x.id === idEvento);
+verificar('la novedad sobrevive al viaje borrado: lo de la vía pasó', !!ev, r.datos.length);
+verificar('y queda desenganchada, no apuntando a un viaje que no existe',
+  ev && ev.trayecto_id === null, ev && ev.trayecto_id);
+
+r = await api('DELETE', '/api/trayectos/999999', { motivo: 'no existe' }, tokenPrincipal);
+verificar('un viaje que no existe responde 404', r.estado === 404, r.estado);
+
+console.log('\n── Período libre en Novedades ────────────────────────────────');
+r = await api('GET', '/api/eventos/rango', null, tCoord);
+verificar('se puede preguntar desde cuándo hay novedades',
+  r.estado === 200 && r.datos.total > 0 && !!r.datos.primera, r.datos);
+r = await api('GET', '/api/eventos?desde=2000-01-01&hasta=2100-01-01&limite=1', null, tCoord);
+verificar('la consulta de novedades respeta el tope', r.datos.length === 1, r.datos.length);
+
 console.log('\n── Integridad de catálogos ───────────────────────────────────');
 r = await api('DELETE', '/api/catalogos/destinos/8', null, tokenPrincipal);
 verificar('borrar un destino solo lo desactiva', r.estado === 200 && r.datos.nota, r.datos);

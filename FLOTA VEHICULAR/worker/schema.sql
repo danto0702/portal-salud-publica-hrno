@@ -259,7 +259,13 @@ CREATE TABLE trayectos (
                       -- en_curso | cerrado | anulado
   creado_por          INTEGER NOT NULL,
   creado_en           TEXT NOT NULL,
-  cerrado_en          TEXT
+  cerrado_en          TEXT,
+  -- Anulacion (D35). Solo el administrador. Un viaje anulado deja de contar
+  -- para el pago pero NO se borra: el motivo queda en el propio registro, no
+  -- solo en la auditoria, porque es ahi donde se mira al revisar la cuenta.
+  anulado_por         INTEGER REFERENCES usuarios(id),
+  anulado_en          TEXT,
+  motivo_anulacion    TEXT
 );
 CREATE INDEX idx_tray_fecha ON trayectos(fecha_operacion);
 CREATE INDEX idx_tray_veh   ON trayectos(vehiculo_id, fecha_operacion);

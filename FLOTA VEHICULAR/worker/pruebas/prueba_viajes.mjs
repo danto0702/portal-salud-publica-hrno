@@ -59,6 +59,16 @@ const pag = await ctx.newPage();
 const errores = [];
 pag.on('pageerror', e => errores.push(e.message));
 
+/** Entra con otra cuenta en la misma pestaña. */
+async function entrar(usuario, clave) {
+  await pag.evaluate(() => { try { salir(true); } catch { localStorage.clear(); } });
+  await pag.goto(`${BASE}/index.html`, { waitUntil: 'networkidle' });
+  await pag.fill('#in-usuario', usuario);
+  await pag.fill('#in-clave', clave);
+  await pag.click('#in-btn');
+  await pag.waitForSelector('#app:not([hidden])');
+}
+
 const cuenta = () => pag.locator('#tray-tabla tbody tr').count();
 
 try {
@@ -236,6 +246,74 @@ try {
   await descarga2.saveAs(destino2);
   verificar('con un filtro puesto se descarga lo filtrado',
     fs.readFileSync(destino2, 'utf8').trim().split('\n').length === 2);
+
+  // ── Anular y borrar un viaje: solo el administrador ─────────────────────
+  console.log('\n══ Quitar un viaje: solo el administrador ══');
+
+  const unViaje = await pag.evaluate(() =>
+    trayectosCargados.find(x => x.estado === 'cerrado'));
+  await pag.evaluate(id => verTrayecto(id), unViaje.id);
+  await pag.waitForSelector('.modal-caja');
+  verificar('Coordinación no ve el botón de quitar',
+    await pag.locator('.modal-pie button:has-text("Quitar este viaje")').count() === 0);
+  verificar('ni la casilla de ver los anulados',
+    await pag.locator('.marca-check:has-text("anulados")').count() === 0);
+  await pag.click('.modal-pie .btn:has-text("Cerrar")');
+  await pag.waitForSelector('.modal-caja', { state: 'hidden' });
+
+  await entrar('danilo', 'Demo2026Clave');
+  await pag.click('.nav button:has-text("Trayectos")');
+  await pag.waitForSelector('#tray-tabla');
+  await pag.waitForTimeout(900);
+  const antes = await cuenta();
+  verificar('el administrador sí ve la casilla de los anulados',
+    await pag.locator('.marca-check:has-text("anulados")').count() === 1);
+
+  await pag.evaluate(id => verTrayecto(id), unViaje.id);
+  await pag.waitForSelector('.modal-caja');
+  await pag.click('.modal-pie button:has-text("Quitar este viaje")');
+  await pag.waitForSelector('#qt-motivo');
+  verificar('la ventana avisa de lo que pasa con el día',
+    /deja de ser pagable/i.test(await pag.locator('.modal-caja').innerText()));
+  verificar('y ofrece borrar definitivamente como una casilla aparte',
+    await pag.locator('#qt-definitivo').count() === 1
+    && !await pag.isChecked('#qt-definitivo'));
+
+  // Sin motivo no deja
+  await pag.click('#qt-btn');
+  await pag.waitForTimeout(400);
+  verificar('sin motivo no deja quitarlo',
+    await pag.locator('#qt-motivo').count() === 1);
+
+  await pag.fill('#qt-motivo', 'Lo registró el conductor equivocado');
+  await pag.click('#qt-btn');
+  await pag.waitForSelector('.modal-caja', { state: 'hidden' });
+  await pag.waitForTimeout(1300);
+  verificar('anulado, el viaje sale de la lista',
+    await cuenta() === antes - 1, `${await cuenta()} contra ${antes - 1}`);
+
+  await pag.check('.marca-check:has-text("anulados") input');
+  await pag.waitForTimeout(1300);
+  verificar('pero destapando los anulados vuelve a verse',
+    await cuenta() === antes, `${await cuenta()} contra ${antes}`);
+  verificar('y se ve tachado, para que no se confunda con uno que cuenta',
+    await pag.locator('tr.fila-anulada').count() === 1);
+
+  await pag.evaluate(id => verTrayecto(id), unViaje.id);
+  await pag.waitForSelector('.modal-caja');
+  const fichaAnulada = await pag.locator('.modal-caja').innerText();
+  verificar('la ficha dice por qué se anuló',
+    /lo registró el conductor equivocado/i.test(fichaAnulada));
+  verificar('y quién lo hizo', /anulado por/i.test(fichaAnulada) && /danilo/.test(fichaAnulada));
+
+  await pag.click('.modal-pie button:has-text("Deshacer la anulación")');
+  await pag.waitForTimeout(1400);
+  verificar('se puede deshacer',
+    await pag.locator('tr.fila-anulada').count() === 0);
+
+  await pag.uncheck('.marca-check:has-text("anulados") input');
+  await pag.waitForTimeout(1300);
+  verificar('y el viaje vuelve a contar', await cuenta() === antes, `${await cuenta()}`);
 
   verificar('ninguna excepción en la consola', errores.length === 0, errores[0]);
 } finally {

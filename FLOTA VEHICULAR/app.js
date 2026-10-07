@@ -17,7 +17,7 @@
  * peticiones e ignora en silencio lo que no entiende — un campo que no se
  * guarda y ningún mensaje de error. Por eso se comprueba y se avisa.
  */
-const VERSION_API_REQUERIDA = 11;
+const VERSION_API_REQUERIDA = 12;
 
 const esLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 const API = localStorage.getItem('flota_api') ||
@@ -2713,6 +2713,62 @@ async function copiarGeo(texto, ev) {
   aviso(`Copiado: ${texto}`, 'ok');
 }
 
+// ── Selector de período, compartido ─────────────────────────────────────────
+//
+// Lo usan Viajes y Novedades. Las dos nacieron con una ventana fija —14 y 60
+// días— y las dos son pantallas donde se revisa: con una ventana fija había
+// que creerles en vez de poder auditarlas.
+
+/**
+ * Las fechas de un atajo. 'todo' no sale de aquí: hay que preguntarle al
+ * servidor desde cuándo hay registros, y eso depende de la pantalla.
+ */
+function rangoAtajo(cual) {
+  const h = hoy();
+  if (cual === 'mes') return { desde: h.slice(0, 8) + '01', hasta: h };
+  if (cual === 'mes-pasado') {
+    const d = new Date(h + 'T12:00:00');
+    d.setDate(1); d.setMonth(d.getMonth() - 1);
+    const desde = d.toISOString().slice(0, 10);
+    d.setMonth(d.getMonth() + 1); d.setDate(0);
+    return { desde, hasta: d.toISOString().slice(0, 10) };
+  }
+  return { desde: nDias(h, -Number(cual) + 1), hasta: h };
+}
+
+/**
+ * @param pref   prefijo de los id de los campos ('tr', 'ev'...)
+ * @param desde  fecha inicial actual
+ * @param hasta  fecha final actual
+ * @param fnAtajo  nombre de la función que recibe el atajo
+ * @param derecha  lo que va al final de la fila (botones de la pantalla)
+ */
+function barraPeriodo(pref, desde, hasta, fnAtajo, derecha = '') {
+  return `<div class="fila">
+    <div><label class="lb">Desde</label>
+      <input class="inp" type="date" id="${pref}-desde" value="${desde}"></div>
+    <div><label class="lb">Hasta</label>
+      <input class="inp" type="date" id="${pref}-hasta" value="${hasta}"></div>
+    <button class="btn sm" onclick="${fnAtajo}('aplicar')">Aplicar</button>
+    <div class="chips">
+      <button class="chip" onclick="${fnAtajo}(14)">14 días</button>
+      <button class="chip" onclick="${fnAtajo}(30)">30 días</button>
+      <button class="chip" onclick="${fnAtajo}('mes')">Este mes</button>
+      <button class="chip" onclick="${fnAtajo}('mes-pasado')">Mes pasado</button>
+      <button class="chip" onclick="${fnAtajo}('todo')">Toda la operación</button>
+    </div>
+    ${derecha}
+  </div>`;
+}
+
+/** Lee los dos campos de fecha y comprueba que tengan sentido. */
+function leerPeriodo(pref) {
+  const d = $(`#${pref}-desde`).value, h = $(`#${pref}-hasta`).value;
+  if (!d || !h) { aviso('Indique las dos fechas', 'mal', 'Falta una fecha'); return null; }
+  if (h < d) { aviso('La fecha final es anterior a la inicial', 'mal', 'Fechas al revés'); return null; }
+  return { desde: d, hasta: h };
+}
+
 // ── Viajes ───────────────────────────────────────────────────────────────────
 //
 // Esta pantalla es donde se VERIFICA: se contrasta lo que marcó el conductor
@@ -2724,6 +2780,8 @@ let trayDesde = localStorage.getItem('flota_tray_desde') || '';
 let trayHasta = localStorage.getItem('flota_tray_hasta') || '';
 /** Filtros en memoria: se aplican sobre lo ya descargado, sin volver a pedir. */
 let trayFiltro = { vehiculo: '', conductor: '', texto: '', sinGps: false };
+/** Destapar los viajes anulados. Solo el administrador, y vuelve a pedirlos. */
+let trayVerAnulados = false;
 /** Tope que se le pidió al servidor; si vuelve lleno, se avisa. */
 const TRAY_LIMITE = 5000;
 
@@ -2732,7 +2790,8 @@ async function verTrayectos() {
   $('#main').innerHTML = '<div class="cargando">Cargando viajes...</div>';
   try {
     trayectosCargados = await api(
-      `/api/trayectos?desde=${trayDesde}&hasta=${trayHasta}&limite=${TRAY_LIMITE}`);
+      `/api/trayectos?desde=${trayDesde}&hasta=${trayHasta}&limite=${TRAY_LIMITE}` +
+      (trayVerAnulados ? '&anulados=1' : ''));
   } catch (e) {
     return $('#main').innerHTML = `<div class="card"><div class="nota avi">${esc(e.message)}</div></div>`;
   }
@@ -2747,26 +2806,15 @@ function periodoTrayectos(desde, hasta) {
   verTrayectos();
 }
 
-function aplicarPeriodoTray() {
-  const d = $('#tr-desde').value, h = $('#tr-hasta').value;
-  if (!d || !h) return aviso('Indique las dos fechas', 'mal', 'Falta una fecha');
-  if (h < d) return aviso('La fecha final es anterior a la inicial', 'mal', 'Fechas al revés');
-  periodoTrayectos(d, h);
-}
-
 /** Atajos de período. El del mes pasado es el que se usa para liquidar. */
 function atajoTray(cual) {
-  const h = hoy();
   if (cual === 'todo') return todaLaOperacion();
-  if (cual === 'mes') return periodoTrayectos(h.slice(0, 8) + '01', h);
-  if (cual === 'mes-pasado') {
-    const d = new Date(h + 'T12:00:00');
-    d.setDate(1); d.setMonth(d.getMonth() - 1);
-    const ini = d.toISOString().slice(0, 10);
-    d.setMonth(d.getMonth() + 1); d.setDate(0);
-    return periodoTrayectos(ini, d.toISOString().slice(0, 10));
+  if (cual === 'aplicar') {
+    const p = leerPeriodo('tr');
+    return p && periodoTrayectos(p.desde, p.hasta);
   }
-  periodoTrayectos(nDias(h, -Number(cual) + 1), h);
+  const { desde, hasta } = rangoAtajo(cual);
+  periodoTrayectos(desde, hasta);
 }
 
 /**
@@ -2839,22 +2887,9 @@ function pintarTrayectos() {
     </div>
 
     <div class="card filtros-tray">
-      <div class="fila">
-        <div><label class="lb">Desde</label>
-          <input class="inp" type="date" id="tr-desde" value="${trayDesde}"></div>
-        <div><label class="lb">Hasta</label>
-          <input class="inp" type="date" id="tr-hasta" value="${trayHasta}"></div>
-        <button class="btn sm" onclick="aplicarPeriodoTray()">Aplicar</button>
-        <div class="chips">
-          <button class="chip" onclick="atajoTray(14)">14 días</button>
-          <button class="chip" onclick="atajoTray(30)">30 días</button>
-          <button class="chip" onclick="atajoTray('mes')">Este mes</button>
-          <button class="chip" onclick="atajoTray('mes-pasado')">Mes pasado</button>
-          <button class="chip" onclick="atajoTray('todo')">Toda la operación</button>
-        </div>
-        <button class="btn sec sm" onclick="exportarTrayectos()"
-          title="Lo que se está viendo, con todas las columnas">Descargar</button>
-      </div>
+      ${barraPeriodo('tr', trayDesde, trayHasta, 'atajoTray',
+        `<button class="btn sec sm" onclick="exportarTrayectos()"
+           title="Lo que se está viendo, con todas las columnas">Descargar</button>`)}
       <div class="fila">
         <div><label class="lb">Vehículo</label>
           <select class="inp" onchange="filtrarTrayectos('vehiculo',this.value)">
@@ -2875,6 +2910,9 @@ function pintarTrayectos() {
         <label class="marca-check">
           <input type="checkbox" ${trayFiltro.sinGps ? 'checked' : ''}
             onchange="filtrarTrayectos('sinGps',this.checked)"> Solo los que les falta GPS</label>
+        ${sesion.rol === 'principal' ? `<label class="marca-check">
+          <input type="checkbox" ${trayVerAnulados ? 'checked' : ''}
+            onchange="trayVerAnulados=this.checked;verTrayectos()"> Ver también los anulados</label>` : ''}
       </div>
     </div>
 
@@ -2911,11 +2949,12 @@ function tablaTrayectos(t) {
       const o = ORIGEN_MARCA[x.origen_salida] || ['gris', '—'];
       const km = (x.km_final && x.km_inicial) ? x.km_final - x.km_inicial : null;
       const fotos = (x.fotos || '').split(',').filter(Boolean);
-      return `<tr>
+      return `<tr class="${x.estado === 'anulado' ? 'fila-anulada' : ''}">
         <td>${esc(x.fecha_operacion)}</td>
         <td><button class="btn sec sm btn-viaje" onclick="verTrayecto(${x.id})"
           title="Ver todos los datos de este viaje">${esc(x.consecutivo || '#' + x.id)}</button>
-          ${x.estado === 'en_curso' ? '<br><span class="etq ambar">en curso</span>' : ''}</td>
+          ${x.estado === 'en_curso' ? '<br><span class="etq ambar">en curso</span>' : ''}
+          ${x.estado === 'anulado' ? '<br><span class="etq rojo">anulado</span>' : ''}</td>
         <td class="placa">${esc(x.placa)}</td>
         <td>${esc(x.conductor?.trim() || '—')}</td>
         <td style="max-width:190px">${x.tripulantes
@@ -2967,9 +3006,15 @@ function verTrayecto(id) {
   abrirModal(`Viaje ${x.consecutivo || '#' + x.id}`, `
     <table class="ficha" style="margin-bottom:1rem"><tbody>
       <tr><th>Día de operación</th><td><b>${esc(x.fecha_operacion)}</b></td></tr>
-      <tr><th>Estado</th><td>${x.estado === 'cerrado'
+      <tr><th>Estado</th><td>${x.estado === 'anulado'
+        ? '<span class="etq rojo">Anulado — no cuenta para el pago</span>'
+        : x.estado === 'cerrado'
         ? '<span class="etq verde">Cerrado</span>'
         : '<span class="etq ambar">En curso — sin llegada</span>'}</td></tr>
+      ${x.estado === 'anulado' ? `
+      <tr><th>Motivo de la anulación</th><td>${esc(x.motivo_anulacion || '—')}</td></tr>
+      <tr><th>Anulado por</th><td>${esc(x.anulado_por_usuario || '—')}
+        ${x.anulado_en ? ` <span style="color:var(--muted)">· ${fechaHora(x.anulado_en)}</span>` : ''}</td></tr>` : ''}
       <tr><th>Vehículo</th><td><span class="placa">${esc(x.placa)}</span></td></tr>
       <tr><th>Conductor</th><td>${esc(x.conductor?.trim() || '—')}</td></tr>
       <tr><th>Tripulantes</th><td>${esc(x.tripulantes || '—')}
@@ -2996,7 +3041,82 @@ function verTrayecto(id) {
       : '<div class="nota avi">Este viaje no tiene llegada registrada.</div>'}`,
     `${(x.fotos || '').split(',').filter(Boolean).length
       ? `<button class="btn sec" onclick="verFotos(${x.id},'${esc(x.placa)}')">Ver fotografías</button>` : ''}
+     ${sesion.rol === 'principal' ? (x.estado === 'anulado'
+       ? `<button class="btn sec" onclick="restaurarTrayecto(${x.id})">Deshacer la anulación</button>`
+       : `<button class="btn rojo" onclick="modalQuitarTrayecto(${x.id})">Quitar este viaje</button>`) : ''}
      <button class="btn sec" onclick="cerrarModal()">Cerrar</button>`);
+}
+
+/**
+ * Quitar un viaje. Solo el administrador (D35).
+ *
+ * Un viaje es el soporte de un día de operación: quitarlo cambia lo que se le
+ * paga a un contratista. Por eso se ofrecen dos cosas distintas, igual que en
+ * el itinerario, y la de por omisión es la reversible: ANULAR deja el registro
+ * y su motivo a la vista de quien revise la cuenta; BORRAR solo es para lo que
+ * se registró por error y no debe dejar rastro.
+ */
+function modalQuitarTrayecto(id) {
+  const x = trayectosCargados.find(t => t.id === id);
+  if (!x) return;
+  const km = (x.km_final && x.km_inicial) ? x.km_final - x.km_inicial : null;
+
+  abrirModal('Quitar el viaje', `
+    <div class="nota avi" style="margin-bottom:1rem">
+      <b>${esc(x.consecutivo || '#' + x.id)}</b> · ${esc(x.placa)} ·
+      ${esc(x.fecha_operacion)}${km != null ? ` · ${num(km)} km` : ''}<br>
+      Si era el único viaje de ese día, <b>el día deja de contarse como
+      ejecutado</b> y deja de ser pagable.
+    </div>
+    <div class="campo"><label class="lb">Por qué se quita <span class="req">*</span></label>
+      <textarea class="inp" id="qt-motivo" rows="2"
+        placeholder="Ej: lo registró el conductor equivocado; se duplicó al sincronizar"></textarea>
+      <p class="ayuda">Queda registrado con su nombre. Es lo que explica después
+        el cambio en la liquidación.</p></div>
+    <div class="campo">
+      <label style="display:flex;gap:.5rem;align-items:flex-start;font-size:.86rem;cursor:pointer">
+        <input type="checkbox" id="qt-definitivo" style="margin-top:.2rem">
+        <span><b>Borrar definitivamente</b><br>
+          <span style="color:var(--muted);font-size:.8rem">Sin esta casilla queda
+          <b>anulado</b>: no cuenta en ninguna parte, pero el viaje, sus fotografías
+          y el motivo se pueden consultar, y se puede deshacer. Con ella se elimina
+          de verdad, con sus fotografías y su checklist, y no hay vuelta atrás.
+          Las novedades que se hubieran reportado en ese viaje no se borran.</span>
+        </span></label>
+    </div>`,
+    `<button class="btn sec" onclick="verTrayecto(${id})">Volver</button>
+     <button class="btn rojo" id="qt-btn" onclick="confirmarQuitarTrayecto(${id})">Confirmar</button>`);
+}
+
+async function confirmarQuitarTrayecto(id) {
+  const motivo = $('#qt-motivo').value.trim();
+  if (motivo.length < 5) {
+    return aviso('Escriba por qué se quita', 'mal', 'Falta el motivo');
+  }
+  const definitivo = $('#qt-definitivo').checked;
+  const btn = $('#qt-btn'); btn.disabled = true; btn.textContent = 'Quitando...';
+  try {
+    const r = await api(`/api/trayectos/${id}${definitivo ? '?definitivo=1' : ''}`,
+      { metodo: 'DELETE', cuerpo: { motivo } });
+    cerrarModal();
+    // Se dice cómo quedó el día: es la consecuencia que importa.
+    aviso(`${definitivo ? 'Viaje borrado' : 'Viaje anulado'}. El ${r.fecha} ` +
+      (r.dia?.dia_pagable ? 'sigue siendo pagable (hay otro viaje).' : 'ya no cuenta como pagable.'),
+      'ok', 'Listo');
+    verTrayectos();
+  } catch (e) {
+    aviso(e.message, 'mal', 'No se pudo quitar');
+    btn.disabled = false; btn.textContent = 'Confirmar';
+  }
+}
+
+async function restaurarTrayecto(id) {
+  try {
+    await api(`/api/trayectos/${id}/restaurar`, { metodo: 'POST', cuerpo: {} });
+    cerrarModal();
+    aviso('El viaje vuelve a contar', 'ok', 'Listo');
+    verTrayectos();
+  } catch (e) { aviso(e.message, 'mal', 'No se pudo deshacer'); }
 }
 
 /** Lo que se está viendo, con TODAS las columnas, para revisarlo en Excel. */
@@ -3051,42 +3171,152 @@ async function verFotos(id, placa) {
   }
 }
 
+// ── Novedades ────────────────────────────────────────────────────────────────
+//
+// Mismo tratamiento que Viajes y por la misma razón: nació con una ventana
+// fija de 60 días y es una pantalla donde se revisa.
+
+let evDesde = localStorage.getItem('flota_ev_desde') || '';
+let evHasta = localStorage.getItem('flota_ev_hasta') || '';
+let eventosCargados = [];
+let evFiltro = { tipo: '', abiertas: false };
+const EV_LIMITE = 2000;
+
+const GRAV_EV = { baja: 'gris', media: 'azul', alta: 'ambar', critica: 'rojo' };
+
 async function verEventos() {
+  if (!evDesde || !evHasta) { evDesde = nDias(hoy(), -59); evHasta = hoy(); }
   $('#main').innerHTML = '<div class="cargando">Cargando novedades...</div>';
-  const ev = await api(`/api/eventos?desde=${nDias(hoy(), -60)}&hasta=${hoy()}`);
+  try {
+    eventosCargados = await api(
+      `/api/eventos?desde=${evDesde}&hasta=${evHasta}&limite=${EV_LIMITE}`);
+  } catch (e) {
+    return $('#main').innerHTML = `<div class="card"><div class="nota avi">${esc(e.message)}</div></div>`;
+  }
+  pintarEventos();
+}
+
+function periodoEventos(desde, hasta) {
+  evDesde = desde; evHasta = hasta;
+  localStorage.setItem('flota_ev_desde', desde);
+  localStorage.setItem('flota_ev_hasta', hasta);
+  verEventos();
+}
+
+function atajoEv(cual) {
+  if (cual === 'aplicar') {
+    const p = leerPeriodo('ev');
+    return p && periodoEventos(p.desde, p.hasta);
+  }
+  if (cual === 'todo') return todasLasNovedades();
+  const { desde, hasta } = rangoAtajo(cual);
+  periodoEventos(desde, hasta);
+}
+
+/** Desde la primera novedad registrada, no desde una fecha inventada. */
+async function todasLasNovedades() {
+  try {
+    const r = await api('/api/eventos/rango');
+    periodoEventos(r.primera || nDias(hoy(), -365), r.ultima || hoy());
+  } catch (e) {
+    // Contra un Worker viejo esa ruta no existe: se pide un rango amplio en
+    // vez de dejar el botón muerto.
+    if (!esFalloDeRed(e)) {
+      periodoEventos('2026-01-01', hoy());
+      return aviso('Se pidió desde enero: el servidor todavía no sabe decir ' +
+        'desde cuándo hay novedades. Actualícelo para que la fecha sea exacta.', 'avi');
+    }
+    aviso(e.message, 'mal', 'No se pudo');
+  }
+}
+
+function eventosFiltrados() {
+  return eventosCargados.filter(e =>
+    (!evFiltro.tipo || e.tipo === evFiltro.tipo) &&
+    (!evFiltro.abiertas || e.estado !== 'cerrado'));
+}
+
+function filtrarEventos(campo, valor) {
+  evFiltro[campo] = valor;
+  $('#ev-lista').innerHTML = listaEventos(eventosFiltrados());
+  $('#ev-cuenta').textContent = textoCuentaEv();
+}
+
+function textoCuentaEv() {
+  const n = eventosFiltrados().length, total = eventosCargados.length;
+  return `Del ${evDesde} al ${evHasta} · ${num(total)} registro(s)` +
+         (n !== total ? ` · ${num(n)} tras los filtros` : '');
+}
+
+function pintarEventos() {
   const ET = Object.fromEntries(TIPOS_EVENTO);
-  const GRAV = { baja: 'gris', media: 'azul', alta: 'ambar', critica: 'rojo' };
-  const puede = sesion.rol !== 'conductor';
+  const abiertas = eventosCargados.filter(e => e.estado !== 'cerrado').length;
+  const tope = eventosCargados.length >= EV_LIMITE;
+  // Solo se ofrecen los tipos que de verdad aparecen en el período.
+  const tipos = [...new Set(eventosCargados.map(e => e.tipo))]
+    .sort((a, b) => (ET[a] || a).localeCompare(ET[b] || b));
 
   $('#main').innerHTML = `
     <div class="cab">
-      <div><h1>Novedades</h1><p>Últimos 60 días · ${ev.length} registro(s)</p></div>
+      <div><h1>Novedades</h1><p id="ev-cuenta">${textoCuentaEv()}</p></div>
       <button class="btn ambar" onclick="modalEvento()">Reportar novedad</button>
     </div>
-    ${ev.length ? ev.map(e => `
-      <div class="card" style="border-left:4px solid var(--${GRAV[e.gravedad] === 'gris' ? 'muted' : GRAV[e.gravedad]})">
-        <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:flex-start">
-          <div style="flex:1;min-width:220px">
-            <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
-              <b>${esc(ET[e.tipo] || e.tipo)}</b>
-              <span class="etq ${GRAV[e.gravedad]}">${esc(e.gravedad)}</span>
-              ${e.estado === 'cerrado' ? '<span class="etq verde">Cerrada</span>' : '<span class="etq ambar">Abierta</span>'}
-            </div>
-            <p style="margin:.4rem 0 .2rem;font-size:.88rem">${esc(e.descripcion)}</p>
-            ${e.acciones ? `<p style="margin:.2rem 0;font-size:.82rem;color:var(--text-soft)"><b>Acciones:</b> ${esc(e.acciones)}</p>` : ''}
-            <div style="font-size:.74rem;color:var(--muted);margin-top:.3rem">
-              ${fechaHora(e.ts_evento)}
-              ${e.placa ? ' · ' + esc(e.placa) : ''}
-              ${e.municipio ? ' · ' + esc(e.municipio) : ''}
-              ${e.lugar ? ' · ' + esc(e.lugar) : ''}
-              ${e.persona ? ' · ' + esc(e.persona.trim()) : ''}
-            </div>
+
+    <div class="card filtros-tray">
+      ${barraPeriodo('ev', evDesde, evHasta, 'atajoEv')}
+      <div class="fila">
+        <div><label class="lb">Tipo</label>
+          <select class="inp" onchange="filtrarEventos('tipo',this.value)">
+            <option value="">Todos</option>
+            ${tipos.map(t => `<option value="${t}" ${evFiltro.tipo === t ? 'selected' : ''}
+              >${esc(ET[t] || t)}</option>`).join('')}
+          </select></div>
+        <label class="marca-check">
+          <input type="checkbox" ${evFiltro.abiertas ? 'checked' : ''}
+            onchange="filtrarEventos('abiertas',this.checked)"> Solo las abiertas</label>
+        ${abiertas ? `<span style="font-size:.78rem;color:var(--ambar);font-weight:700;
+          padding-bottom:.45rem">${abiertas} sin cerrar</span>` : ''}
+      </div>
+    </div>
+
+    ${tope ? `<div class="nota avi" style="margin-bottom:.85rem">
+      Se están mostrando las <b>${num(EV_LIMITE)} novedades más recientes</b> del período.
+      Hay más: acote las fechas para verlas todas.</div>` : ''}
+
+    <div id="ev-lista">${listaEventos(eventosFiltrados())}</div>`;
+}
+
+function listaEventos(ev) {
+  const ET = Object.fromEntries(TIPOS_EVENTO);
+  const puede = sesion.rol !== 'conductor';
+  if (!ev.length) {
+    return `<div class="card"><div class="vacio">${eventosCargados.length
+      ? 'Ninguna novedad coincide con los filtros.'
+      : 'Sin novedades reportadas en el período.'}</div></div>`;
+  }
+  return ev.map(e => `
+    <div class="card" style="border-left:4px solid var(--${GRAV_EV[e.gravedad] === 'gris' ? 'muted' : GRAV_EV[e.gravedad]})">
+      <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:flex-start">
+        <div style="flex:1;min-width:220px">
+          <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+            <b>${esc(ET[e.tipo] || e.tipo)}</b>
+            <span class="etq ${GRAV_EV[e.gravedad]}">${esc(e.gravedad)}</span>
+            ${e.estado === 'cerrado' ? '<span class="etq verde">Cerrada</span>' : '<span class="etq ambar">Abierta</span>'}
           </div>
-          ${puede && e.estado !== 'cerrado'
-            ? `<button class="btn sec sm" onclick="cerrarEvento(${e.id})">Marcar cerrada</button>` : ''}
+          <p style="margin:.4rem 0 .2rem;font-size:.88rem">${esc(e.descripcion)}</p>
+          ${e.acciones ? `<p style="margin:.2rem 0;font-size:.82rem;color:var(--text-soft)"><b>Acciones:</b> ${esc(e.acciones)}</p>` : ''}
+          <div style="font-size:.74rem;color:var(--muted);margin-top:.3rem">
+            ${fechaHora(e.ts_evento)}
+            ${e.placa ? ' · ' + esc(e.placa) : ''}
+            ${e.municipio ? ' · ' + esc(e.municipio) : ''}
+            ${e.lugar ? ' · ' + esc(e.lugar) : ''}
+            ${e.persona ? ' · ' + esc(e.persona.trim()) : ''}
+          </div>
         </div>
-      </div>`).join('')
-      : '<div class="card"><div class="vacio">Sin novedades reportadas.</div></div>'}`;
+        ${puede && e.estado !== 'cerrado'
+          ? `<button class="btn sec sm" onclick="cerrarEvento(${e.id})">Marcar cerrada</button>` : ''}
+      </div>
+    </div>`).join('');
 }
 
 async function cerrarEvento(id) {

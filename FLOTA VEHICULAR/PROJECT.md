@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D35 | Quitar un viaje | **Solo el administrador**, y con motivo obligatorio. **Anular** deja el registro y se deshace; **borrar** elimina de verdad. En los dos casos se recalcula el día |
 | D34 | Revisión de viajes | La pantalla de Viajes tiene **período libre** —hasta toda la operación—, filtros en memoria, ficha con todos los campos y descarga a CSV. La consulta lleva tope |
 | D33 | Días fuera de servicio | Se registra el **rango de días** en que un vehículo no pudo operar, con su causa. Un día parado **no es pagable**. El conductor puede declararlo desde el celular, acotado a su vehículo y desde hoy |
 | D32 | Mover sin arrastrar | Además del arrastre, la ventana de la programación lleva **día y vehículo de destino**. Con el dedo el arrastre exige sostener 350 ms y soltar sobre una celda que suele estar fuera de pantalla |
@@ -700,6 +701,50 @@ El servidor de desarrollo siembra **dos meses** de historia, no dos semanas: sin
 en la ventana por omisión y las pruebas pasarían sin probar nada.
 
 Se prueba con `node worker/pruebas/prueba_viajes.mjs`.
+
+### 5.4.6 Quitar un viaje (D35)
+
+Un viaje es el **soporte de un día de operación**: quitarlo cambia lo que se le paga a un
+contratista. Por eso **solo el administrador** puede hacerlo, el **motivo es obligatorio** (mínimo
+cinco caracteres, para que no pase un «ok») y son dos cosas distintas, igual que en el itinerario
+(D15):
+
+- **Anular** (lo normal) deja el registro con `estado = 'anulado'`. Deja de contar en todas
+  partes —la lista, el día de operación, el dashboard y la liquidación ya filtraban
+  `estado != 'anulado'`—, pero el viaje, sus fotografías y el motivo siguen consultables, y se
+  puede **deshacer**. El motivo y el autor van en columnas del propio registro
+  (`motivo_anulacion`, `anulado_por`, `anulado_en`), no solo en la auditoría: es ahí donde se mira
+  al revisar la cuenta.
+- **Borrar definitivamente** elimina el viaje, sus fotografías y su checklist. Es para lo que se
+  registró por error y no debe dejar rastro.
+
+**Las novedades sobreviven al viaje.** Un borrado definitivo no las elimina: las *desengancha*
+(`eventos.trayecto_id = NULL`). Un retén o un derrumbe ocurrió de verdad, aunque el viaje al que
+se asoció estuviera mal registrado. `eventos.trayecto_id` no lleva `ON DELETE CASCADE`, así que sin
+ese paso el borrado fallaría contra la clave foránea.
+
+**En los dos casos se recalcula el día.** Sin eso, el contador de días y el día pagable se
+quedarían diciendo lo de antes, en silencio — que es exactamente el error que esta función existe
+para corregir. La respuesta devuelve cómo quedó el día, y la pantalla lo dice: *«El 2026-11-25 ya
+no cuenta como pagable»*.
+
+El administrador puede destapar los anulados con una casilla en los filtros; salen **tachados**,
+para que no se confundan con los que cuentan. Coordinación no los ve ni aunque pida
+`?anulados=1`: el servidor comprueba el rol.
+
+Las columnas de anulación se añaden con `ALTER TABLE` dentro de `asegurarEsquema()`, ignorando el
+error de «ya existe»: SQLite no tiene `ADD COLUMN IF NOT EXISTS` y la base de producción es
+anterior.
+
+### 5.4.7 Novedades: el mismo período libre (D34)
+
+Novedades nació con una ventana fija de 60 días, por lo mismo que Viajes con 14. Lleva ahora el
+**mismo selector** —los dos campos de fecha, los atajos, la memoria del período y el tope de la
+consulta salen de las mismas funciones (`barraPeriodo`, `rangoAtajo`, `leerPeriodo`)— más filtros
+de tipo y *solo las abiertas*. `GET /api/eventos` acepta `limite` (500 por omisión, 5 000 máximo)
+y `GET /api/eventos/rango` dice desde cuándo hay novedades.
+
+Se prueba con `node worker/pruebas/prueba_novedades.mjs`.
 
 ### 5.5 Checklist de distintivos y elementos (D4)
 

@@ -33,7 +33,7 @@
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 11;
+const VERSION_API = 12;
 
 /**
  * Juegos de roles que usan las rutas.
@@ -216,6 +216,14 @@ async function asegurarEsquema(db) {
     'CREATE INDEX IF NOT EXISTS idx_fs_veh ON fuera_servicio(vehiculo_id, fecha_inicio)').run();
   await db.prepare(
     'CREATE INDEX IF NOT EXISTS idx_fs_abierto ON fuera_servicio(fecha_fin, vehiculo_id)').run();
+
+  // Columnas de anulación de viajes (D35). SQLite no tiene
+  // ADD COLUMN IF NOT EXISTS: se intenta y se ignora el error de «ya existe»,
+  // que es lo que pasa en todos los arranques menos el primero.
+  for (const col of ['anulado_por INTEGER', 'anulado_en TEXT', 'motivo_anulacion TEXT']) {
+    try { await db.prepare(`ALTER TABLE trayectos ADD COLUMN ${col}`).run(); }
+    catch { /* ya estaba */ }
+  }
   esquemaListo = true;
 }
 

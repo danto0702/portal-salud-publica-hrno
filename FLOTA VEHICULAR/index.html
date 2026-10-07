@@ -548,6 +548,10 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 .filtros-tray{padding:.7rem .85rem;margin-bottom:.85rem}
 /* El consecutivo en una sola línea: partido en tres estiraba toda la fila */
 .btn-viaje{white-space:nowrap;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:.7rem}
+/* Un viaje anulado sigue listado para el administrador, pero se ve que no cuenta */
+tr.fila-anulada{opacity:.55}
+tr.fila-anulada td{text-decoration:line-through;text-decoration-color:var(--rojo)}
+tr.fila-anulada .etq,tr.fila-anulada button{text-decoration:none}
 .filtros-tray .fila{
   display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;
 }
