@@ -99,8 +99,8 @@ PORTAL SALUD PÚBLICA/               ← raíz del repo
 ```
 
 **Archivos duplicados — estado actual:**
-- `CertiVac.html` en la raíz (`PORTAL SALUD PÚBLICA/CertiVac.html`) → **v5.4 — versión activa y canónica**
-- `PAI/CertiVac.html` → **v5.1 — DEPRECADA**. El usuario siempre abre la copia de la raíz.
+- `PAI/CertiVac.html` → **versión activa y canónica** (backend Supabase, login del portal). Es la que enlaza `index.html`.
+- La copia de la raíz (`CertiVac.html`) se eliminó el 06/10/2026: era la versión previa a la corrección del guardado en Supabase.
 - `Analizador_PAI_HRNO.html` existe en raíz y en `PAI/`. La canónica para GitHub Pages es `PAI/Analizador_PAI_HRNO.html`.
 
 ---
