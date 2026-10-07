@@ -9,6 +9,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../auth.js"></script>
+<!-- Plantilla base (membrete) para la Certificación de Trazadores en Word -->
+<script src="cert_trazadores_plantilla.js"></script>
 
 <script>
 // ╔══════════════════════════════════════════════════════════════╗
@@ -536,6 +538,9 @@ body.sumar-fuera span.solo-sumar{display:inline-flex!important}
       <button class="ni" onclick="nav('liquidacion',this)"><span class="ico">💵</span>Liquidaciones</button>
       <button class="ni" onclick="nav('metas',this)"><span class="ico">🎯</span>Tabla de Metas</button>
       <button class="ni" onclick="nav('informemun',this)"><span class="ico">📋</span>Informe por Municipio</button>
+      <div class="nsec">Trazadores</div>
+      <button class="ni" onclick="nav('trazpai',this)"><span class="ico">💉</span>Trazadores PAI</button>
+      <button class="ni" onclick="nav('certtraz',this)"><span class="ico">📑</span>Certificación Trazadores</button>
       <div class="nsec">Análisis</div>
       <button class="ni" onclick="nav('analytics',this)"><span class="ico">📈</span>Gráficas & Análisis</button>
       <button class="ni" onclick="nav('exportar',this)"><span class="ico">⬇️</span>Exportar Excel</button>
@@ -734,6 +739,72 @@ body.sumar-fuera span.solo-sumar{display:inline-flex!important}
     </div>
 
     <!-- ANALYTICS -->
+    <!-- VERIFICACIÓN DE TRAZADORES PAI -->
+    <div class="view" id="view-trazpai">
+      <div class="al al-i" style="margin-bottom:14px">💉 <div>Las dosis se cuentan desde los <strong>registros diarios cargados</strong>, por cohorte PAI: <strong>BCG</strong> en recién nacidos (menores de 1 año), <strong>Pentavalente 3ª</strong> en menores de 12 meses, <strong>Triple Viral 1ª</strong> de 12 a 23 meses y <strong>DPT 2º refuerzo</strong> de 60 a 71 meses. Meta esperada = población meta ÷ 12 × meses al corte. Semáforo: <span class="bdg b-g">≥95%</span> <span class="bdg b-y">90–94%</span> <span class="bdg b-r">&lt;90%</span></div></div>
+
+      <div class="card" style="padding:14px 20px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
+          <div><div class="an-filter-label">Año</div><select id="tz-anio" class="an-sel" style="min-width:90px" onchange="tzCambioAnio()"></select></div>
+          <div><div class="an-filter-label">Corte (acumulado hasta)</div><select id="tz-corte" class="an-sel" style="min-width:140px" onchange="tzRender()"></select></div>
+          <div><div class="an-filter-label">Municipio</div><select id="tz-mun" class="an-sel" style="min-width:150px" onchange="tzRender()"></select></div>
+          <div style="display:flex;gap:6px;align-items:flex-end;margin-left:auto">
+            <button class="btn b-gh b-sm" onclick="tzExportar()">⬇️ Exportar Excel</button>
+            <button class="btn b-te b-sm" onclick="tzRecargar()">🔄 Actualizar</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tz-avisos"></div>
+      <div class="sg" id="tz-kpis"></div>
+
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-h"><div class="card-t">📊 Cumplimiento por municipio — <span id="tz-corte-lbl" style="font-size:12px;color:var(--s4);font-weight:400"></span></div></div>
+        <div class="tw"><table>
+          <thead><tr><th>Trazador</th><th>Municipio</th><th>Población meta</th><th>Meta mensual</th><th>Meta esperada</th><th>Aplicadas</th><th>Diferencia</th><th>% Cumplimiento</th><th>% Avance anual</th><th>Estado</th></tr></thead>
+          <tbody id="tz-tabla"><tr><td colspan="10"><div class="es"><div class="ei">💉</div><p>Cargando…</p></div></td></tr></tbody>
+        </table></div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-h">
+          <div class="card-t">📅 Dosis mensuales</div>
+          <select id="tz-traz" class="an-sel" style="min-width:200px" onchange="tzRenderMatriz()"></select>
+        </div>
+        <div id="tz-matriz-nota" style="padding:0 20px 8px;font-size:11.5px;color:var(--s4)"></div>
+        <div class="tw"><table id="tz-matriz"></table></div>
+      </div>
+
+      <div class="card" id="tz-pob-card" style="margin-bottom:14px">
+        <div class="card-h">
+          <div class="card-t">👶 Población meta programática <span id="tz-pob-anio" style="font-size:12px;color:var(--s4);font-weight:400"></span></div>
+          <button class="btn b-co b-sm" id="tz-pob-btn" onclick="tzGuardarPoblacion()">💾 Guardar población</button>
+        </div>
+        <div class="tw"><table id="tz-pob"></table></div>
+        <div id="tz-pob-fuente" style="padding:8px 20px 14px;font-size:11px;color:var(--s4)"></div>
+      </div>
+    </div>
+
+    <!-- CERTIFICACIÓN DE TRAZADORES POR MUNICIPIO -->
+    <div class="view" id="view-certtraz">
+      <div class="al al-i" style="margin-bottom:14px">📑 <div>Dosis del mes por municipio contadas desde los <strong>registros diarios</strong> (mismos criterios del módulo <strong>Trazadores PAI</strong>, incluido el BCG manual). La meta de cada trazador es la <strong>meta mensual</strong> (población meta ÷ 12) y se puede ajustar antes de generar. Revise o edite la conclusión y genere el Word con el membrete institucional.</div></div>
+      <div class="card" style="padding:14px 20px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
+          <div><div class="an-filter-label">Mes a certificar</div><select id="ct-mes" class="an-sel" style="min-width:200px" onchange="ctMesChange()"><option value="">— Seleccione —</option></select></div>
+          <div><div class="an-filter-label">Lugar de expedición</div><input id="ct-lugar" class="an-sel" style="min-width:130px" value="Ábrego"></div>
+          <div><div class="an-filter-label">Fecha de expedición</div><input id="ct-fecha" type="date" class="an-sel" style="min-width:150px"></div>
+          <label class="chk-sumar" style="margin-bottom:6px"><input type="checkbox" id="ct-incluir-bcg" checked onchange="ctMesChange()"> Incluir BCG</label>
+          <div style="display:flex;gap:6px;align-items:flex-end;margin-left:auto">
+            <button class="btn b-te b-sm" onclick="ctCargarCoberturas()">🔄 Calcular coberturas</button>
+            <button class="btn b-co b-sm" onclick="ctGenerarWord()">⬇️ Generar Word (4 certificados)</button>
+          </div>
+        </div>
+      </div>
+      <div id="ct-municipios">
+        <div class="card"><div class="es"><div class="ei">📍</div><p>Seleccione un mes y pulse <strong>Calcular coberturas</strong>.</p></div></div>
+      </div>
+    </div>
+
     <div class="view" id="view-analytics">
 
       <!-- ── Filtros ── -->
@@ -1678,6 +1749,8 @@ function nav(id,btn){
     historial:'🗂️ Historial de Archivos en Supabase',liquidacion:'💵 Liquidación de Vacunadoras',
     metas:'🎯 Tabla de Metas — Contrato CPSESEHRNO-0064-2026',
     informemun:'📋 Informe de Vacunación por Municipio',
+    trazpai:'💉 Verificación de Trazadores PAI',
+    certtraz:'📑 Certificación de Trazadores por Municipio',
     analytics:'📈 Análisis & Gráficas por Período',exportar:'⬇️ Exportar Datos a Excel',
     alias:'👥 Unificar Nombres de Vacunadoras',
     asignaciones:'📍 Asignación Vacunadora → Municipio',
@@ -1691,6 +1764,8 @@ function nav(id,btn){
   if(id==='dashboard')recargarDatos();
   if(id==='analytics')renderAnalytics();
   if(id==='informemun')cargarInformeMun();
+  if(id==='trazpai')tzInit();
+  if(id==='certtraz')certTrazInit();
   if(id==='alias')cargarAlias();
   if(id==='asignaciones')cargarAsignaciones();
   if(id==='valores')cargarValores();
@@ -4360,6 +4435,521 @@ function descargarPDFInformeMun(){
   setTimeout(()=>{ document.title=tituloOrig; },1000);
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// VERIFICACIÓN DE TRAZADORES PAI — metas programáticas vs registros diarios
+// ═══════════════════════════════════════════════════════════════════════
+// Conteo en Supabase: RPC certivac_trazadores_mes (cohorte PAI, municipio del
+// archivo). certivac_traz_manual reemplaza el valor de un mes (BCG manual).
+// certivac_traz_poblacion guarda la población meta por año, municipio y trazador.
+const TZ_TRAZ=[
+  {id:'BCG',   label:'BCG',                    cohorte:'Recién nacidos',   cert:'BCG Recién Nacidos',   color:'#1B4FD8', manual:true},
+  {id:'PENTA3',label:'Pentavalente 3ª dosis',  cohorte:'Menores de 1 año', cert:'3ras de Pentavalente', color:'#00B4A0'},
+  {id:'TV1',   label:'Triple Viral 1ª dosis',  cohorte:'Niños de 1 año',   cert:'1ras Triple Viral',    color:'#7C3AED'},
+  {id:'DPT2',  label:'DPT 2º refuerzo',        cohorte:'Niños de 5 años',  cert:'2do Refuerzo DPT',     color:'#F59E0B'},
+];
+const TZ_MUN=[
+  {key:'ABREGO',disp:'Ábrego'},{key:'CONVENCION',disp:'Convención'},
+  {key:'EL CARMEN',disp:'El Carmen'},{key:'TEORAMA',disp:'Teorama'},
+];
+const TZ_MES=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const TZ_MES_C=['','ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+let TZ=null;
+
+async function sbRpc(fn, args){
+  const r=await fetch(SB_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:SB_H,body:JSON.stringify(args||{})});
+  if(!r.ok){ let m='HTTP '+r.status; try{const e=await r.json();m=e.message||e.error||m;}catch(x){} throw new Error(m); }
+  return r.json();
+}
+
+async function tzCargar(anio){
+  const[reg,man,pob,arch]=await Promise.all([
+    sbRpc('certivac_trazadores_mes',{p_año:anio}),
+    sbAll('certivac_traz_manual',{'año':'eq.'+anio},'mes,municipio,trazador,dosis'),
+    sbAll('certivac_traz_poblacion',{'año':'eq.'+anio},'municipio,trazador,poblacion,fuente'),
+    sbRpc('certivac_archivos_mes',{p_año:anio})
+  ]);
+  const d={anio, reg:{}, man:{}, pob:{}, arch:{}, fuente:'', ultimoMes:0};
+  const put=(o,a,b,c,v)=>{ o[a]=o[a]||{}; o[a][b]=o[a][b]||{}; o[a][b][c]=v; };
+  reg.forEach(r=>put(d.reg,r.municipio,r.trazador,r.mes,Number(r.dosis)||0));
+  man.forEach(r=>put(d.man,r.municipio,r.trazador,r.mes,Number(r.dosis)||0));
+  pob.forEach(r=>{ d.pob[r.municipio]=d.pob[r.municipio]||{}; d.pob[r.municipio][r.trazador]=Number(r.poblacion)||0; if(r.fuente) d.fuente=r.fuente; });
+  arch.forEach(r=>{ d.arch[r.municipio]=d.arch[r.municipio]||{}; d.arch[r.municipio][r.mes]=Number(r.archivos)||0; if(r.mes>d.ultimoMes) d.ultimoMes=r.mes; });
+  man.forEach(r=>{ if(r.mes>d.ultimoMes) d.ultimoMes=r.mes; });
+  TZ=d;
+  return d;
+}
+
+// Dosis del mes: la cifra manual reemplaza la de los registros diarios
+function tzDosis(mun,traz,mes){
+  const m=TZ.man[mun]?.[traz]?.[mes];
+  return m!=null ? m : (TZ.reg[mun]?.[traz]?.[mes]||0);
+}
+function tzEsManual(mun,traz,mes){ return TZ.man[mun]?.[traz]?.[mes]!=null; }
+function tzAcum(mun,traz,corte){ let s=0; for(let m=1;m<=corte;m++) s+=tzDosis(mun,traz,m); return s; }
+function tzPob(mun,traz){ return TZ.pob[mun]?.[traz]||0; }
+function tzMunsSel(){ const v=$('tz-mun')?.value||''; return v?TZ_MUN.filter(m=>m.key===v):TZ_MUN; }
+function tzSemaforo(pct){
+  if(pct==null) return {cls:'b-b',txt:'Sin meta'};
+  if(pct>=95) return {cls:'b-g',txt:'Cumple'};
+  if(pct>=90) return {cls:'b-y',txt:'En riesgo'};
+  return {cls:'b-r',txt:'No cumple'};
+}
+function tzNum(n,dec){ return Number(n||0).toLocaleString('es-CO',{maximumFractionDigits:dec||0,minimumFractionDigits:dec||0}); }
+function tzPct(n){ return n==null?'—':tzNum(n,1)+'%'; }
+
+// Indicadores de un trazador para un grupo de municipios al corte
+function tzIndicador(muns,traz,corte){
+  let pob=0,ap=0;
+  muns.forEach(m=>{ pob+=tzPob(m.key,traz); ap+=tzAcum(m.key,traz,corte); });
+  const metaMes=pob/12, metaEsp=pob*corte/12;
+  return {pob,ap,metaMes,metaEsp,dif:ap-metaEsp,
+    pct:metaEsp>0?ap/metaEsp*100:null, avance:pob>0?ap/pob*100:null};
+}
+
+async function tzInit(){
+  const sa=$('tz-anio');
+  if(!sa.options.length){
+    const hoy=new Date().getFullYear();
+    let anios=[hoy];
+    try{ const p=await sbAll('certivac_traz_poblacion',{},'año'); anios=[...new Set(p.map(x=>x.año).concat([hoy]))].sort((a,b)=>b-a); }catch(e){}
+    sa.innerHTML=anios.map(a=>`<option value="${a}">${a}</option>`).join('');
+    $('tz-mun').innerHTML='<option value="">Todos los municipios</option>'+TZ_MUN.map(m=>`<option value="${m.key}">${m.disp}</option>`).join('');
+    $('tz-traz').innerHTML=TZ_TRAZ.map(t=>`<option value="${t.id}">${t.label} — ${t.cohorte}</option>`).join('');
+  }
+  if(!TZ || TZ.anio!==parseInt(sa.value)) await tzCambioAnio();
+  else tzRender();
+}
+
+async function tzCambioAnio(){
+  const anio=parseInt($('tz-anio').value)||new Date().getFullYear();
+  $('tz-tabla').innerHTML=`<tr><td colspan="10"><div class="es"><div class="ei">⏳</div><p>Consultando registros…</p></div></td></tr>`;
+  try{
+    await tzCargar(anio);
+    const sc=$('tz-corte');
+    const ult=TZ.ultimoMes||(anio===new Date().getFullYear()?new Date().getMonth()+1:12);
+    sc.innerHTML=TZ_MES.slice(1).map((n,i)=>`<option value="${i+1}"${i+1===ult?' selected':''}>${n} ${anio}</option>`).join('');
+    tzRender();
+  }catch(e){
+    $('tz-tabla').innerHTML=`<tr><td colspan="10"><div class="es"><div class="ei">❌</div><p>${e.message}</p></div></td></tr>`;
+    toast('❌ Trazadores: '+e.message,'err');
+  }
+}
+async function tzRecargar(){ TZ=null; await tzCambioAnio(); }
+
+function tzRender(){
+  if(!TZ) return;
+  const corte=parseInt($('tz-corte').value)||1;
+  const muns=tzMunsSel();
+  $('tz-corte-lbl').textContent=`acumulado enero a ${TZ_MES[corte].toLowerCase()} ${TZ.anio} (${corte} ${corte===1?'mes':'meses'})`;
+
+  // Avisos: meses sin archivos cargados hasta el corte
+  const faltan=[];
+  muns.forEach(m=>{
+    const sin=[]; for(let k=1;k<=corte;k++) if(!(TZ.arch[m.key]?.[k])) sin.push(TZ_MES[k]);
+    if(sin.length) faltan.push(`<strong>${m.disp}</strong>: ${sin.join(', ')}`);
+  });
+  const sinPob=muns.filter(m=>TZ_TRAZ.some(t=>!tzPob(m.key,t.id))).map(m=>m.disp);
+  let av='';
+  if(faltan.length) av+=`<div class="al al-w" style="margin-bottom:12px">⚠️ <div>Meses sin registros diarios cargados (las dosis de esos meses cuentan como 0): ${faltan.join(' · ')}</div></div>`;
+  if(sinPob.length) av+=`<div class="al al-e" style="margin-bottom:12px">❌ <div>Falta la población meta ${TZ.anio} de: ${sinPob.join(', ')}. Regístrela en la tabla de población al final de esta página.</div></div>`;
+  $('tz-avisos').innerHTML=av;
+
+  // Tarjetas por trazador
+  $('tz-kpis').innerHTML=TZ_TRAZ.map(t=>{
+    const i=tzIndicador(muns,t.id,corte); const s=tzSemaforo(i.pct);
+    return `<div class="sc"><div class="sc-bar" style="background:${t.color}"></div>
+      <div class="sc-lbl">${t.label}</div>
+      <div class="sc-val" style="font-size:24px">${tzPct(i.pct)}</div>
+      <div class="sc-sub">${tzNum(i.ap)} de ${tzNum(i.metaEsp,1)} esperadas · <span class="bdg ${s.cls}">${s.txt}</span></div>
+      <div class="sc-sub" style="margin-top:3px">${t.cohorte} · avance anual ${tzPct(i.avance)}</div></div>`;
+  }).join('');
+
+  // Tabla de cumplimiento
+  let html='';
+  TZ_TRAZ.forEach(t=>{
+    const filas=muns.map(m=>({nom:m.disp,...tzIndicador([m],t.id,corte)}));
+    if(muns.length>1) filas.push({nom:'TOTAL ESE',total:true,...tzIndicador(muns,t.id,corte)});
+    filas.forEach((f,ix)=>{
+      const s=tzSemaforo(f.pct);
+      html+=`<tr style="${f.total?'background:var(--s1);font-weight:700':''}">
+        ${ix===0?`<td rowspan="${filas.length}" style="font-weight:700;border-left:4px solid ${t.color}">${t.label}<div style="font-size:10.5px;color:var(--s4);font-weight:500">${t.cohorte}</div></td>`:''}
+        <td class="td-v">${f.nom}</td>
+        <td class="td-m">${tzNum(f.pob)}</td>
+        <td class="td-m">${tzNum(f.metaMes,1)}</td>
+        <td class="td-m">${tzNum(f.metaEsp,1)}</td>
+        <td class="td-m" style="color:var(--cobalt);font-weight:700">${tzNum(f.ap)}</td>
+        <td class="td-m" style="color:${f.dif<0?'var(--crimson)':'var(--teal-d)'}">${f.dif>0?'+':''}${tzNum(f.dif,1)}</td>
+        <td class="td-m" style="font-weight:700">${tzPct(f.pct)}</td>
+        <td class="td-m">${tzPct(f.avance)}</td>
+        <td><span class="bdg ${s.cls}">${s.txt}</span></td></tr>`;
+    });
+  });
+  $('tz-tabla').innerHTML=html;
+  tzRenderMatriz();
+  tzRenderPoblacion();
+}
+
+// Matriz municipio × mes del trazador seleccionado (BCG editable)
+function tzRenderMatriz(){
+  if(!TZ) return;
+  const corte=parseInt($('tz-corte').value)||1;
+  const t=TZ_TRAZ.find(x=>x.id===$('tz-traz').value)||TZ_TRAZ[0];
+  const muns=tzMunsSel();
+  const editable=!!t.manual && portalTienePermiso('certivac','registro');
+  $('tz-matriz-nota').innerHTML=t.manual
+    ? (editable?'✎ Escriba una cifra para <strong>reemplazar</strong> la de los registros diarios de ese mes; borre la casilla para volver al valor de los registros (se muestra en gris). Las cifras manuales se marcan en azul.':'Las cifras en azul fueron digitadas manualmente.')
+    : 'Verde: el mes alcanzó la meta mensual. Naranja: por debajo de la meta mensual. Gris: meses posteriores al corte.';
+  let h=`<thead><tr><th>Municipio</th><th>Meta mensual</th>${TZ_MES_C.slice(1).map((n,i)=>`<th style="${i+1>corte?'opacity:.45':''}">${n}</th>`).join('')}<th>Acumulado</th><th>Meta esperada</th><th>%</th></tr></thead><tbody>`;
+  const tot=new Array(13).fill(0);
+  muns.forEach(m=>{
+    const metaMes=tzPob(m.key,t.id)/12;
+    h+=`<tr><td class="td-v">${m.disp}</td><td class="td-m">${tzNum(metaMes,1)}</td>`;
+    for(let k=1;k<=12;k++){
+      const v=tzDosis(m.key,t.id,k); const man=tzEsManual(m.key,t.id,k);
+      if(k<=corte) tot[k]+=v;
+      const fuera=k>corte;
+      const col=fuera?'var(--s4)':(metaMes>0&&v>=metaMes?'var(--teal-d)':'var(--orange)');
+      if(editable){
+        const regV=TZ.reg[m.key]?.[t.id]?.[k]||0;
+        h+=`<td style="padding:4px"><input type="number" min="0" value="${man?v:''}" placeholder="${regV}" title="Registros diarios: ${regV}"
+          onchange="tzGuardarManual('${m.key}','${t.id}',${k},this.value)"
+          style="width:52px;padding:4px 6px;border:1.5px solid ${man?'var(--cobalt)':'var(--s2)'};border-radius:6px;font-size:12px;text-align:center;background:${man?'rgba(27,79,216,.08)':'#fff'};color:${man?'var(--cobalt)':'inherit'};font-weight:${man?700:400}"></td>`;
+      } else {
+        h+=`<td class="td-m" style="color:${man?'var(--cobalt)':col};${man?'font-weight:700;background:rgba(27,79,216,.06)':''}">${v||(fuera?'':'0')}${man?' ✎':''}</td>`;
+      }
+    }
+    const i=tzIndicador([m],t.id,corte); const s=tzSemaforo(i.pct);
+    h+=`<td class="td-m" style="font-weight:700">${tzNum(i.ap)}</td><td class="td-m">${tzNum(i.metaEsp,1)}</td><td><span class="bdg ${s.cls}">${tzPct(i.pct)}</span></td></tr>`;
+  });
+  if(muns.length>1){
+    const i=tzIndicador(muns,t.id,corte); const s=tzSemaforo(i.pct);
+    h+=`<tr style="background:var(--s1);font-weight:700"><td>TOTAL ESE</td><td class="td-m">${tzNum(i.metaMes,1)}</td>${tot.slice(1).map((v,ix)=>`<td class="td-m">${ix+1<=corte?v:''}</td>`).join('')}<td class="td-m">${tzNum(i.ap)}</td><td class="td-m">${tzNum(i.metaEsp,1)}</td><td><span class="bdg ${s.cls}">${tzPct(i.pct)}</span></td></tr>`;
+  }
+  $('tz-matriz').innerHTML=h+'</tbody>';
+}
+
+async function tzGuardarManual(mun,traz,mes,valor){
+  const anio=TZ.anio; const v=String(valor).trim();
+  try{
+    if(v===''){
+      await sbDelete('certivac_traz_manual',{'año':'eq.'+anio,'mes':'eq.'+mes,'municipio':'eq.'+mun,'trazador':'eq.'+traz});
+      if(TZ.man[mun]?.[traz]) delete TZ.man[mun][traz][mes];
+      toast(`↩️ ${TZ_MES[mes]}: se usa de nuevo el valor de los registros diarios`);
+    } else {
+      const n=parseInt(v);
+      if(isNaN(n)||n<0) throw new Error('Cifra no válida');
+      await sbPost('certivac_traz_manual?on_conflict=año,mes,municipio,trazador',
+        {año:anio,mes,municipio:mun,trazador:traz,dosis:n,actualizado:new Date().toISOString()},
+        'resolution=merge-duplicates,return=minimal');
+      TZ.man[mun]=TZ.man[mun]||{}; TZ.man[mun][traz]=TZ.man[mun][traz]||{}; TZ.man[mun][traz][mes]=n;
+      toast(`✅ ${traz} ${TZ_MES[mes]}: ${n} dosis (manual)`);
+    }
+    tzRender();
+  }catch(e){ toast('❌ No se guardó: '+e.message,'err'); tzRenderMatriz(); }
+}
+
+// Población meta (editable solo con nivel admin)
+function tzRenderPoblacion(){
+  if(!TZ) return;
+  const admin=portalTienePermiso('certivac','admin');
+  $('tz-pob-anio').textContent=TZ.anio;
+  $('tz-pob-btn').style.display=admin?'':'none';
+  let h=`<thead><tr><th>Municipio</th>${TZ_TRAZ.map(t=>`<th>${t.label}<div style="font-size:10px;font-weight:500;opacity:.7;text-transform:none">${t.cohorte}</div></th>`).join('')}</tr></thead><tbody>`;
+  TZ_MUN.forEach(m=>{
+    h+=`<tr><td class="td-v">${m.disp}</td>`+TZ_TRAZ.map(t=>{
+      const v=tzPob(m.key,t.id);
+      return admin
+        ? `<td><input type="number" min="0" class="tz-pob-inp" data-mun="${m.key}" data-traz="${t.id}" value="${v||''}" style="width:90px;padding:5px 8px;border:1.5px solid var(--s2);border-radius:6px;font-size:12px;text-align:center"></td>`
+        : `<td class="td-m">${v?tzNum(v):'—'}</td>`;
+    }).join('')+'</tr>';
+  });
+  $('tz-pob').innerHTML=h+'</tbody>';
+  $('tz-pob-fuente').textContent=TZ.fuente?'Fuente: '+TZ.fuente:'';
+}
+
+async function tzGuardarPoblacion(){
+  const filas=[...document.querySelectorAll('.tz-pob-inp')].filter(i=>i.value!=='').map(i=>({
+    año:TZ.anio, municipio:i.dataset.mun, trazador:i.dataset.traz, poblacion:parseInt(i.value)||0,
+    fuente:TZ.fuente||'Ingresada en CertiVac', actualizado:new Date().toISOString()
+  }));
+  if(!filas.length){ toast('No hay valores para guardar','warn'); return; }
+  showLoad('Guardando población…','');
+  try{
+    await sbPost('certivac_traz_poblacion?on_conflict=año,municipio,trazador',filas,'resolution=merge-duplicates,return=minimal');
+    hideLoad(); toast('✅ Población meta guardada');
+    await tzRecargar();
+  }catch(e){ hideLoad(); toast('❌ '+e.message,'err'); }
+}
+
+function tzExportar(){
+  if(!TZ){ toast('Sin datos','warn'); return; }
+  const corte=parseInt($('tz-corte').value)||1;
+  const muns=tzMunsSel();
+  const wb=XLSXO.utils.book_new();
+  const f1=[[`Trazadores PAI ${TZ.anio} — acumulado enero a ${TZ_MES[corte]}`],[],
+    ['Trazador','Cohorte','Municipio','Población meta','Meta mensual','Meta esperada','Aplicadas','Diferencia','% Cumplimiento','% Avance anual','Estado']];
+  TZ_TRAZ.forEach(t=>{
+    const filas=muns.map(m=>({nom:m.disp,...tzIndicador([m],t.id,corte)}));
+    if(muns.length>1) filas.push({nom:'TOTAL ESE',...tzIndicador(muns,t.id,corte)});
+    filas.forEach(f=>f1.push([t.label,t.cohorte,f.nom,f.pob,+f.metaMes.toFixed(2),+f.metaEsp.toFixed(2),f.ap,+f.dif.toFixed(2),
+      f.pct==null?'':+f.pct.toFixed(1),f.avance==null?'':+f.avance.toFixed(1),tzSemaforo(f.pct).txt]));
+  });
+  const ws1=XLSXO.utils.aoa_to_sheet(f1); setW(ws1,[24,18,14,14,12,14,11,11,15,14,12]);
+  XLSXO.utils.book_append_sheet(wb,ws1,'Cumplimiento');
+  const f2=[['Trazador','Municipio','Población meta',...TZ_MES_C.slice(1),'Total']];
+  TZ_TRAZ.forEach(t=>muns.forEach(m=>{
+    const meses=[]; for(let k=1;k<=12;k++) meses.push(k<=corte?tzDosis(m.key,t.id,k):'');
+    f2.push([t.label,m.disp,tzPob(m.key,t.id),...meses,tzAcum(m.key,t.id,corte)]);
+  }));
+  const ws2=XLSXO.utils.aoa_to_sheet(f2); setW(ws2,[24,14,14,...Array(12).fill(7),9]);
+  XLSXO.utils.book_append_sheet(wb,ws2,'Dosis mensuales');
+  dl(wb,`Trazadores_PAI_${TZ.anio}_${TZ_MES_C[corte]}`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CERTIFICACIÓN DE TRAZADORES POR MUNICIPIO  → Word con membrete institucional
+// ═══════════════════════════════════════════════════════════════════════
+// Recuperado del commit ab03ebf (se perdió el 02/10/2026). Ahora usa los datos
+// del módulo Trazadores PAI (TZ): dosis desde registros diarios + BCG manual y
+// meta mensual = población meta ÷ 12 (editable antes de generar el Word).
+const CT_SECTPR='<w:sectPr w:rsidR="009B5780" w:rsidRPr="00AF7AC6" w:rsidSect="009B5780"><w:headerReference w:type="even" r:id="rId8"/><w:headerReference w:type="default" r:id="rId9"/><w:footerReference w:type="even" r:id="rId10"/><w:footerReference w:type="default" r:id="rId11"/><w:headerReference w:type="first" r:id="rId12"/><w:footerReference w:type="first" r:id="rId13"/><w:pgSz w:w="12240" w:h="18720" w:code="119"/><w:pgMar w:top="1418" w:right="1701" w:bottom="1985" w:left="1701" w:header="510" w:footer="227" w:gutter="0"/><w:cols w:space="708"/><w:docGrid w:linePitch="360"/></w:sectPr>';
+function ctTrazadores(){ return TZ_TRAZ.filter(t=>t.id!=='BCG' || $('ct-incluir-bcg')?.checked); }
+
+// ── Clasificación cualitativa y textos ──
+function ctEstado(meta,cob){
+  meta=+meta||0; cob=+cob||0;
+  if(meta<=0) return 'Sin meta definida';
+  const r=cob/meta;
+  if(cob>=meta) return r>=1.20?'Muy superior a la meta':'Superior a la meta';
+  return r>=0.85?'Inferior a la meta':'Muy inferior a la meta';
+}
+function ctConclusion(mun,filas){
+  const cumplen=filas.filter(f=>(+f.cob)>=(+f.meta) && (+f.meta)>0).length;
+  const rezagados=filas.filter(f=>(+f.cob)<(+f.meta));
+  const nombres=rezagados.map(f=>f.label).join(', ');
+  if(cumplen===filas.length){
+    return `De acuerdo con lo anterior, se concluye que se dio cumplimiento a las metas mensuales establecidas en los trazadores de vacunación para el municipio de ${mun}. En consecuencia, y conforme a lo estipulado contractualmente, aplica el pago completo general para el equipo de vacunación del municipio.`;
+  }
+  if(cumplen===0){
+    return `De acuerdo con lo anterior, se concluye que no se dio cumplimiento a las metas mensuales establecidas en los trazadores de vacunación para el municipio de ${mun}, presentándose rezagos significativos en todos los trazadores. En consecuencia, y conforme a lo estipulado contractualmente, no aplica el pago completo general para el equipo de vacunación del municipio. Por lo tanto, se deja constancia de que para efectos de pago únicamente se tendrán en cuenta las metas de vacunación de cumplimiento individual, tal como lo establece el contrato vigente.`;
+  }
+  return `De acuerdo con lo anterior, si bien se presentan rezagos en el(los) trazador(es) de ${nombres}, se destaca el buen comportamiento en los demás trazadores, los cuales cumplen las metas establecidas. Conforme a lo estipulado contractualmente, se certifica el cumplimiento para efectos del pago total correspondiente para el municipio de ${mun}. No obstante, se deja constancia de que el siguiente pago quedará condicionado a la recuperación de los usuarios en rezago del(los) trazador(es) de ${nombres}.`;
+}
+function ctMesTexto(){
+  const v=$('ct-mes').value; if(!v) return {nombre:'',anio:'',mm:''};
+  const [y,m]=v.split('-');
+  return {nombre:TZ_MES[+m]||m, anio:y, mm:v};
+}
+function ctFechaTexto(){
+  const lugar=($('ct-lugar').value||'Ábrego').trim();
+  const f=$('ct-fecha').value;
+  const MN=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  if(!f) return `Dado en ${lugar}.`;
+  const [y,m,d]=f.split('-').map(Number);
+  return `Dado en ${lugar}, a los ${d} días del mes de ${MN[m]||m} de ${y}.`;
+}
+
+// ── Inicialización de la vista: meses con registros cargados ──
+async function certTrazInit(){
+  const fe=$('ct-fecha'); if(fe && !fe.value) fe.value=new Date().toISOString().substring(0,10);
+  const sel=$('ct-mes'); if(!sel) return;
+  if([...sel.options].some(o=>/^\d{4}-\d{2}$/.test(o.value))) return;
+  try{
+    const pd=await apiGet({accion:'periodos'});
+    const prev=sel.value;
+    sel.innerHTML='<option value="">— Seleccione —</option>'+(pd.periodos||[]).filter(p=>/^\d{4}-\d{2}$/.test(p)).map(p=>{
+      const [y,m]=p.split('-'); return `<option value="${p}"${p===prev?' selected':''}>${TZ_MES[+m]||m} ${y}</option>`;
+    }).join('');
+  }catch(e){ toast('❌ '+e.message,'err'); }
+}
+function ctMesChange(){
+  APP.ctData=null;
+  $('ct-municipios').innerHTML='<div class="card"><div class="es"><div class="ei">📍</div><p>Pulse <strong>Calcular coberturas</strong> para el mes seleccionado.</p></div></div>';
+}
+
+// ── Coberturas del mes desde el módulo Trazadores PAI ──
+async function ctCargarCoberturas(){
+  const mes=$('ct-mes').value;
+  if(!mes){ toast('Seleccione el mes a certificar','warn'); return; }
+  const [y,m]=mes.split('-').map(Number);
+  showLoad('Calculando coberturas…','Consultando registros diarios en Supabase');
+  try{
+    if(!TZ || TZ.anio!==y) await tzCargar(y);
+    APP.ctData={mes, anio:y, mesNum:m};
+    ctRenderMunicipios();
+    const sinArch=TZ_MUN.filter(x=>!(TZ.arch[x.key]?.[m])).map(x=>x.disp);
+    if(sinArch.length) toast(`⚠️ Sin registros diarios de ${TZ_MES[m]} en: ${sinArch.join(', ')}`,'warn');
+    else toast(`✅ Coberturas de ${TZ_MES[m]} ${y} calculadas`);
+  }catch(e){ toast('❌ '+e.message,'err'); }
+  finally{ hideLoad(); }
+}
+
+// ── Render de los 4 bloques por municipio ──
+function ctRenderMunicipios(){
+  const {mesNum}=APP.ctData;
+  const BORD='1px solid #cfd8e3';
+  $('ct-municipios').innerHTML=TZ_MUN.map((mun,i)=>{
+    const rows=ctTrazadores().map(t=>{
+      const c=tzDosis(mun.key,t.id,mesNum);
+      const meta=Math.round(tzPob(mun.key,t.id)/12);
+      const man=tzEsManual(mun.key,t.id,mesNum);
+      return `<tr>
+        <td style="font-weight:600">${t.cert}</td>
+        <td><input type="number" min="0" id="ct-meta-${i}-${t.id}" value="${meta||''}" oninput="ctFilaChange(${i},'${t.id}')" title="Meta mensual = población meta ÷ 12" style="width:74px;padding:5px 8px;border:${BORD};border-radius:6px;font-size:12px;text-align:center"></td>
+        <td id="ct-cob-${i}-${t.id}" style="font-weight:700;color:var(--cobalt)" title="${man?'Cifra manual':'Registros diarios'}">${c}${man?' ✎':''}</td>
+        <td id="ct-rez-${i}-${t.id}" style="color:${meta-c>0?'var(--orange)':'var(--teal-d)'}">${meta?meta-c:'—'}</td>
+        <td id="ct-est-${i}-${t.id}" style="font-size:11px">${ctEstado(meta,c)}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="card" style="margin-bottom:14px">
+      <div class="card-h"><div class="card-t">📍 ${mun.disp}</div><span class="bdg" id="ct-badge-${i}">—</span></div>
+      <div class="tw"><table>
+        <thead><tr><th>Trazador</th><th>Meta mensual</th><th>Cobertura</th><th>Rezago</th><th>Estado</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div style="padding:12px 16px 16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <label style="font-size:11px;font-weight:700;color:var(--s4);text-transform:uppercase;letter-spacing:.5px">Conclusión (editable)</label>
+          <button class="btn b-gh b-sm" onclick="ctSugerir(${i})">🔄 Sugerir texto</button>
+        </div>
+        <textarea id="ct-concl-${i}" oninput="this.dataset.edited='1'" style="width:100%;min-height:92px;padding:10px 12px;border:${BORD};border-radius:8px;font-size:12.5px;font-family:inherit;line-height:1.5;resize:vertical"></textarea>
+      </div>
+    </div>`;
+  }).join('');
+  TZ_MUN.forEach((mun,i)=>{ ctUpdateBadge(i); ctSugerir(i); });
+}
+function ctCob(i,tid){ return parseInt($(`ct-cob-${i}-${tid}`)?.textContent)||0; }
+function ctFilaChange(i,tid){
+  const meta=+($(`ct-meta-${i}-${tid}`).value)||0;
+  const cob=ctCob(i,tid);
+  const rez=meta-cob;
+  const rezEl=$(`ct-rez-${i}-${tid}`); rezEl.textContent=meta?rez:'—'; rezEl.style.color=rez>0?'var(--orange)':'var(--teal-d)';
+  $(`ct-est-${i}-${tid}`).textContent=ctEstado(meta,cob);
+  ctUpdateBadge(i);
+  // Regenerar la conclusión sugerida salvo que el usuario la haya editado a mano
+  const ta=$(`ct-concl-${i}`); if(ta && ta.dataset.edited!=='1') ctSugerir(i);
+}
+function ctUpdateBadge(i){
+  const traz=ctTrazadores(); let cumplen=0;
+  traz.forEach(t=>{ const m=+($(`ct-meta-${i}-${t.id}`).value)||0; if(m>0 && ctCob(i,t.id)>=m) cumplen++; });
+  const el=$(`ct-badge-${i}`); if(!el) return;
+  const n=traz.length;
+  if(cumplen===n){ el.className='bdg b-g'; el.textContent=`Cumple ${n}/${n}`; }
+  else if(cumplen===0){ el.className='bdg b-r'; el.textContent=`No cumple 0/${n}`; }
+  else { el.className='bdg b-y'; el.textContent=`Parcial ${cumplen}/${n}`; }
+}
+function ctSugerir(i){
+  const filas=ctTrazadores().map(t=>({label:t.cert, meta:+($(`ct-meta-${i}-${t.id}`).value)||0, cob:ctCob(i,t.id)}));
+  const ta=$(`ct-concl-${i}`);
+  ta.value=ctConclusion(TZ_MUN[i].disp, filas);
+  ta.dataset.edited=''; // vuelve a modo "sugerencia automática"
+}
+
+function ctBuildDocumentXml(){
+  const {nombre:mesN}=ctMesTexto();
+  const fechaTxt=ctFechaTexto();
+  const PB='<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+  const certs=TZ_MUN.map((mun,i)=>{
+    const b=[];
+    b.push(ctPara(`CERTIFICADO TRAZADORES PAI DEL MES DE ${mesN.toUpperCase()}`,{bold:true,center:true,size:28}));
+    b.push(ctPara(''));
+    b.push(ctPara('EL SUSCRITO COORDINADOR DE SALUD PÚBLICA DE LA E.S.E. HOSPITAL REGIONAL NOROCCIDENTAL',{bold:true,center:true}));
+    b.push(ctPara(''));
+    b.push(ctPara('CERTIFICA:',{bold:true,center:true}));
+    b.push(ctPara(''));
+    b.push(ctPara(`Que, una vez revisado el comportamiento de los trazadores de vacunación correspondientes al mes de ${mesN.toLowerCase()} en el municipio de ${mun.disp}, se evidencian los siguientes resultados:`,{justify:true}));
+    b.push(ctPara(''));
+    ctTrazadores().forEach(t=>{
+      const meta=+($(`ct-meta-${i}-${t.id}`)?.value)||0;
+      const cob=ctCob(i,t.id);
+      b.push(ctPara(`${t.cert}: Meta ${meta}, Cobertura ${cob}, ${ctEstado(meta,cob)}`));
+    });
+    b.push(ctPara(''));
+    b.push(ctPara(($(`ct-concl-${i}`)?.value||''),{justify:true}));
+    b.push(ctPara(''));
+    b.push(ctPara(fechaTxt));
+    b.push(ctPara('')); b.push(ctPara('')); b.push(ctPara(''));
+    b.push(ctPara('DANILO TORRADO BLANCO',{bold:true}));
+    b.push(ctPara('Coordinador de Salud Pública (CPS)'));
+    return b.join('');
+  });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${certs.join(PB)}${CT_SECTPR}</w:body></w:document>`;
+}
+
+// ── Utilidades OOXML / ZIP (STORE) para armar el .docx ──
+function ctEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function ctPara(text,o){ o=o||{};
+  let rpr=''; if(o.bold)rpr+='<w:b/>'; if(o.size)rpr+=`<w:sz w:val="${o.size}"/><w:szCs w:val="${o.size}"/>`;
+  let ppr=''; if(o.center)ppr+='<w:jc w:val="center"/>'; else if(o.justify)ppr+='<w:jc w:val="both"/>';
+  const pprXml=(ppr||rpr)?`<w:pPr>${ppr}${rpr?`<w:rPr>${rpr}</w:rPr>`:''}</w:pPr>`:'';
+  const run=(text!==''&&text!=null)?`<w:r>${rpr?`<w:rPr>${rpr}</w:rPr>`:''}<w:t xml:space="preserve">${ctEsc(text)}</w:t></w:r>`:'';
+  return `<w:p>${pprXml}${run}</w:p>`;
+}
+function ctB64ToBytes(b64){ const bin=atob(b64); const len=bin.length; const out=new Uint8Array(len); for(let i=0;i<len;i++) out[i]=bin.charCodeAt(i); return out; }
+function ctCrc32(bytes){ let c=~0>>>0; for(let i=0;i<bytes.length;i++){ c^=bytes[i]; for(let k=0;k<8;k++) c=(c>>>1)^(0xEDB88320 & -(c&1)); } return (~c)>>>0; }
+function ctReadZip(bytes){
+  const dv=new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const dec=new TextDecoder(); const entries=[]; let i=0;
+  while(i+30<=bytes.length && dv.getUint32(i,true)===0x04034b50){
+    const compSize=dv.getUint32(i+18,true);
+    const nameLen=dv.getUint16(i+26,true);
+    const extraLen=dv.getUint16(i+28,true);
+    const nameStart=i+30;
+    const name=dec.decode(bytes.subarray(nameStart,nameStart+nameLen));
+    const dataStart=nameStart+nameLen+extraLen;
+    entries.push({name, data:bytes.subarray(dataStart,dataStart+compSize)});
+    i=dataStart+compSize;
+  }
+  return entries;
+}
+function ctBuildZip(entries){
+  const enc=new TextEncoder();
+  const u16=n=>[n&255,(n>>8)&255];
+  const u32=n=>[n&255,(n>>8)&255,(n>>16)&255,(n>>>24)&255];
+  const chunks=[]; const central=[]; let offset=0;
+  entries.forEach(e=>{
+    const nameB=enc.encode(e.name);
+    const crc=ctCrc32(e.data); const size=e.data.length;
+    const lh=new Uint8Array([].concat(u32(0x04034b50),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(size),u32(size),u16(nameB.length),u16(0)));
+    chunks.push(lh, nameB, e.data);
+    const cd=new Uint8Array([].concat(u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(size),u32(size),u16(nameB.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset)));
+    central.push(cd, nameB);
+    offset+=lh.length+nameB.length+size;
+  });
+  let cdSize=0; central.forEach(p=>cdSize+=p.length);
+  const eocd=new Uint8Array([].concat(u32(0x06054b50),u16(0),u16(0),u16(entries.length),u16(entries.length),u32(cdSize),u32(offset),u16(0)));
+  const all=chunks.concat(central,[eocd]);
+  let total=0; all.forEach(p=>total+=p.length);
+  const out=new Uint8Array(total); let pos=0;
+  all.forEach(p=>{ out.set(p,pos); pos+=p.length; });
+  return out;
+}
+function ctDescargar(bytes, filename){
+  const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1200);
+}
+function ctGenerarWord(){
+  if(typeof window.PLANTILLA_TRAZADORES_B64!=='string'){ toast('❌ No se cargó la plantilla del Word (cert_trazadores_plantilla.js)','err'); return; }
+  if(!APP.ctData){ toast('Primero pulse "Calcular coberturas"','warn'); return; }
+  const {nombre:mesN, anio}=ctMesTexto();
+  if(!mesN){ toast('Seleccione el mes a certificar','warn'); return; }
+  try{
+    showLoad('Generando Word…','Ensamblando los 4 certificados');
+    const tpl=ctB64ToBytes(window.PLANTILLA_TRAZADORES_B64);
+    const entries=ctReadZip(tpl);
+    if(!entries.length) throw new Error('Plantilla del Word inválida');
+    const docBytes=new TextEncoder().encode(ctBuildDocumentXml());
+    let reemplazado=false;
+    const nuevos=entries.map(e=>{ if(e.name==='word/document.xml'){ reemplazado=true; return {name:e.name, data:docBytes}; } return e; });
+    if(!reemplazado) nuevos.push({name:'word/document.xml', data:docBytes});
+    const out=ctBuildZip(nuevos);
+    ctDescargar(out, `CERTIFICADO TRAZADORES ${mesN} ${anio}.docx`);
+    toast('✅ Word generado con los 4 certificados');
+  }catch(e){ console.error('[certtraz]',e); toast('❌ '+e.message,'err'); }
+  finally{ hideLoad(); }
+}
+
 // ── Opción: sumar el valor fuera de meta al total a pagar ──
 function setSumarFuera(on){
   document.body.classList.toggle('sumar-fuera',!!on);
@@ -4388,6 +4978,9 @@ window.onload=async ()=>{
   const ok = await verificarConexion();
   if(ok){
     cargarDashboard();
+    // Acceso directo desde el portal (tarjeta "Trazadores")
+    let destino=''; try{ destino=localStorage.getItem('certivac-nav')||''; localStorage.removeItem('certivac-nav'); }catch(e){}
+    if(destino==='trazadores') nav('trazpai',document.querySelector(`.ni[onclick*="'trazpai'"]`));
   } else {
     toast('⚠️ No se pudo conectar a Supabase — verifique la red','warn');
   }
