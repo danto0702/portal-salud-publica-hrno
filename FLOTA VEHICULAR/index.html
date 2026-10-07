@@ -542,6 +542,37 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 .ayuda{font-size:.75rem;color:var(--muted);margin:.45rem 0 0}
 .ayuda.mal{color:var(--ambar);font-weight:600}
 
+/* ── Pantalla de Viajes: filtros y ficha ─────────────────────────────
+   Es la pantalla donde se verifica, así que el período es libre —hasta toda
+   la operación— y los filtros trabajan sobre lo ya descargado. */
+.filtros-tray{padding:.7rem .85rem;margin-bottom:.85rem}
+/* El consecutivo en una sola línea: partido en tres estiraba toda la fila */
+.btn-viaje{white-space:nowrap;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:.7rem}
+.filtros-tray .fila{
+  display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;
+}
+.filtros-tray .fila + .fila{margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--border)}
+.filtros-tray .inp{width:auto}
+.filtros-tray .chips{gap:.3rem;margin:0}
+.filtros-tray .chip{padding:.3rem .6rem;font-size:.74rem}
+.marca-check{
+  display:flex;align-items:center;gap:.35rem;font-size:.8rem;cursor:pointer;
+  color:var(--text-soft);padding-bottom:.45rem;white-space:nowrap;
+}
+
+/* Ficha de un viaje: etiqueta a la izquierda, dato a la derecha */
+table.ficha{width:100%;border-collapse:collapse}
+table.ficha th{
+  text-align:left;vertical-align:top;white-space:nowrap;width:1%;
+  padding:.3rem .7rem .3rem 0;font:600 .76rem 'Inter',sans-serif;color:var(--muted);
+}
+table.ficha td{padding:.3rem 0;font-size:.86rem;border-bottom:1px solid var(--border)}
+table.ficha th{border-bottom:1px solid var(--border)}
+.ficha-tit{
+  font:800 .78rem 'Inter',sans-serif;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--azul);margin:1.1rem 0 .3rem;
+}
+
 /* Coordenadas copiables en la pantalla de viajes */
 .geo{min-width:132px}
 .geo-copiar{

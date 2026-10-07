@@ -17,7 +17,7 @@
  * peticiones e ignora en silencio lo que no entiende — un campo que no se
  * guarda y ningún mensaje de error. Por eso se comprueba y se avisa.
  */
-const VERSION_API_REQUERIDA = 10;
+const VERSION_API_REQUERIDA = 11;
 
 const esLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 const API = localStorage.getItem('flota_api') ||
@@ -2713,50 +2713,324 @@ async function copiarGeo(texto, ev) {
   aviso(`Copiado: ${texto}`, 'ok');
 }
 
+// ── Viajes ───────────────────────────────────────────────────────────────────
+//
+// Esta pantalla es donde se VERIFICA: se contrasta lo que marcó el conductor
+// con lo que se va a pagar. Por eso el período es libre —hasta toda la
+// operación— y no una ventana fija de dos semanas, que obligaba a creerle a
+// la pantalla en vez de poder revisarla.
+
+let trayDesde = localStorage.getItem('flota_tray_desde') || '';
+let trayHasta = localStorage.getItem('flota_tray_hasta') || '';
+/** Filtros en memoria: se aplican sobre lo ya descargado, sin volver a pedir. */
+let trayFiltro = { vehiculo: '', conductor: '', texto: '', sinGps: false };
+/** Tope que se le pidió al servidor; si vuelve lleno, se avisa. */
+const TRAY_LIMITE = 5000;
+
 async function verTrayectos() {
-  const desde = nDias(hoy(), -14), hasta = hoy();
+  if (!trayDesde || !trayHasta) { trayDesde = nDias(hoy(), -14); trayHasta = hoy(); }
   $('#main').innerHTML = '<div class="cargando">Cargando viajes...</div>';
-  const t = await api(`/api/trayectos?desde=${desde}&hasta=${hasta}`);
-  trayectosCargados = t;
-  const origen = { en_linea: ['verde', 'en línea'], offline_sincronizado: ['ambar', 'sin señal'], digitado_por_coordinador: ['gris', 'digitado'] };
+  try {
+    trayectosCargados = await api(
+      `/api/trayectos?desde=${trayDesde}&hasta=${trayHasta}&limite=${TRAY_LIMITE}`);
+  } catch (e) {
+    return $('#main').innerHTML = `<div class="card"><div class="nota avi">${esc(e.message)}</div></div>`;
+  }
+  pintarTrayectos();
+}
+
+/** Cambia el período y recarga. */
+function periodoTrayectos(desde, hasta) {
+  trayDesde = desde; trayHasta = hasta;
+  localStorage.setItem('flota_tray_desde', desde);
+  localStorage.setItem('flota_tray_hasta', hasta);
+  verTrayectos();
+}
+
+function aplicarPeriodoTray() {
+  const d = $('#tr-desde').value, h = $('#tr-hasta').value;
+  if (!d || !h) return aviso('Indique las dos fechas', 'mal', 'Falta una fecha');
+  if (h < d) return aviso('La fecha final es anterior a la inicial', 'mal', 'Fechas al revés');
+  periodoTrayectos(d, h);
+}
+
+/** Atajos de período. El del mes pasado es el que se usa para liquidar. */
+function atajoTray(cual) {
+  const h = hoy();
+  if (cual === 'todo') return todaLaOperacion();
+  if (cual === 'mes') return periodoTrayectos(h.slice(0, 8) + '01', h);
+  if (cual === 'mes-pasado') {
+    const d = new Date(h + 'T12:00:00');
+    d.setDate(1); d.setMonth(d.getMonth() - 1);
+    const ini = d.toISOString().slice(0, 10);
+    d.setMonth(d.getMonth() + 1); d.setDate(0);
+    return periodoTrayectos(ini, d.toISOString().slice(0, 10));
+  }
+  periodoTrayectos(nDias(h, -Number(cual) + 1), h);
+}
+
+/**
+ * Desde el primer viaje registrado, no desde una fecha inventada: se le
+ * pregunta al servidor cuál fue, para no pedir años vacíos.
+ */
+async function todaLaOperacion() {
+  try {
+    const r = await api('/api/trayectos/rango');
+    periodoTrayectos(r.primera || nDias(hoy(), -365), r.ultima || hoy());
+  } catch (e) {
+    // Contra un Worker viejo esa ruta no existe. En vez de dejar el botón
+    // muerto se pide un rango amplio: sale lo mismo, solo que la fecha de
+    // inicio es inventada en lugar de ser la del primer viaje.
+    if (!esFalloDeRed(e)) {
+      periodoTrayectos('2026-01-01', hoy());
+      return aviso('Se pidió desde enero: el servidor todavía no sabe decir ' +
+        'desde cuándo hay viajes. Actualícelo para que la fecha sea exacta.', 'avi');
+    }
+    aviso(e.message, 'mal', 'No se pudo');
+  }
+}
+
+/** Los viajes que pasan los filtros en memoria. */
+function trayectosFiltrados() {
+  const f = trayFiltro;
+  const txt = f.texto.trim().toLowerCase();
+  return trayectosCargados.filter(x => {
+    if (f.vehiculo && String(x.vehiculo_id) !== f.vehiculo) return false;
+    if (f.conductor && String(x.conductor_id) !== f.conductor) return false;
+    if (f.sinGps && x.lat_salida != null && x.lat_llegada != null) return false;
+    if (!txt) return true;
+    return [x.consecutivo, x.placa, x.conductor, x.tripulantes, x.lugar_salida,
+            x.lugar_llegada, x.municipio_salida, x.municipio_llegada, x.observaciones]
+      .some(c => c && String(c).toLowerCase().includes(txt));
+  });
+}
+
+function filtrarTrayectos(campo, valor) {
+  trayFiltro[campo] = valor;
+  // Solo se repinta la tabla: repintar la cabecera le quitaría el foco al
+  // cuadro de búsqueda en cada letra.
+  $('#tray-tabla').innerHTML = tablaTrayectos(trayectosFiltrados());
+  $('#tray-cuenta').textContent = textoCuentaTray();
+}
+
+function textoCuentaTray() {
+  const n = trayectosFiltrados().length, total = trayectosCargados.length;
+  return `Del ${trayDesde} al ${trayHasta} · ${num(total)} registro(s)` +
+         (n !== total ? ` · ${num(n)} tras los filtros` : '');
+}
+
+function pintarTrayectos() {
+  const t = trayectosCargados;
   const sinGps = t.filter(x => x.lat_salida == null).length;
+  const abiertos = t.filter(x => x.estado === 'en_curso').length;
+  const tope = t.length >= TRAY_LIMITE;
+
+  // Las listas de los filtros salen de lo descargado: solo se ofrece filtrar
+  // por lo que de verdad aparece en el período.
+  const vehs = [...new Map(t.map(x => [x.vehiculo_id, x.placa])).entries()]
+    .sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+  const conds = [...new Map(t.map(x => [x.conductor_id, (x.conductor || '').trim()])).entries()]
+    .filter(c => c[1]).sort((a, b) => a[1].localeCompare(b[1]));
 
   $('#main').innerHTML = `
     <div class="cab">
-      <div><h1>Viajes</h1><p>Últimos 14 días · ${t.length} registro(s)</p></div>
+      <div><h1>Viajes</h1><p id="tray-cuenta">${textoCuentaTray()}</p></div>
       <button class="btn sec sm" onclick="sincronizarAhora()" id="btn-sincronizar">Actualizar</button>
     </div>
+
+    <div class="card filtros-tray">
+      <div class="fila">
+        <div><label class="lb">Desde</label>
+          <input class="inp" type="date" id="tr-desde" value="${trayDesde}"></div>
+        <div><label class="lb">Hasta</label>
+          <input class="inp" type="date" id="tr-hasta" value="${trayHasta}"></div>
+        <button class="btn sm" onclick="aplicarPeriodoTray()">Aplicar</button>
+        <div class="chips">
+          <button class="chip" onclick="atajoTray(14)">14 días</button>
+          <button class="chip" onclick="atajoTray(30)">30 días</button>
+          <button class="chip" onclick="atajoTray('mes')">Este mes</button>
+          <button class="chip" onclick="atajoTray('mes-pasado')">Mes pasado</button>
+          <button class="chip" onclick="atajoTray('todo')">Toda la operación</button>
+        </div>
+        <button class="btn sec sm" onclick="exportarTrayectos()"
+          title="Lo que se está viendo, con todas las columnas">Descargar</button>
+      </div>
+      <div class="fila">
+        <div><label class="lb">Vehículo</label>
+          <select class="inp" onchange="filtrarTrayectos('vehiculo',this.value)">
+            <option value="">Todos</option>
+            ${vehs.map(([id, placa]) => `<option value="${id}" ${trayFiltro.vehiculo == id ? 'selected' : ''}
+              >${esc(placa)}</option>`).join('')}
+          </select></div>
+        <div><label class="lb">Conductor</label>
+          <select class="inp" onchange="filtrarTrayectos('conductor',this.value)">
+            <option value="">Todos</option>
+            ${conds.map(([id, n]) => `<option value="${id}" ${trayFiltro.conductor == id ? 'selected' : ''}
+              >${esc(n)}</option>`).join('')}
+          </select></div>
+        <div style="flex:1;min-width:180px"><label class="lb">Buscar</label>
+          <input class="inp" id="tr-buscar" value="${esc(trayFiltro.texto)}"
+            placeholder="Consecutivo, lugar, tripulante, observación..."
+            oninput="filtrarTrayectos('texto',this.value)"></div>
+        <label class="marca-check">
+          <input type="checkbox" ${trayFiltro.sinGps ? 'checked' : ''}
+            onchange="filtrarTrayectos('sinGps',this.checked)"> Solo los que les falta GPS</label>
+      </div>
+    </div>
+
+    ${tope ? `<div class="nota avi" style="margin-bottom:.85rem">
+      Se están mostrando los <b>${num(TRAY_LIMITE)} viajes más recientes</b> del período,
+      que es el tope de una sola consulta. Hay más: acote las fechas para verlos todos.</div>` : ''}
     ${sinGps ? `<div class="nota avi" style="margin-bottom:.85rem">
       ${sinGps} viaje(s) quedaron sin ubicación: el conductor negó el permiso o no había señal
       de GPS al marcar.</div>` : ''}
-    ${t.length ? `<div class="tabla-env"><table>
-      <thead><tr><th>Fecha</th><th>Vehículo</th><th>Conductor</th><th>Tripulación</th>
-        <th>Salida</th><th>Ubicación salida</th><th>Llegada</th><th>Ubicación llegada</th>
-        <th class="num">Horas</th><th class="num">Km</th><th>Fotos</th><th>Marca</th></tr></thead>
-      <tbody>${t.map(x => {
-        const o = origen[x.origen_salida] || ['gris', '—'];
-        const km = (x.km_final && x.km_inicial) ? x.km_final - x.km_inicial : null;
-        const fotos = (x.fotos || '').split(',').filter(Boolean);
-        return `<tr>
-          <td>${esc(x.fecha_operacion)}</td>
-          <td class="placa">${esc(x.placa)}</td>
-          <td>${esc(x.conductor?.trim() || '—')}</td>
-          <td style="max-width:190px">${x.tripulantes
-            ? `<span style="font-size:.76rem">${esc(x.tripulantes)}</span>`
-            : '<span style="color:var(--muted)">—</span>'}
-            ${x.num_tripulantes ? `<br><span style="font-size:.68rem;color:var(--muted)">${x.num_tripulantes} a bordo</span>` : ''}</td>
-          <td>${hora(x.ts_salida)}<br><span style="font-size:.72rem;color:var(--muted)">${esc(x.lugar_salida || '')}</span></td>
-          <td>${celdaGeo(x.lat_salida, x.lon_salida, x.precision_salida)}</td>
-          <td>${hora(x.ts_llegada)}<br><span style="font-size:.72rem;color:var(--muted)">${esc(x.lugar_llegada || '')}</span></td>
-          <td>${celdaGeo(x.lat_llegada, x.lon_llegada, x.precision_llegada)}</td>
-          <td class="num">${x.horas ?? '—'}</td>
-          <td class="num">${num(km)}</td>
-          <td>${fotos.length
-            ? `<button class="btn sec sm btn-fotos" onclick="verFotos(${x.id},&#39;${esc(x.placa)}&#39;)">${fotos.length}</button>`
-            : '<span class="etq gris">—</span>'}</td>
-          <td><span class="etq ${o[0]}">${o[1]}</span></td>
-        </tr>`; }).join('')}</tbody></table></div>`
-      : '<div class="card"><div class="vacio">Sin viajes registrados en el período.</div></div>'}`;
+    ${abiertos ? `<div class="nota avi" style="margin-bottom:.85rem">
+      ${abiertos} viaje(s) siguen <b>en curso</b>: se marcó la salida y nunca la llegada.</div>` : ''}
+
+    <div id="tray-tabla">${tablaTrayectos(trayectosFiltrados())}</div>`;
+}
+
+const ORIGEN_MARCA = {
+  en_linea: ['verde', 'en línea'],
+  offline_sincronizado: ['ambar', 'sin señal'],
+  digitado_por_coordinador: ['gris', 'digitado'],
+};
+
+function tablaTrayectos(t) {
+  if (!t.length) {
+    return `<div class="card"><div class="vacio">
+      ${trayectosCargados.length
+        ? 'Ningún viaje coincide con los filtros.'
+        : 'Sin viajes registrados en el período.'}</div></div>`;
+  }
+  return `<div class="tabla-env"><table>
+    <thead><tr><th>Fecha</th><th>Viaje</th><th>Vehículo</th><th>Conductor</th><th>Tripulación</th>
+      <th>Salida</th><th>Ubicación salida</th><th>Llegada</th><th>Ubicación llegada</th>
+      <th class="num">Horas</th><th class="num">Km</th><th>Fotos</th><th>Marca</th></tr></thead>
+    <tbody>${t.map(x => {
+      const o = ORIGEN_MARCA[x.origen_salida] || ['gris', '—'];
+      const km = (x.km_final && x.km_inicial) ? x.km_final - x.km_inicial : null;
+      const fotos = (x.fotos || '').split(',').filter(Boolean);
+      return `<tr>
+        <td>${esc(x.fecha_operacion)}</td>
+        <td><button class="btn sec sm btn-viaje" onclick="verTrayecto(${x.id})"
+          title="Ver todos los datos de este viaje">${esc(x.consecutivo || '#' + x.id)}</button>
+          ${x.estado === 'en_curso' ? '<br><span class="etq ambar">en curso</span>' : ''}</td>
+        <td class="placa">${esc(x.placa)}</td>
+        <td>${esc(x.conductor?.trim() || '—')}</td>
+        <td style="max-width:190px">${x.tripulantes
+          ? `<span style="font-size:.76rem">${esc(x.tripulantes)}</span>`
+          : '<span style="color:var(--muted)">—</span>'}
+          ${x.num_tripulantes ? `<br><span style="font-size:.68rem;color:var(--muted)">${x.num_tripulantes} a bordo</span>` : ''}</td>
+        <td>${hora(x.ts_salida)}<br><span style="font-size:.72rem;color:var(--muted)">${esc(x.lugar_salida || '')}</span></td>
+        <td>${celdaGeo(x.lat_salida, x.lon_salida, x.precision_salida)}</td>
+        <td>${hora(x.ts_llegada)}<br><span style="font-size:.72rem;color:var(--muted)">${esc(x.lugar_llegada || '')}</span></td>
+        <td>${celdaGeo(x.lat_llegada, x.lon_llegada, x.precision_llegada)}</td>
+        <td class="num">${x.horas ?? '—'}</td>
+        <td class="num">${num(km)}</td>
+        <td>${fotos.length
+          ? `<button class="btn sec sm btn-fotos" onclick="verFotos(${x.id},&#39;${esc(x.placa)}&#39;)">${fotos.length}</button>`
+          : '<span class="etq gris">—</span>'}</td>
+        <td><span class="etq ${o[0]}">${o[1]}</span></td>
+      </tr>`; }).join('')}</tbody></table></div>`;
+}
+
+/**
+ * Un viaje con TODOS sus campos.
+ *
+ * La tabla resume; aquí está lo que no cabe en una columna y es justo lo que
+ * se mira cuando un dato no cuadra: los dos odómetros por separado, la hora
+ * del servidor frente a la del celular, la precisión del GPS y quién registró
+ * la marca.
+ */
+function verTrayecto(id) {
+  const x = trayectosCargados.find(t => t.id === id);
+  if (!x) return;
+  const o = ORIGEN_MARCA[x.origen_salida] || ['gris', '—'];
+  const ol = ORIGEN_MARCA[x.origen_llegada] || null;
+  const km = (x.km_final && x.km_inicial) ? x.km_final - x.km_inicial : null;
+
+  const hito = (t) => `
+    <table class="ficha"><tbody>
+      <tr><th>Municipio</th><td>${esc(t.mun || '—')}</td></tr>
+      <tr><th>Lugar</th><td>${esc(t.lugar || '—')}</td></tr>
+      <tr><th>Hora del servidor</th><td>${t.ts ? fechaHora(t.ts) : '—'}</td></tr>
+      <tr><th>Hora del celular</th><td>${t.disp ? fechaHora(t.disp) : '—'}
+        ${t.ts && t.disp && Math.abs(Date.parse(t.ts) - Date.parse(t.disp)) > 600000
+          ? '<br><span class="etq ambar">difiere más de 10 minutos</span>' : ''}</td></tr>
+      <tr><th>Odómetro</th><td>${t.km != null ? num(t.km) : '—'}</td></tr>
+      <tr><th>Ubicación</th><td>${celdaGeo(t.lat, t.lon, t.prec)}</td></tr>
+      <tr><th>Cómo se marcó</th><td>${t.org
+        ? `<span class="etq ${t.org[0]}">${t.org[1]}</span>` : '—'}</td></tr>
+    </tbody></table>`;
+
+  abrirModal(`Viaje ${x.consecutivo || '#' + x.id}`, `
+    <table class="ficha" style="margin-bottom:1rem"><tbody>
+      <tr><th>Día de operación</th><td><b>${esc(x.fecha_operacion)}</b></td></tr>
+      <tr><th>Estado</th><td>${x.estado === 'cerrado'
+        ? '<span class="etq verde">Cerrado</span>'
+        : '<span class="etq ambar">En curso — sin llegada</span>'}</td></tr>
+      <tr><th>Vehículo</th><td><span class="placa">${esc(x.placa)}</span></td></tr>
+      <tr><th>Conductor</th><td>${esc(x.conductor?.trim() || '—')}</td></tr>
+      <tr><th>Tripulantes</th><td>${esc(x.tripulantes || '—')}
+        ${x.num_tripulantes ? ` <span style="color:var(--muted)">(${x.num_tripulantes} a bordo)</span>` : ''}</td></tr>
+      <tr><th>Tipo de jornada</th><td>${esc(TIPOS_JORNADA[x.tipo_jornada]?.et || x.tipo_jornada || '—')}</td></tr>
+      <tr><th>Kilómetros</th><td>${km != null
+        ? `<b>${num(km)}</b> <span style="color:var(--muted)">(${num(x.km_inicial)} → ${num(x.km_final)})</span>`
+        : '—'}</td></tr>
+      <tr><th>Horas</th><td>${x.horas ?? '—'}</td></tr>
+      <tr><th>Observaciones</th><td>${esc(x.observaciones || '—')}</td></tr>
+      <tr><th>Registrado por</th><td>${esc(x.registrado_por || '—')}
+        ${x.creado_en ? ` <span style="color:var(--muted)">· ${fechaHora(x.creado_en)}</span>` : ''}</td></tr>
+    </tbody></table>
+
+    <h3 class="ficha-tit">Salida</h3>
+    ${hito({ mun: x.municipio_salida, lugar: x.lugar_salida, ts: x.ts_salida,
+             disp: x.ts_salida_disp, km: x.km_inicial, lat: x.lat_salida,
+             lon: x.lon_salida, prec: x.precision_salida, org: o })}
+
+    <h3 class="ficha-tit">Llegada</h3>
+    ${x.ts_llegada ? hito({ mun: x.municipio_llegada, lugar: x.lugar_llegada, ts: x.ts_llegada,
+             disp: x.ts_llegada_disp, km: x.km_final, lat: x.lat_llegada,
+             lon: x.lon_llegada, prec: x.precision_llegada, org: ol })
+      : '<div class="nota avi">Este viaje no tiene llegada registrada.</div>'}`,
+    `${(x.fotos || '').split(',').filter(Boolean).length
+      ? `<button class="btn sec" onclick="verFotos(${x.id},'${esc(x.placa)}')">Ver fotografías</button>` : ''}
+     <button class="btn sec" onclick="cerrarModal()">Cerrar</button>`);
+}
+
+/** Lo que se está viendo, con TODAS las columnas, para revisarlo en Excel. */
+function exportarTrayectos() {
+  const t = trayectosFiltrados();
+  if (!t.length) return aviso('No hay nada que descargar', 'avi');
+  const cab = ['Consecutivo', 'Fecha operacion', 'Estado', 'Placa', 'Conductor',
+    'Num tripulantes', 'Tripulantes', 'Tipo jornada',
+    'Municipio salida', 'Lugar salida', 'Hora salida (servidor)', 'Hora salida (celular)',
+    'Lat salida', 'Lon salida', 'Precision salida (m)', 'Origen salida', 'Km inicial',
+    'Municipio llegada', 'Lugar llegada', 'Hora llegada (servidor)', 'Hora llegada (celular)',
+    'Lat llegada', 'Lon llegada', 'Precision llegada (m)', 'Origen llegada', 'Km final',
+    'Km recorridos', 'Horas', 'Fotos', 'Observaciones', 'Registrado por', 'Creado en'];
+  const filas = t.map(x => [
+    x.consecutivo || '', x.fecha_operacion, x.estado, x.placa, (x.conductor || '').trim(),
+    x.num_tripulantes ?? '', x.tripulantes || '', x.tipo_jornada || '',
+    x.municipio_salida || '', x.lugar_salida || '', x.ts_salida || '', x.ts_salida_disp || '',
+    x.lat_salida ?? '', x.lon_salida ?? '', x.precision_salida ?? '', x.origen_salida || '',
+    x.km_inicial ?? '',
+    x.municipio_llegada || '', x.lugar_llegada || '', x.ts_llegada || '', x.ts_llegada_disp || '',
+    x.lat_llegada ?? '', x.lon_llegada ?? '', x.precision_llegada ?? '', x.origen_llegada || '',
+    x.km_final ?? '',
+    (x.km_final && x.km_inicial) ? x.km_final - x.km_inicial : '',
+    x.horas ?? '', (x.fotos || '').split(',').filter(Boolean).length,
+    x.observaciones || '', x.registrado_por || '', x.creado_en || '',
+  ]);
+  const csv = [cab, ...filas]
+    .map(f => f.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n');
+  // BOM para que Excel reconozca los acentos
+  const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = `viajes_${trayDesde}_a_${trayHasta}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  aviso(`${t.length} viaje(s) descargados`, 'ok');
 }
 
 async function verFotos(id, placa) {

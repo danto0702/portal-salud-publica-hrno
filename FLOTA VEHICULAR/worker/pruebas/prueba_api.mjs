@@ -680,11 +680,33 @@ r = await api('POST', '/api/sync', {
 verificar('sincroniza una marca capturada sin señal',
   r.estado === 200 && r.datos.resultados[0].ok, r.datos);
 
+// Se busca la marca, no se da por hecho que sea la primera: el 2026-10-07 que
+// esta sección usa puede coincidir con el día en que se corre la prueba, y
+// entonces el viaje de hoy —que se registró más tarde— ordena antes.
 r = await api('GET', '/api/trayectos?desde=2026-10-07&hasta=2026-10-07', null, tCoord);
-verificar('la marca offline queda etiquetada como tal',
-  r.datos[0] && r.datos[0].origen_salida === 'offline_sincronizado', r.datos[0]);
+const offline = r.datos.find(x => x.origen_salida === 'offline_sincronizado');
+verificar('la marca offline queda etiquetada como tal', !!offline, r.datos.length);
 verificar('y conserva la hora real del dispositivo',
-  r.datos[0] && r.datos[0].ts_salida === '2026-10-07T05:45:00Z', r.datos[0]);
+  offline && offline.ts_salida === '2026-10-07T05:45:00Z', offline && offline.ts_salida);
+
+// El período es libre, así que la consulta necesita tope: un año de flota son
+// miles de filas y la pantalla las pide desde un celular.
+r = await api('GET', '/api/trayectos?desde=2000-01-01&hasta=2100-01-01&limite=1', null, tCoord);
+verificar('la consulta de viajes respeta el tope que se le pide',
+  r.estado === 200 && r.datos.length === 1, r.datos.length);
+r = await api('GET', '/api/trayectos?desde=2000-01-01&hasta=2100-01-01&limite=500', null, tCoord);
+verificar('y con un tope alto trae todo el histórico', r.datos.length > 1, r.datos.length);
+const masReciente = r.datos[0];
+verificar('los más recientes van primero: es el recorte útil',
+  r.datos.every(x => x.fecha_operacion <= masReciente.fecha_operacion), masReciente.fecha_operacion);
+
+r = await api('GET', '/api/trayectos/rango', null, tCoord);
+verificar('se puede preguntar desde cuándo hay viajes',
+  r.estado === 200 && !!r.datos.primera && r.datos.total > 0, r.datos);
+
+r = await api('GET', '/api/trayectos/rango', null, tCond);
+verificar('al conductor el rango solo le cuenta los suyos',
+  r.estado === 200 && r.datos.total < 10, r.datos);
 
 console.log('\n── Dashboard ─────────────────────────────────────────────────');
 r = await api('GET', '/api/dashboard?desde=2026-01-01&hasta=2026-12-31', null, tCoord);

@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D34 | Revisión de viajes | La pantalla de Viajes tiene **período libre** —hasta toda la operación—, filtros en memoria, ficha con todos los campos y descarga a CSV. La consulta lleva tope |
 | D33 | Días fuera de servicio | Se registra el **rango de días** en que un vehículo no pudo operar, con su causa. Un día parado **no es pagable**. El conductor puede declararlo desde el celular, acotado a su vehículo y desde hoy |
 | D32 | Mover sin arrastrar | Además del arrastre, la ventana de la programación lleva **día y vehículo de destino**. Con el dedo el arrastre exige sostener 350 ms y soltar sobre una celda que suele estar fuera de pantalla |
 
@@ -660,6 +661,45 @@ Cada marca muestra sus coordenadas con seis decimales, un botón para **copiarla
 al mapa. Al lado va la precisión reportada por el GPS: por encima de 100 m se pinta en ámbar,
 porque en zona montañosa una lectura de 500 m no dice gran cosa. Los viajes sin ubicación se
 cuentan aparte, arriba de la tabla.
+
+### 5.4.5 Revisar la operación completa, no las dos últimas semanas (D34)
+
+La pantalla de Viajes es donde se **verifica**: se contrasta lo que marcó el conductor con lo que
+se va a pagar. Nació con una ventana fija de 14 días, y con eso no se podía revisar un mes
+cerrado ni contrastar la operación entera — había que creerle a la pantalla en vez de poder
+auditarla.
+
+**El período es libre.** Dos campos de fecha, atajos de *14 días, 30 días, este mes, mes pasado*
+y **toda la operación**, y la elección queda recordada en el aparato: al volver a la pantalla
+sigue puesta. El atajo de *mes pasado* es el que se usa para liquidar.
+
+«Toda la operación» no pide desde una fecha inventada: `GET /api/trayectos/rango` devuelve la
+**primera fecha con viajes**, para no consultar años vacíos.
+
+**La consulta tiene tope.** Con período libre, un año de flota son miles de filas y la pantalla
+las pide desde un celular. `GET /api/trayectos` acepta `limite` (2 000 por omisión, 20 000 como
+máximo) y devuelve los **más recientes**, que es el recorte útil. La pantalla pide 5 000 y, si
+llegan justo 5 000, avisa de que hay más y que conviene acotar.
+
+**Los filtros no vuelven a pedir nada.** Vehículo, conductor, búsqueda libre —consecutivo, lugar,
+tripulante, observación— y *solo los que les falta GPS* trabajan sobre lo ya descargado. Solo se
+repinta la tabla, no la cabecera: repintarla entera le quitaría el foco al cuadro de búsqueda en
+cada letra.
+
+**Cada viaje abre con todos sus campos.** La tabla resume; la ficha trae lo que no cabe en una
+columna y es justo lo que se mira cuando un dato no cuadra: los **dos odómetros por separado**
+—no solo la resta—, la **hora del servidor frente a la del celular** (con aviso si difieren más
+de diez minutos), la precisión del GPS, el tipo de jornada, las observaciones y **quién registró
+la marca**.
+
+**Se descarga lo que se está viendo**, filtros incluidos, en CSV con las 32 columnas —incluidas
+las que la tabla no muestra—, con BOM para que Excel respete los acentos. Para revisar cientos de
+viajes, la herramienta natural de la Coordinación es Excel, no una tabla en el navegador.
+
+El servidor de desarrollo siembra **dos meses** de historia, no dos semanas: sin ella, todo cabría
+en la ventana por omisión y las pruebas pasarían sin probar nada.
+
+Se prueba con `node worker/pruebas/prueba_viajes.mjs`.
 
 ### 5.5 Checklist de distintivos y elementos (D4)
 

@@ -93,10 +93,15 @@ await llamar('POST', '/api/usuarios',
 // el aviso obligatorio en cada ingreso.
 db.prepare('UPDATE usuarios SET debe_cambiar_clave = 0').run();
 
-// Itinerario de las dos últimas semanas y la siguiente
+// Itinerario de los dos últimos meses y la semana siguiente.
+//
+// Hacia atrás hace falta historia de verdad, no dos semanas: sin ella no se
+// puede probar nada que mire un mes cerrado —la pantalla de Viajes, el atajo
+// «mes pasado», el período de un mes del itinerario— porque todo cabría en la
+// ventana por omisión y las pruebas pasarían sin probar nada.
 let semilla = 7;
 const azar = n => (semilla = (semilla * 1103515245 + 12345) % 2147483648) % n;
-for (let d = -9; d <= 4; d++) {
+for (let d = -70; d <= 4; d++) {
   const f = dia(d);
   const findeSemana = [0, 6].includes(new Date(f + 'T12:00:00').getDay());
   for (let i = 0; i < idsVehiculo.length; i++) {
@@ -129,16 +134,22 @@ for (const it of its) {
   const salida = it.fecha + 'T' + String(6 + azar(3)).padStart(2, '0') + ':' + String(azar(60)).padStart(2, '0') + ':00Z';
   const llegada = it.fecha + 'T' + String(14 + azar(4)).padStart(2, '0') + ':' + String(azar(60)).padStart(2, '0') + ':00Z';
   const km = 140000 + azar(5000);
+  const origenSalida = azar(10) < 8 ? 'en_linea' : 'offline_sincronizado';
+  const origenLlegada = azar(10) < 8 ? 'en_linea' : 'offline_sincronizado';
+  // Marcar sin señal guarda también la hora del celular, que es la que la
+  // ficha del viaje contrasta con la del servidor.
+  const dispS = origenSalida === 'en_linea' ? null : salida;
+  const dispL = origenLlegada === 'en_linea' ? null : llegada;
   db.prepare(`INSERT INTO trayectos (consecutivo, itinerario_id, vehiculo_id, conductor_id,
-      fecha_operacion, municipio_salida_id, lugar_salida, ts_salida, origen_salida,
+      fecha_operacion, municipio_salida_id, lugar_salida, ts_salida, ts_salida_disp, origen_salida,
       lat_salida, lon_salida, precision_salida, municipio_llegada_id, lugar_llegada,
-      ts_llegada, origen_llegada, lat_llegada, lon_llegada, precision_llegada,
+      ts_llegada, ts_llegada_disp, origen_llegada, lat_llegada, lon_llegada, precision_llegada,
       km_inicial, km_final, estado, creado_por, creado_en, cerrado_en)
-    VALUES (?,?,?,?,?,?, 'BASE', ?, ?, 8.07, -73.22, ?, ?, ?, ?, ?, 8.15, -73.19, ?, ?, ?, 'cerrado', 1, ?, ?)`)
+    VALUES (?,?,?,?,?,?, 'BASE', ?,?,?, 8.07, -73.22, ?, ?, ?, ?,?,?, 8.15, -73.19, ?, ?, ?, 'cerrado', 1, ?, ?)`)
     .bind('TR-2026-' + String(100000 + it.id).slice(1), it.id, it.vehiculo_id, it.conductor_id,
-      it.fecha, it.municipio_id, salida, azar(10) < 8 ? 'en_linea' : 'offline_sincronizado',
-      10 + azar(40), it.municipio_id, 'DESTINO', llegada,
-      azar(10) < 8 ? 'en_linea' : 'offline_sincronizado', 15 + azar(60),
+      it.fecha, it.municipio_id, salida, dispS, origenSalida,
+      10 + azar(40), it.municipio_id, 'DESTINO', llegada, dispL,
+      origenLlegada, 15 + azar(60),
       km, km + 30 + azar(80), ahora(), ahora()).run();
 }
 // Recalcular los días a partir de lo sembrado

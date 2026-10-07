@@ -847,10 +847,22 @@ ruta('PUT', '/api/trayectos/:id', async ({ db, sesion, params, cuerpo }) => {
   return { ok: true };
 }, GESTION);
 
+/**
+ * Los viajes de un período.
+ *
+ * El tope existe para que «toda la operación» no sea una petición que crece
+ * sin límite: un año de flota son miles de filas, y la pantalla las pide desde
+ * un celular en el Catatumbo. Se devuelven los MÁS RECIENTES, que es el
+ * recorte útil, y la pantalla avisa cuando llegó justo al tope para que se
+ * acote el período o se descargue el archivo.
+ */
+const TOPE_TRAYECTOS = 20000;
+
 ruta('GET', '/api/trayectos', async ({ db, url, sesion }) => {
   const desde = url.searchParams.get('desde') || hoyISO();
   const hasta = url.searchParams.get('hasta') || desde;
   const vehiculo = url.searchParams.get('vehiculo_id');
+  const limite = Math.min(Number(url.searchParams.get('limite')) || 2000, TOPE_TRAYECTOS);
 
   const cond = ['t.fecha_operacion BETWEEN ? AND ?', "t.estado != 'anulado'"];
   const args = [desde, hasta];
@@ -861,6 +873,7 @@ ruta('GET', '/api/trayectos', async ({ db, url, sesion }) => {
     SELECT t.*, v.placa,
            p.nombres || ' ' || IFNULL(p.apellidos,'') AS conductor,
            ms.nombre AS municipio_salida, ml.nombre AS municipio_llegada,
+           u.usuario AS registrado_por,
            CASE WHEN t.ts_llegada IS NOT NULL AND t.ts_salida IS NOT NULL
                 THEN ROUND((julianday(t.ts_llegada) - julianday(t.ts_salida)) * 24, 2)
                 END AS horas,
@@ -871,9 +884,29 @@ ruta('GET', '/api/trayectos', async ({ db, url, sesion }) => {
       LEFT JOIN personas p ON p.id = t.conductor_id
       LEFT JOIN cat_municipios ms ON ms.id = t.municipio_salida_id
       LEFT JOIN cat_municipios ml ON ml.id = t.municipio_llegada_id
+      LEFT JOIN usuarios u ON u.id = t.creado_por
      WHERE ${cond.join(' AND ')}
-     ORDER BY t.fecha_operacion DESC, t.ts_salida DESC`).bind(...args).all();
+     ORDER BY t.fecha_operacion DESC, t.ts_salida DESC
+     LIMIT ?`).bind(...args, limite).all();
   return r.results;
+}, TODOS);
+
+/**
+ * La primera fecha con viajes registrados: el arranque real de la operación.
+ *
+ * La pantalla de Viajes la usa para el botón «Toda la operación». Sin esto
+ * habría que inventar una fecha de inicio —2000-01-01— y pedir un rango que
+ * en su mayor parte está vacío.
+ */
+ruta('GET', '/api/trayectos/rango', async ({ db, sesion }) => {
+  const cond = ["estado != 'anulado'"];
+  const args = [];
+  if (sesion.rol === 'conductor') { cond.push('conductor_id = ?'); args.push(sesion.persona_id); }
+  const r = await db.prepare(`
+    SELECT MIN(fecha_operacion) AS primera, MAX(fecha_operacion) AS ultima,
+           COUNT(*) AS total
+      FROM trayectos WHERE ${cond.join(' AND ')}`).bind(...args).first();
+  return r || { primera: null, ultima: null, total: 0 };
 }, TODOS);
 
 

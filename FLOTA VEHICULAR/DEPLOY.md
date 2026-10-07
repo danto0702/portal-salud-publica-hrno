@@ -138,6 +138,13 @@ siga funcionando:
 node pruebas/prueba_movil.mjs
 ```
 
+Y la de la pantalla de Viajes, que recorre el período libre, los filtros, la
+ficha de un viaje y la descarga:
+
+```bash
+node pruebas/prueba_viajes.mjs
+```
+
 Y la de los días fuera de servicio, que registra un período, comprueba que los
 días marcados se vean en la matriz y que el conductor pueda declarar su vehículo
 averiado desde el teléfono:
