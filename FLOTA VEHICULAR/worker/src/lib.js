@@ -33,7 +33,7 @@
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 12;
+const VERSION_API = 13;
 
 /**
  * Juegos de roles que usan las rutas.
@@ -343,13 +343,55 @@ async function marcarUsoDestino(db, destinoId) {
 
 // ─────────────────────────────────────────────────────────────── consecutivos ─
 
+/**
+ * El siguiente número de la serie del año: TR-2026-000253.
+ *
+ * Sale del MÁXIMO, no de COUNT(*). Contar solo funciona mientras no se borre
+ * nada nunca, y eso dejó de ser cierto el día que el administrador pudo quitar
+ * un viaje: al borrar uno, el conteo baja y el siguiente número choca con el
+ * último que ya existe. Como la columna es UNIQUE, el choque no se queda en un
+ * número repetido — rechaza la marca, y la rechaza SIEMPRE, para todos los
+ * conductores, hasta que alguien lo arregle. Pasó en producción el 7 de
+ * octubre de 2026: se borró el viaje de prueba TR-2026-000001 y a la mañana
+ * siguiente ningún conductor podía registrar la salida.
+ *
+ * Con el máximo, un número borrado deja un hueco y la serie sigue hacia
+ * adelante, que es lo que se espera de un consecutivo: no se reutiliza.
+ *
+ * El número empieza en el carácter siguiente a «PREFIJO-AAAA-», que son
+ * prefijo + 6 caracteres; substr() cuenta desde 1.
+ */
 async function siguienteConsecutivo(db, prefijo, tabla) {
   const anio = hoyISO().slice(0, 4);
   const fila = await db.prepare(
-    `SELECT COUNT(*) AS n FROM ${tabla} WHERE consecutivo LIKE ?`)
+    `SELECT MAX(CAST(substr(consecutivo, ${prefijo.length + 7}) AS INTEGER)) AS ultimo
+       FROM ${tabla} WHERE consecutivo LIKE ?`)
     .bind(`${prefijo}-${anio}-%`).first();
-  const n = String((fila ? fila.n : 0) + 1).padStart(6, '0');
+  const n = String(((fila && fila.ultimo) || 0) + 1).padStart(6, '0');
   return `${prefijo}-${anio}-${n}`;
+}
+
+/**
+ * Inserta reintentando si el consecutivo se le adelantó otro.
+ *
+ * Dos conductores marcando salida en el mismo segundo —a las seis de la mañana
+ * salen todos a la vez— leen el mismo máximo y piden el mismo número. Uno gana
+ * y el otro se estrella contra el UNIQUE. No hay transacciones que valgan aquí:
+ * la salida se vuelve a intentar con el número siguiente, que es lo que haría
+ * una persona.
+ *
+ * @param hacer  función que recibe el consecutivo y ejecuta el INSERT
+ */
+async function conConsecutivo(db, prefijo, tabla, hacer, intentos = 5) {
+  for (let i = 0; ; i++) {
+    const consecutivo = await siguienteConsecutivo(db, prefijo, tabla);
+    try {
+      return await hacer(consecutivo);
+    } catch (e) {
+      const choque = /UNIQUE constraint failed/i.test(String(e && e.message || e));
+      if (!choque || i >= intentos - 1) throw e;
+    }
+  }
 }
 
 /**
@@ -399,5 +441,5 @@ export {
   hashClave, verificarClave,
   sesionActual, exigirRol, auditar,
   recalcularDia, marcarUsoDestino, resolverDestino, siguienteConsecutivo,
-  asegurarEsquema, fueraDeServicio,
+  conConsecutivo, asegurarEsquema, fueraDeServicio,
 };

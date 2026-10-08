@@ -6,7 +6,7 @@
 import { ruta } from './router.js';
 import {
   ahora, hoyISO, malaPeticion, prohibido, noEncontrado,
-  auditar, recalcularDia, marcarUsoDestino, resolverDestino, siguienteConsecutivo,
+  auditar, recalcularDia, marcarUsoDestino, resolverDestino, conConsecutivo,
   fueraDeServicio, asegurarEsquema, TODOS, GESTION,
 } from './lib.js';
 
@@ -748,25 +748,28 @@ ruta('POST', '/api/trayectos/salida', async ({ db, sesion, cuerpo }) => {
   if (itin) { itinerarioId = itin.id; vehiculoId = vehiculoId || itin.vehiculo_id; }
   if (!vehiculoId) throw malaPeticion('No hay vehículo asignado; indíquelo explícitamente');
 
-  const consecutivo = await siguienteConsecutivo(db, 'TR', 'trayectos');
   const ts = ahora();
 
-  const r = await db.prepare(`
-    INSERT INTO trayectos (consecutivo, itinerario_id, vehiculo_id, conductor_id,
-                           fecha_operacion, municipio_salida_id, lugar_salida,
-                           ts_salida, ts_salida_disp, origen_salida,
-                           lat_salida, lon_salida, precision_salida,
-                           km_inicial, num_tripulantes, tripulantes, tipo_jornada,
-                           observaciones, estado, creado_por, creado_en)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'en_curso', ?,?)`)
-    .bind(consecutivo, itinerarioId, vehiculoId, conductorId, fecha,
-          cuerpo.municipio_id || null, cuerpo.lugar || null,
-          ts, cuerpo.ts_dispositivo || null, cuerpo.origen || 'en_linea',
-          cuerpo.lat ?? null, cuerpo.lon ?? null, cuerpo.precision ?? null,
-          cuerpo.km_inicial || null, cuerpo.num_tripulantes || null,
-          String(cuerpo.tripulantes || '').trim() || null,
-          (itin && itin.tipo_jornada) || cuerpo.tipo_jornada || null,
-          cuerpo.observaciones || null, sesion.id, ts).run();
+  // A las seis de la mañana salen todos a la vez: si dos marcas caen en el
+  // mismo instante piden el mismo consecutivo y una choca contra el UNIQUE.
+  // conConsecutivo vuelve a intentarlo con el siguiente número.
+  const { r, consecutivo } = await conConsecutivo(db, 'TR', 'trayectos',
+    async (consecutivo) => ({ consecutivo, r: await db.prepare(`
+      INSERT INTO trayectos (consecutivo, itinerario_id, vehiculo_id, conductor_id,
+                             fecha_operacion, municipio_salida_id, lugar_salida,
+                             ts_salida, ts_salida_disp, origen_salida,
+                             lat_salida, lon_salida, precision_salida,
+                             km_inicial, num_tripulantes, tripulantes, tipo_jornada,
+                             observaciones, estado, creado_por, creado_en)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'en_curso', ?,?)`)
+      .bind(consecutivo, itinerarioId, vehiculoId, conductorId, fecha,
+            cuerpo.municipio_id || null, cuerpo.lugar || null,
+            ts, cuerpo.ts_dispositivo || null, cuerpo.origen || 'en_linea',
+            cuerpo.lat ?? null, cuerpo.lon ?? null, cuerpo.precision ?? null,
+            cuerpo.km_inicial || null, cuerpo.num_tripulantes || null,
+            String(cuerpo.tripulantes || '').trim() || null,
+            (itin && itin.tipo_jornada) || cuerpo.tipo_jornada || null,
+            cuerpo.observaciones || null, sesion.id, ts).run() }));
 
   await guardarFoto(db, r.meta.last_row_id, 'salida', cuerpo.foto, sesion, cuerpo);
   await recalcularDia(db, fecha, vehiculoId);
@@ -1051,8 +1054,10 @@ ruta('POST', '/api/sync', async ({ db, sesion, cuerpo }) => {
       // señal: se conserva la del dispositivo y se etiqueta como tal, para que
       // el dashboard no la confunda con una marca en tiempo real.
       if (m.hito === 'salida') {
-        const consecutivo = await siguienteConsecutivo(db, 'TR', 'trayectos');
-        const r = await db.prepare(`
+        // Una cola que se vacía tras volver la señal manda varias marcas
+        // seguidas, y varios teléfonos a la vez: mismo reintento que arriba.
+        const r = await conConsecutivo(db, 'TR', 'trayectos', (consecutivo) =>
+          db.prepare(`
           INSERT INTO trayectos (consecutivo, vehiculo_id, conductor_id, fecha_operacion,
                                  municipio_salida_id, lugar_salida, ts_salida,
                                  ts_salida_disp, origen_salida, lat_salida, lon_salida,
@@ -1063,7 +1068,7 @@ ruta('POST', '/api/sync', async ({ db, sesion, cuerpo }) => {
                 m.municipio_id || null, m.lugar || null,
                 m.ts_dispositivo, m.ts_dispositivo,
                 m.lat ?? null, m.lon ?? null, m.precision ?? null,
-                m.km_inicial || null, sesion.id, ahora()).run();
+                m.km_inicial || null, sesion.id, ahora()).run());
         await recalcularDia(db, m.fecha_operacion || hoyISO(), m.vehiculo_id);
         // La fotografía viaja con la marca: sin señal el conductor la toma igual
         // y se guarda en el teléfono, así que aquí hay que aterrizarla.

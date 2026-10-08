@@ -1091,6 +1091,66 @@ verificar('y queda desenganchada, no apuntando a un viaje que no existe',
 r = await api('DELETE', '/api/trayectos/999999', { motivo: 'no existe' }, tokenPrincipal);
 verificar('un viaje que no existe responde 404', r.estado === 404, r.estado);
 
+console.log('\n── El consecutivo sobrevive a un viaje borrado ───────────────');
+
+// Reproduce el fallo de producción del 7 de octubre de 2026: el
+// administrador borró el viaje de prueba TR-2026-000001 y a la mañana
+// siguiente NINGÚN conductor pudo registrar la salida. El consecutivo salía
+// de COUNT(*)+1: al borrar uno, el conteo bajaba y el siguiente número
+// chocaba contra el último que ya existía. Como la columna es UNIQUE, el
+// choque rechazaba la marca, y la rechazaba siempre.
+const trayectosDe = () => db.prepare(
+  "SELECT consecutivo FROM trayectos WHERE consecutivo LIKE 'TR-%' ORDER BY id").all()
+  .results.map(x => x.consecutivo);
+
+async function marcarSalida(fecha, dia) {
+  await api('POST', '/api/itinerario', {
+    fecha, vehiculo_id: vehiculo, conductor_id: personaConductor,
+    municipio_id: 1, destino_nombre: 'LA PLAYA', tipo_jornada: 'ebs',
+  }, tCoord).catch(() => {});
+  return api('POST', '/api/sync', { marcas: [{
+    local_id: 'c' + dia, hito: 'salida', vehiculo_id: vehiculo,
+    conductor_id: personaConductor, fecha_operacion: fecha,
+    ts_dispositivo: `${fecha}T06:00:00Z`, municipio_id: 1, lugar: 'BASE',
+    km: 300000, lat: 8.07, lon: -73.22,
+  }] }, tCondFS);
+}
+
+r = await marcarSalida('2026-12-10', 1);
+verificar('se registra una salida', r.datos.resultados[0].ok, r.datos);
+const antesDeBorrar = trayectosDe();
+
+// El administrador borra el PRIMERO de la serie, como pasó en producción.
+const primero = db.prepare(
+  "SELECT id FROM trayectos WHERE consecutivo = ?").bind(antesDeBorrar[0]).first();
+r = await api('DELETE', `/api/trayectos/${primero.id}?definitivo=1`,
+  { motivo: 'Usuario de Prueba' }, tokenPrincipal);
+verificar('el administrador borra el viaje de prueba', r.estado === 200, r.datos);
+
+// Y ahora la salida siguiente: es justo la que fallaba.
+r = await marcarSalida('2026-12-11', 2);
+verificar('tras borrar uno, la SIGUIENTE salida se registra igual',
+  r.estado === 200 && r.datos.resultados[0].ok, r.datos);
+
+const despues = trayectosDe();
+verificar('el consecutivo no se repite', new Set(despues).size === despues.length, despues);
+verificar('y no retrocede: el número borrado deja un hueco, no se reutiliza',
+  despues[despues.length - 1] > antesDeBorrar[antesDeBorrar.length - 1],
+  `${despues[despues.length - 1]} tras ${antesDeBorrar[antesDeBorrar.length - 1]}`);
+
+// Varias salidas seguidas, como una cola que se vacía al volver la señal.
+r = await api('POST', '/api/sync', { marcas: [1, 2, 3].map(i => ({
+  local_id: 'lote' + i, hito: 'salida', vehiculo_id: vehiculo,
+  conductor_id: personaConductor, fecha_operacion: '2026-12-1' + (i + 1),
+  ts_dispositivo: `2026-12-1${i + 1}T06:00:00Z`, municipio_id: 1, lugar: 'BASE',
+  km: 300000, lat: 8.07, lon: -73.22,
+})) }, tCondFS);
+verificar('un lote de marcas en una sola petición no choca entre sí',
+  r.datos.resultados.every(x => x.ok), r.datos.resultados);
+const finales = trayectosDe();
+verificar('y todos los consecutivos del lote son distintos',
+  new Set(finales).size === finales.length, finales.length);
+
 console.log('\n── Período libre en Novedades ────────────────────────────────');
 r = await api('GET', '/api/eventos/rango', null, tCoord);
 verificar('se puede preguntar desde cuándo hay novedades',

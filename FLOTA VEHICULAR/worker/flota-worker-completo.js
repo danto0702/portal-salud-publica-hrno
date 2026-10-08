@@ -95,7 +95,7 @@ const totalRutas = () => rutas.length;
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 12;
+const VERSION_API = 13;
 
 /**
  * Juegos de roles que usan las rutas.
@@ -405,13 +405,55 @@ async function marcarUsoDestino(db, destinoId) {
 
 // ─────────────────────────────────────────────────────────────── consecutivos ─
 
+/**
+ * El siguiente número de la serie del año: TR-2026-000253.
+ *
+ * Sale del MÁXIMO, no de COUNT(*). Contar solo funciona mientras no se borre
+ * nada nunca, y eso dejó de ser cierto el día que el administrador pudo quitar
+ * un viaje: al borrar uno, el conteo baja y el siguiente número choca con el
+ * último que ya existe. Como la columna es UNIQUE, el choque no se queda en un
+ * número repetido — rechaza la marca, y la rechaza SIEMPRE, para todos los
+ * conductores, hasta que alguien lo arregle. Pasó en producción el 7 de
+ * octubre de 2026: se borró el viaje de prueba TR-2026-000001 y a la mañana
+ * siguiente ningún conductor podía registrar la salida.
+ *
+ * Con el máximo, un número borrado deja un hueco y la serie sigue hacia
+ * adelante, que es lo que se espera de un consecutivo: no se reutiliza.
+ *
+ * El número empieza en el carácter siguiente a «PREFIJO-AAAA-», que son
+ * prefijo + 6 caracteres; substr() cuenta desde 1.
+ */
 async function siguienteConsecutivo(db, prefijo, tabla) {
   const anio = hoyISO().slice(0, 4);
   const fila = await db.prepare(
-    `SELECT COUNT(*) AS n FROM ${tabla} WHERE consecutivo LIKE ?`)
+    `SELECT MAX(CAST(substr(consecutivo, ${prefijo.length + 7}) AS INTEGER)) AS ultimo
+       FROM ${tabla} WHERE consecutivo LIKE ?`)
     .bind(`${prefijo}-${anio}-%`).first();
-  const n = String((fila ? fila.n : 0) + 1).padStart(6, '0');
+  const n = String(((fila && fila.ultimo) || 0) + 1).padStart(6, '0');
   return `${prefijo}-${anio}-${n}`;
+}
+
+/**
+ * Inserta reintentando si el consecutivo se le adelantó otro.
+ *
+ * Dos conductores marcando salida en el mismo segundo —a las seis de la mañana
+ * salen todos a la vez— leen el mismo máximo y piden el mismo número. Uno gana
+ * y el otro se estrella contra el UNIQUE. No hay transacciones que valgan aquí:
+ * la salida se vuelve a intentar con el número siguiente, que es lo que haría
+ * una persona.
+ *
+ * @param hacer  función que recibe el consecutivo y ejecuta el INSERT
+ */
+async function conConsecutivo(db, prefijo, tabla, hacer, intentos = 5) {
+  for (let i = 0; ; i++) {
+    const consecutivo = await siguienteConsecutivo(db, prefijo, tabla);
+    try {
+      return await hacer(consecutivo);
+    } catch (e) {
+      const choque = /UNIQUE constraint failed/i.test(String(e && e.message || e));
+      if (!choque || i >= intentos - 1) throw e;
+    }
+  }
 }
 
 /**
@@ -1627,25 +1669,28 @@ ruta('POST', '/api/trayectos/salida', async ({ db, sesion, cuerpo }) => {
   if (itin) { itinerarioId = itin.id; vehiculoId = vehiculoId || itin.vehiculo_id; }
   if (!vehiculoId) throw malaPeticion('No hay vehículo asignado; indíquelo explícitamente');
 
-  const consecutivo = await siguienteConsecutivo(db, 'TR', 'trayectos');
   const ts = ahora();
 
-  const r = await db.prepare(`
-    INSERT INTO trayectos (consecutivo, itinerario_id, vehiculo_id, conductor_id,
-                           fecha_operacion, municipio_salida_id, lugar_salida,
-                           ts_salida, ts_salida_disp, origen_salida,
-                           lat_salida, lon_salida, precision_salida,
-                           km_inicial, num_tripulantes, tripulantes, tipo_jornada,
-                           observaciones, estado, creado_por, creado_en)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'en_curso', ?,?)`)
-    .bind(consecutivo, itinerarioId, vehiculoId, conductorId, fecha,
-          cuerpo.municipio_id || null, cuerpo.lugar || null,
-          ts, cuerpo.ts_dispositivo || null, cuerpo.origen || 'en_linea',
-          cuerpo.lat ?? null, cuerpo.lon ?? null, cuerpo.precision ?? null,
-          cuerpo.km_inicial || null, cuerpo.num_tripulantes || null,
-          String(cuerpo.tripulantes || '').trim() || null,
-          (itin && itin.tipo_jornada) || cuerpo.tipo_jornada || null,
-          cuerpo.observaciones || null, sesion.id, ts).run();
+  // A las seis de la mañana salen todos a la vez: si dos marcas caen en el
+  // mismo instante piden el mismo consecutivo y una choca contra el UNIQUE.
+  // conConsecutivo vuelve a intentarlo con el siguiente número.
+  const { r, consecutivo } = await conConsecutivo(db, 'TR', 'trayectos',
+    async (consecutivo) => ({ consecutivo, r: await db.prepare(`
+      INSERT INTO trayectos (consecutivo, itinerario_id, vehiculo_id, conductor_id,
+                             fecha_operacion, municipio_salida_id, lugar_salida,
+                             ts_salida, ts_salida_disp, origen_salida,
+                             lat_salida, lon_salida, precision_salida,
+                             km_inicial, num_tripulantes, tripulantes, tipo_jornada,
+                             observaciones, estado, creado_por, creado_en)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'en_curso', ?,?)`)
+      .bind(consecutivo, itinerarioId, vehiculoId, conductorId, fecha,
+            cuerpo.municipio_id || null, cuerpo.lugar || null,
+            ts, cuerpo.ts_dispositivo || null, cuerpo.origen || 'en_linea',
+            cuerpo.lat ?? null, cuerpo.lon ?? null, cuerpo.precision ?? null,
+            cuerpo.km_inicial || null, cuerpo.num_tripulantes || null,
+            String(cuerpo.tripulantes || '').trim() || null,
+            (itin && itin.tipo_jornada) || cuerpo.tipo_jornada || null,
+            cuerpo.observaciones || null, sesion.id, ts).run() }));
 
   await guardarFoto(db, r.meta.last_row_id, 'salida', cuerpo.foto, sesion, cuerpo);
   await recalcularDia(db, fecha, vehiculoId);
@@ -1929,8 +1974,10 @@ ruta('POST', '/api/sync', async ({ db, sesion, cuerpo }) => {
       // señal: se conserva la del dispositivo y se etiqueta como tal, para que
       // el dashboard no la confunda con una marca en tiempo real.
       if (m.hito === 'salida') {
-        const consecutivo = await siguienteConsecutivo(db, 'TR', 'trayectos');
-        const r = await db.prepare(`
+        // Una cola que se vacía tras volver la señal manda varias marcas
+        // seguidas, y varios teléfonos a la vez: mismo reintento que arriba.
+        const r = await conConsecutivo(db, 'TR', 'trayectos', (consecutivo) =>
+          db.prepare(`
           INSERT INTO trayectos (consecutivo, vehiculo_id, conductor_id, fecha_operacion,
                                  municipio_salida_id, lugar_salida, ts_salida,
                                  ts_salida_disp, origen_salida, lat_salida, lon_salida,
@@ -1941,7 +1988,7 @@ ruta('POST', '/api/sync', async ({ db, sesion, cuerpo }) => {
                 m.municipio_id || null, m.lugar || null,
                 m.ts_dispositivo, m.ts_dispositivo,
                 m.lat ?? null, m.lon ?? null, m.precision ?? null,
-                m.km_inicial || null, sesion.id, ahora()).run();
+                m.km_inicial || null, sesion.id, ahora()).run());
         await recalcularDia(db, m.fecha_operacion || hoyISO(), m.vehiculo_id);
         // La fotografía viaja con la marca: sin señal el conductor la toma igual
         // y se guarda en el teléfono, así que aquí hay que aterrizarla.

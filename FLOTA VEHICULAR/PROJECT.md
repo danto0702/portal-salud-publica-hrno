@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D36 | Consecutivos | Salen del **máximo**, no de `COUNT(*)`: un número borrado deja hueco y la serie sigue. Con reintento, para cuando dos conductores marcan en el mismo segundo |
 | D35 | Quitar un viaje | **Solo el administrador**, y con motivo obligatorio. **Anular** deja el registro y se deshace; **borrar** elimina de verdad. En los dos casos se recalcula el día |
 | D34 | Revisión de viajes | La pantalla de Viajes tiene **período libre** —hasta toda la operación—, filtros en memoria, ficha con todos los campos y descarga a CSV. La consulta lleva tope |
 | D33 | Días fuera de servicio | Se registra el **rango de días** en que un vehículo no pudo operar, con su causa. Un día parado **no es pagable**. El conductor puede declararlo desde el celular, acotado a su vehículo y desde hoy |
@@ -735,6 +736,35 @@ para que no se confundan con los que cuentan. Coordinación no los ve ni aunque 
 Las columnas de anulación se añaden con `ALTER TABLE` dentro de `asegurarEsquema()`, ignorando el
 error de «ya existe»: SQLite no tiene `ADD COLUMN IF NOT EXISTS` y la base de producción es
 anterior.
+
+### 5.4.8 El consecutivo del viaje (D36)
+
+`TR-2026-000253`. Sale del **máximo de la serie del año**, no de `COUNT(*)`.
+
+> **Por qué, y lo que costó.** Contar funciona mientras no se borre nada nunca. Eso dejó de ser
+> cierto el día que el administrador pudo quitar un viaje (D35): al borrar uno, el conteo baja y
+> el siguiente número choca con el último que ya existe. Como `consecutivo` es `UNIQUE`, el choque
+> no se queda en un número repetido — **rechaza la marca, y la rechaza siempre**, para todos los
+> conductores, hasta que alguien lo arregle.
+>
+> Pasó en producción. El 7 de octubre de 2026, a las 17:21, se borró el viaje de prueba
+> `TR-2026-000001` —exactamente para lo que se hizo esa función—. A las 6:48 de la mañana
+> siguiente ningún conductor podía registrar la salida: *«Ya existe un registro con esos datos»*.
+> Las marcas que ya estaban en la cola del teléfono no se perdieron (la cola solo borra lo que el
+> servidor confirma), pero las que se intentaron con señal se rechazaron y hubo que repetirlas.
+>
+> La lección no es «cuidado con borrar»: es que un contador derivado de `COUNT(*)` asume que nada
+> desaparece, y esa suposición no estaba escrita en ninguna parte. Con el máximo, un número
+> borrado deja un hueco y la serie sigue hacia adelante, que es lo que se espera de un
+> consecutivo: **no se reutiliza**.
+
+**Y un reintento.** A las seis de la mañana salen todos a la vez: dos marcas en el mismo segundo
+leen el mismo máximo y piden el mismo número; una gana y la otra choca. `conConsecutivo()`
+vuelve a intentarlo con el número siguiente, hasta cinco veces. Vale igual para una cola que se
+vacía de golpe al recuperar la señal.
+
+`prueba_api.mjs` reproduce el caso completo —registrar, borrar el primero, volver a registrar— y
+comprueba además que el número no retroceda ni se repita.
 
 ### 5.4.7 Novedades: el mismo período libre (D34)
 
