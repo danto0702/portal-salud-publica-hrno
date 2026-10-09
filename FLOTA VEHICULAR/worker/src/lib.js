@@ -33,7 +33,7 @@
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 13;
+const VERSION_API = 14;
 
 /**
  * Juegos de roles que usan las rutas.

@@ -577,6 +577,15 @@ table.ficha th{border-bottom:1px solid var(--border)}
   color:var(--azul);margin:1.1rem 0 .3rem;
 }
 
+/* Tabla con columnas agrupadas: la del detalle por conductor mide cuatro
+   cosas distintas y sin separarlas se leen como una sola lista de números. */
+thead tr.grupo th{
+  font-size:.62rem;letter-spacing:.06em;color:var(--azul);
+  border-bottom:0;padding-bottom:.15rem;
+}
+thead tr.grupo th:first-child{border:0}
+th.sep,td.sep{border-left:1px solid var(--border)}
+
 /* Coordenadas copiables en la pantalla de viajes */
 .geo{min-width:132px}
 .geo-copiar{

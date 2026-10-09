@@ -145,6 +145,13 @@ ficha de un viaje y la descarga:
 node pruebas/prueba_viajes.mjs
 ```
 
+Y la del Dashboard, que recorre las estadísticas por conductor, el enfoque en
+una persona o un vehículo y la descarga de los dos detalles:
+
+```bash
+node pruebas/prueba_dashboard.mjs
+```
+
 Y la de Novedades, que recorre su período libre y sus filtros:
 
 ```bash

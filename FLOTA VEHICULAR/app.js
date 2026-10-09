@@ -17,7 +17,7 @@
  * peticiones e ignora en silencio lo que no entiende — un campo que no se
  * guarda y ningún mensaje de error. Por eso se comprueba y se avisa.
  */
-const VERSION_API_REQUERIDA = 13;
+const VERSION_API_REQUERIDA = 14;
 
 const esLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 const API = localStorage.getItem('flota_api') ||
@@ -2465,17 +2465,44 @@ function grafica(id, config) {
   graficas[id] = new Chart(el, config);
 }
 
+/**
+ * Enfoque del dashboard (D37): al escoger un conductor o un vehículo, TODO
+ * pasa a hablar solo de él. El recorte lo hace el servidor, no la pantalla:
+ * así los contadores de arriba son los de esa persona y no los de la flota
+ * con una tabla recortada debajo.
+ */
+let dashConductor = '', dashVehiculo = '';
+
+function enfocarDash(campo, valor) {
+  if (campo === 'conductor') dashConductor = valor; else dashVehiculo = valor;
+  verDashboard();
+}
+
 async function verDashboard() {
   if (!dashDesde) { dashDesde = hoy().slice(0, 8) + '01'; dashHasta = hoy(); }
   $('#main').innerHTML = '<div class="cargando">Calculando...</div>';
   let d;
-  try { d = await api(`/api/dashboard?desde=${dashDesde}&hasta=${dashHasta}`); }
+  try {
+    d = await api(`/api/dashboard?desde=${dashDesde}&hasta=${dashHasta}` +
+      (dashConductor ? `&conductor_id=${dashConductor}` : '') +
+      (dashVehiculo ? `&vehiculo_id=${dashVehiculo}` : ''));
+  }
   catch (e) { return $('#main').innerHTML = `<div class="card"><div class="nota avi">${esc(e.message)}</div></div>`; }
 
   const t = d.totales || {};
   const conDatos = d.por_vehiculo.filter(v => v.dias_registrados > 0);
+  // Con la flota entera, un conductor sin un solo día registrado solo añade
+  // ruido a la gráfica; enfocado en uno, se muestra aunque esté en cero,
+  // porque esa es justamente la respuesta.
+  const condDatos = (d.por_conductor || []).filter(c =>
+    dashConductor || c.dias_programados || c.dias_con_desplazamiento || c.trayectos);
   const cumplimiento = t.programados ? Math.round((t.ejecutados / t.programados) * 100) : 0;
   const totalPagar = d.por_vehiculo.reduce((s, v) => s + (v.valor_estimado || 0), 0);
+  const enfocado = dashConductor || dashVehiculo;
+  const nombreCond = dashConductor &&
+    (d.por_conductor.find(c => String(c.id) === String(dashConductor))?.conductor || '').trim();
+  const placaVeh = dashVehiculo &&
+    (d.por_vehiculo.find(v => String(v.id) === String(dashVehiculo))?.placa || '');
 
   $('#main').innerHTML = `
     <div class="cab">
@@ -2487,6 +2514,32 @@ async function verDashboard() {
         <button class="btn sec sm" onclick="exportarDashboard()">Descargar</button>
       </div>
     </div>
+
+    <div class="card filtros-tray" style="margin-bottom:.85rem">
+      <div class="fila">
+        <div><label class="lb">Conductor</label>
+          <select class="inp" onchange="enfocarDash('conductor',this.value)">
+            <option value="">Todos los conductores</option>
+            ${(d.por_conductor || []).map(c => `<option value="${c.id}"
+              ${String(dashConductor) === String(c.id) ? 'selected' : ''}
+              >${esc((c.conductor || '').trim())}</option>`).join('')}
+          </select></div>
+        <div><label class="lb">Vehículo</label>
+          <select class="inp" onchange="enfocarDash('vehiculo',this.value)">
+            <option value="">Todos los vehículos</option>
+            ${d.por_vehiculo.map(v => `<option value="${v.id}"
+              ${String(dashVehiculo) === String(v.id) ? 'selected' : ''}
+              >${esc(v.placa)}</option>`).join('')}
+          </select></div>
+        ${enfocado ? `<button class="btn sec sm" style="margin-bottom:.45rem"
+          onclick="dashConductor='';dashVehiculo='';verDashboard()">Quitar el enfoque</button>` : ''}
+      </div>
+    </div>
+
+    ${enfocado ? `<div class="nota" style="margin-bottom:.85rem;border-left:4px solid var(--azul)">
+      Todo lo de abajo es <b>solo de ${esc([nombreCond, placaVeh].filter(Boolean).join(' con '))}</b>
+      en este período: los contadores, las gráficas y las tablas.
+    </div>` : ''}
 
     <div class="grid g4">
       <div class="kpi azul"><div class="et">Días pagables</div><div class="val">${num(t.pagables || 0)}</div>
@@ -2531,6 +2584,69 @@ async function verDashboard() {
         ${d.eventos.length ? '<div class="grafica-env"><canvas id="g-eventos"></canvas></div>'
           : '<div class="vacio">Sin novedades en el período.</div>'}</div>
     </div>
+
+    <div class="card" style="margin-top:.85rem">
+      <h2>Qué conductores están rodando más</h2>
+      <p style="color:var(--muted);font-size:.8rem;margin:.2rem 0 .85rem">
+        Los mismos días que la tabla de vehículos, contados por quien los condujo.</p>
+      ${condDatos.length
+        ? '<div class="grafica-env"><canvas id="g-conductores"></canvas></div>'
+        : '<div class="vacio">Ningún conductor tiene días registrados en el período.</div>'}
+    </div>
+
+    ${condDatos.length ? `
+    <div class="card" style="margin-top:.85rem">
+      <h2>Detalle por conductor</h2>
+      <p style="color:var(--muted);font-size:.8rem;margin:.2rem 0 0">
+        <b>Calidad del registro</b> no mide al conductor como trabajador: mide cómo está
+        usando la aplicación, y sirve para saber a quién reforzarle la capacitación.
+        <b>Novedades</b> es actividad, no problema — quien más reporta suele ser el que
+        mejor reporta.</p>
+      <div class="tabla-env" style="margin-top:.75rem;border:0">
+        <table>
+          <thead>
+            <tr class="grupo">
+              <th></th>
+              <th class="num" colspan="5">Operación</th>
+              <th class="num sep" colspan="3">Calidad del registro</th>
+              <th class="num sep">Novedades</th>
+              <th class="num sep" colspan="2">Checklist</th>
+            </tr>
+            <tr>
+              <th>Conductor</th>
+              <th class="num">Programados</th><th class="num">Con despl.</th>
+              <th class="num">Viajes</th><th class="num">Horas</th><th class="num">Km</th>
+              <th class="num sep" title="Marcas que quedaron sin ubicación">Sin GPS</th>
+              <th class="num" title="Marcas tomadas sin señal y enviadas después">Sin señal</th>
+              <th class="num" title="Salidas que nunca se cerraron con una llegada">Abiertos</th>
+              <th class="num sep">Reportadas</th>
+              <th class="num sep">Diligenciados</th><th class="num">Completos</th>
+            </tr>
+          </thead>
+          <tbody>${condDatos.map(c => `
+            <tr>
+              <td><b>${esc((c.conductor || '').trim() || 'Sin nombre')}</b></td>
+              <td class="num">${num(c.dias_programados || 0)}</td>
+              <td class="num"><b>${num(c.dias_con_desplazamiento || 0)}</b></td>
+              <td class="num">${num(c.trayectos || 0)}</td>
+              <td class="num">${num(Math.round(c.horas || 0))}</td>
+              <td class="num">${num(c.km || 0)}</td>
+              <td class="num sep">${c.sin_gps
+                ? `<span class="etq ambar">${c.sin_gps}</span>` : '0'}</td>
+              <td class="num">${num(c.sin_senal || 0)}</td>
+              <td class="num">${c.abiertos
+                ? `<span class="etq rojo">${c.abiertos}</span>` : '0'}</td>
+              <td class="num sep">${num(c.novedades || 0)}</td>
+              <td class="num sep">${num(c.checklists || 0)}</td>
+              <td class="num">${c.checklists
+                ? (c.checklists_completos === c.checklists
+                    ? `<span class="etq verde">${c.checklists_completos}</span>`
+                    : `<span class="etq ambar">${c.checklists_completos || 0}</span>`)
+                : '—'}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>` : ''}
 
     <div class="card" style="margin-top:.85rem">
       <h2>Detalle por vehículo</h2>
@@ -2592,14 +2708,28 @@ async function verDashboard() {
   `;
 
   // ── Gráficas ──
-  grafica('g-ranking', {
+  //
+  // El ranking de vehículos y el de conductores cuentan lo mismo, así que
+  // llevan la misma codificación de color: si fueran distintas habría que
+  // releer la leyenda al pasar de una a la otra.
+  //
+  // El azul pálido de «Programados» era #c3d2e6, que no pasaba el validador de
+  // paletas: fuera de la banda de luminosidad, por debajo del mínimo de croma
+  // —se lee como gris— y 1,5:1 de contraste contra el fondo. #4e96db pasa las
+  // seis comprobaciones, incluida la separación para daltonismo.
+  const COLOR_DIAS = ['#4e96db', '#1e5aa8', '#0a7d57'];
+
+  const ranking = (id, etiquetas, filas) => grafica(id, {
     type: 'bar',
     data: {
-      labels: conDatos.map(v => v.placa),
+      labels: etiquetas,
       datasets: [
-        { label: 'Programados', data: conDatos.map(v => v.dias_programados || 0), backgroundColor: '#c3d2e6', borderRadius: 4 },
-        { label: 'Con desplazamiento', data: conDatos.map(v => v.dias_con_desplazamiento || 0), backgroundColor: '#1e5aa8', borderRadius: 4 },
-        { label: 'Pagables', data: conDatos.map(v => v.dias_pagables || 0), backgroundColor: '#0a7d57', borderRadius: 4 },
+        { label: 'Programados', data: filas.map(x => x.dias_programados || 0),
+          backgroundColor: COLOR_DIAS[0], borderRadius: 4 },
+        { label: 'Con desplazamiento', data: filas.map(x => x.dias_con_desplazamiento || 0),
+          backgroundColor: COLOR_DIAS[1], borderRadius: 4 },
+        { label: 'Pagables', data: filas.map(x => x.dias_pagables || 0),
+          backgroundColor: COLOR_DIAS[2], borderRadius: 4 },
       ],
     },
     options: {
@@ -2608,6 +2738,18 @@ async function verDashboard() {
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } } },
     },
   });
+
+  ranking('g-ranking', conDatos.map(v => v.placa), conDatos);
+  if (condDatos.length) {
+    // Primer nombre y primer APELLIDO. El nombre completo no cabe bajo la
+    // barra, y cortar por las dos primeras palabras daba «JEISON OMAR» y
+    // «JEISON MANDO»: dos nombres de pila que no distinguen a nadie.
+    const corto = (c) => [
+      (c.nombres || '').trim().split(/\s+/)[0] || '',
+      (c.apellidos || '').trim().split(/\s+/)[0] || '',
+    ].filter(Boolean).join(' ') || (c.conductor || '').trim();
+    ranking('g-conductores', condDatos.map(corto), condDatos);
+  }
 
   grafica('g-dias', {
     type: 'line',
@@ -2657,13 +2799,33 @@ async function verDashboard() {
 
 /** Descarga el detalle por vehículo como CSV, legible en Excel. */
 async function exportarDashboard() {
-  const d = await api(`/api/dashboard?desde=${dashDesde}&hasta=${dashHasta}`);
-  const cab = ['Placa', 'Propiedad', 'Contratista', 'Dias programados', 'Dias con desplazamiento',
-    'Dias pagables', 'Viajes', 'Horas', 'Kilometros', 'Valor dia', 'Valor estimado'];
-  const filas = d.por_vehiculo.map(v => [v.placa, v.propiedad, v.contratista || '',
-    v.dias_programados || 0, v.dias_con_desplazamiento || 0, v.dias_pagables || 0,
-    v.trayectos || 0, Math.round(v.horas || 0), v.km || 0, v.valor_dia || '', v.valor_estimado || 0]);
-  const csv = [cab, ...filas].map(f => f.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n');
+  const d = await api(`/api/dashboard?desde=${dashDesde}&hasta=${dashHasta}` +
+    (dashConductor ? `&conductor_id=${dashConductor}` : '') +
+    (dashVehiculo ? `&vehiculo_id=${dashVehiculo}` : ''));
+
+  // Los dos detalles en un solo archivo, uno debajo del otro: es lo que se
+  // pega en un informe, y con dos archivos siempre se pierde uno.
+  const bloques = [
+    [['DETALLE POR VEHICULO'],
+     ['Placa', 'Propiedad', 'Contratista', 'Dias programados', 'Dias con desplazamiento',
+      'Dias pagables', 'Viajes', 'Horas', 'Kilometros', 'Valor dia', 'Valor estimado'],
+     ...d.por_vehiculo.map(v => [v.placa, v.propiedad, v.contratista || '',
+       v.dias_programados || 0, v.dias_con_desplazamiento || 0, v.dias_pagables || 0,
+       v.trayectos || 0, Math.round(v.horas || 0), v.km || 0,
+       v.valor_dia || '', v.valor_estimado || 0])],
+    [['DETALLE POR CONDUCTOR'],
+     ['Conductor', 'Dias programados', 'Dias con desplazamiento', 'Dias pagables',
+      'Viajes', 'Horas', 'Kilometros', 'Marcas sin GPS', 'Marcas sin senal',
+      'Viajes abiertos', 'Novedades reportadas', 'Checklists', 'Checklists completos'],
+     ...(d.por_conductor || []).map(c => [(c.conductor || '').trim(),
+       c.dias_programados || 0, c.dias_con_desplazamiento || 0, c.dias_pagables || 0,
+       c.trayectos || 0, Math.round(c.horas || 0), c.km || 0,
+       c.sin_gps || 0, c.sin_senal || 0, c.abiertos || 0, c.novedades || 0,
+       c.checklists || 0, c.checklists_completos || 0])],
+  ];
+  const csv = bloques
+    .map(b => b.map(f => f.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n'))
+    .join('\n\n');
   // BOM para que Excel reconozca los acentos
   const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
   const a = document.createElement('a');

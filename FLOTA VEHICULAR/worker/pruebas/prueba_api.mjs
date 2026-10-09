@@ -991,6 +991,93 @@ verificar('y sale en la lista de los que siguen parados',
 r = await api('GET', '/api/fuera-servicio/resumen', null, tCondFS);
 verificar('el conductor no ve el resumen de toda la flota', r.estado === 403, r.estado);
 
+console.log('\n── Dashboard por conductor y por vehículo ────────────────────');
+
+r = await api('GET', '/api/dashboard?desde=2026-01-01&hasta=2026-12-31', null, tCoord);
+const dash = r.datos;
+verificar('el dashboard trae el detalle por conductor',
+  Array.isArray(dash.por_conductor) && dash.por_conductor.length > 0,
+  dash.por_conductor && dash.por_conductor.length);
+
+const unoConViajes = dash.por_conductor.find(c => c.trayectos > 0);
+verificar('hay un conductor con viajes con el que contrastar', !!unoConViajes, unoConViajes);
+verificar('mide lo básico de operación',
+  unoConViajes && unoConViajes.dias_con_desplazamiento !== undefined
+  && unoConViajes.horas !== undefined && unoConViajes.km !== undefined, unoConViajes);
+verificar('mide la calidad del registro',
+  unoConViajes && unoConViajes.sin_gps !== undefined
+  && unoConViajes.sin_senal !== undefined && unoConViajes.abiertos !== undefined, unoConViajes);
+verificar('cuenta las novedades que reportó', unoConViajes.novedades !== undefined, unoConViajes);
+verificar('y los checklist que diligenció',
+  unoConViajes.checklists !== undefined && unoConViajes.checklists_completos !== undefined,
+  unoConViajes);
+
+// Los días por conductor y por vehículo salen de la misma tabla: no pueden
+// contar cosas distintas, o habría dos verdades sobre el mismo período.
+const sumaVeh = dash.por_vehiculo.reduce((a, v) => a + (v.dias_con_desplazamiento || 0), 0);
+const sumaCond = dash.por_conductor.reduce((a, c) => a + (c.dias_con_desplazamiento || 0), 0);
+verificar('las dos tablas suman los mismos días con desplazamiento',
+  sumaVeh === sumaCond, `vehículos ${sumaVeh} contra conductores ${sumaCond}`);
+
+// ── Enfocar en un conductor ──
+const foco = dash.por_conductor.find(c => c.dias_con_desplazamiento > 0);
+r = await api('GET',
+  `/api/dashboard?desde=2026-01-01&hasta=2026-12-31&conductor_id=${foco.id}`, null, tCoord);
+const soloCond = r.datos;
+verificar('al enfocar un conductor, la tabla trae solo a él',
+  soloCond.por_conductor.length === 1 && soloCond.por_conductor[0].id === foco.id,
+  soloCond.por_conductor.length);
+verificar('y responde a quién se está enfocando',
+  soloCond.enfoque && soloCond.enfoque.conductor_id === foco.id, soloCond.enfoque);
+verificar('los totales de arriba pasan a ser los suyos, no los de la flota',
+  soloCond.totales.ejecutados === foco.dias_con_desplazamiento,
+  `${soloCond.totales.ejecutados} contra ${foco.dias_con_desplazamiento}`);
+verificar('sus totales no superan los de toda la flota',
+  soloCond.totales.ejecutados <= dash.totales.ejecutados,
+  `${soloCond.totales.ejecutados} de ${dash.totales.ejecutados}`);
+verificar('los vehículos siguen listados: los que no condujo salen en cero',
+  soloCond.por_vehiculo.length === dash.por_vehiculo.length,
+  `${soloCond.por_vehiculo.length} de ${dash.por_vehiculo.length}`);
+verificar('y los viajes por día son solo los suyos',
+  soloCond.por_dia.reduce((a, x) => a + x.trayectos, 0)
+    <= dash.por_dia.reduce((a, x) => a + x.trayectos, 0));
+verificar('los vencimientos enfocados son los de esa persona, no los de los vehículos',
+  soloCond.vencimientos.every(v => v.ambito === 'persona'), soloCond.vencimientos);
+
+// ── Enfocar en un vehículo ──
+const vFoco = dash.por_vehiculo.find(v => v.dias_con_desplazamiento > 0) || dash.por_vehiculo[0];
+r = await api('GET',
+  `/api/dashboard?desde=2026-01-01&hasta=2026-12-31&vehiculo_id=${vFoco.id}`, null, tCoord);
+const soloVeh = r.datos;
+verificar('al enfocar un vehículo, la tabla trae solo ese',
+  soloVeh.por_vehiculo.length === 1 && soloVeh.por_vehiculo[0].id === vFoco.id,
+  soloVeh.por_vehiculo.length);
+verificar('sus totales coinciden con los de su fila',
+  soloVeh.totales.ejecutados === vFoco.dias_con_desplazamiento,
+  `${soloVeh.totales.ejecutados} contra ${vFoco.dias_con_desplazamiento}`);
+verificar('los conductores siguen listados: se ve quién lo condujo',
+  soloVeh.por_conductor.length === dash.por_conductor.length,
+  `${soloVeh.por_conductor.length} de ${dash.por_conductor.length}`);
+verificar('los vencimientos enfocados son los de ese vehículo',
+  soloVeh.vencimientos.every(v => v.ambito === 'vehiculo'), soloVeh.vencimientos);
+
+// Los dos a la vez: ese conductor con ese vehículo.
+r = await api('GET', '/api/dashboard?desde=2026-01-01&hasta=2026-12-31' +
+  `&conductor_id=${foco.id}&vehiculo_id=${vFoco.id}`, null, tCoord);
+verificar('se pueden combinar los dos filtros',
+  r.estado === 200 && r.datos.totales.ejecutados <= soloCond.totales.ejecutados
+  && r.datos.totales.ejecutados <= soloVeh.totales.ejecutados,
+  `${r.datos.totales.ejecutados} ≤ ${soloCond.totales.ejecutados} y ${soloVeh.totales.ejecutados}`);
+
+r = await api('GET', '/api/dashboard?desde=2026-01-01&hasta=2026-12-31&conductor_id=999999',
+              null, tCoord);
+verificar('un conductor que no existe devuelve vacío, no todo',
+  r.estado === 200 && r.datos.por_conductor.length === 0
+  && !r.datos.totales.ejecutados, r.datos.totales);
+
+r = await api('GET', '/api/dashboard', null, tCondFS);
+verificar('el conductor no entra al dashboard de la flota', r.estado === 403, r.estado);
+
 console.log('\n── Anular y borrar viajes (solo el administrador) ────────────');
 
 // Un viaje propio para esta sección, con su día programado, para poder ver

@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D37 | Dashboard por persona y por vehículo | Secciones comparativas de las dos cosas **y** dos selectores que enfocan **todo** el tablero en un conductor o un vehículo. El recorte lo hace el servidor, no la pantalla |
 | D36 | Consecutivos | Salen del **máximo**, no de `COUNT(*)`: un número borrado deja hueco y la serie sigue. Con reintento, para cuando dos conductores marcan en el mismo segundo |
 | D35 | Quitar un viaje | **Solo el administrador**, y con motivo obligatorio. **Anular** deja el registro y se deshace; **borrar** elimina de verdad. En los dos casos se recalcula el día |
 | D34 | Revisión de viajes | La pantalla de Viajes tiene **período libre** —hasta toda la operación—, filtros en memoria, ficha con todos los campos y descarga a CSV. La consulta lleva tope |
@@ -775,6 +776,46 @@ de tipo y *solo las abiertas*. `GET /api/eventos` acepta `limite` (500 por omisi
 y `GET /api/eventos/rango` dice desde cuándo hay novedades.
 
 Se prueba con `node worker/pruebas/prueba_novedades.mjs`.
+
+### 5.4.9 Dashboard por conductor y por vehículo (D37)
+
+El dashboard comparaba vehículos y no decía nada de **quién** los conducía, y no había forma de
+mirar a uno solo. Ahora hace las dos cosas.
+
+**Comparar.** Junto al ranking de vehículos va uno de conductores, con la misma codificación de
+color —programados / con desplazamiento / pagables—, porque cuentan lo mismo y con dos leyendas
+distintas habría que releerlas al pasar de una a la otra. Debajo, una tabla de detalle con cuatro
+grupos de columnas:
+
+| Grupo | Qué mide | Cómo se lee |
+|---|---|---|
+| **Operación** | días programados, con desplazamiento, viajes, horas, km | Quién está rodando más |
+| **Calidad del registro** | marcas sin GPS, marcas sin señal, viajes abiertos | **No** mide al conductor como trabajador: mide cómo usa la aplicación. Sirve para saber a quién reforzarle la capacitación |
+| **Novedades** | cuántas reportó | **Actividad, no problema.** Quien más reporta suele ser el que mejor reporta |
+| **Checklist** | diligenciados y completos | Cumplimiento del procedimiento previo a la salida |
+
+Las dos advertencias de lectura van **escritas en la propia pantalla**, no solo aquí: un número
+sin su advertencia al lado se usa mal.
+
+**Enfocar.** Dos selectores arriba. Al escoger a alguien, *todo* el tablero pasa a hablar de él:
+los contadores grandes, las gráficas, los destinos, las novedades y los vencimientos. El recorte
+lo hace el **servidor**, no la pantalla — si los contadores de arriba siguieran siendo los de la
+flota con una tabla recortada debajo, el número grande mentiría. Los vehículos siguen listados al
+enfocar un conductor (para ver cuáles condujo, los demás en cero) y al revés.
+
+**Días contados una sola vez.** Lo básico de las dos tablas sale de `dias_operacion`, no de
+`trayectos`: si cada tabla contara por su lado habría dos verdades sobre el mismo período. La
+suite comprueba que las dos sumen lo mismo.
+
+**Un hueco conocido:** un checklist sin trayecto asociado no se puede atribuir a un conductor y no
+entra en esa columna; sí sigue contando en la tabla de vehículos.
+
+**La paleta.** El azul pálido de «Programados» (`#c3d2e6`) no pasaba el validador: fuera de la
+banda de luminosidad, por debajo del mínimo de croma —se leía como gris— y 1,5:1 de contraste
+contra el fondo. Se cambió por `#4e96db`, que pasa las seis comprobaciones, incluida la separación
+para daltonismo. No se duplicó el defecto en la gráfica nueva: se corrigió en las dos.
+
+Se prueba con `node worker/pruebas/prueba_dashboard.mjs`.
 
 ### 5.5 Checklist de distintivos y elementos (D4)
 
