@@ -245,11 +245,13 @@ tr:hover td{background:#fafcfe}
               <select id="mMun" onchange="renderMasivoList()"><option value="">Todos</option></select></div>
             <div class="field"><label>EBS</label>
               <select id="mEbs" onchange="renderMasivoList()"><option value="">Todos</option></select></div>
-            <div class="field"><label>Perfil (rol)</label>
-              <select id="mRol" onchange="renderMasivoList()"><option value="">Todos</option></select></div>
             <div class="field"><label>Coordinador</label>
               <select id="mCoord" onchange="renderMasivoList()"><option value="">Todos</option><option value="DANILO">Danilo</option><option value="MELISA">Melisa</option></select></div>
             <div class="field"><label>% Ejecución</label><input type="number" id="mPct" value="100" min="0" max="100"></div>
+          </div>
+          <div class="field">
+            <label>Perfil(es) a incluir <span class="small muted">— marca uno o varios; sin marcar = todos</span></label>
+            <div id="mRolChips" class="chip-row"></div>
           </div>
           <div class="field">
             <label>Cuenta(s) a certificar</label>
@@ -610,7 +612,10 @@ function initFilters(){
   const ebsn=[...new Set(ST.contratistas.map(c=>c.ebs_num).filter(Boolean))].sort();
   const terrs=[...new Set(ST.contratistas.map(c=>c.territorio).filter(Boolean))].sort();
   fillSel('ctMun',muns,munDisp); fillSel('ctRol',roles,rolDisp); fillSel('ctEbs',ebsn);
-  fillSel('mMun',muns,munDisp); fillSel('mEbs',ebsn); fillSel('mRol',roles,rolDisp);
+  fillSel('mMun',muns,munDisp); fillSel('mEbs',ebsn);
+  $('mRolChips').innerHTML = roles.length
+    ? roles.map(r=>`<label class="chk"><input type="checkbox" class="mRolChk" value="${esc(r)}" onchange="this.closest('.chk').classList.toggle('on',this.checked);renderMasivoList()"> ${esc(rolDisp(r))}</label>`).join('')
+    : '<span class="muted small">Sin roles.</span>';
   $('rolesList').innerHTML=roles.map(r=>`<option value="${esc(r)}">`).join('');
   $('munsList').innerHTML=muns.map(r=>`<option value="${esc(r)}">`).join('');
   $('terrList').innerHTML=terrs.map(r=>`<option value="${esc(r)}">`).join('');
@@ -945,13 +950,15 @@ function renderMasivoPeriodos(){
   for(let k=1;k<=maxN;k++) html+=`<label class="chk"><input type="checkbox" value="${k}" onchange="this.closest('.chk').classList.toggle('on',this.checked)"> Cuenta ${k}</label>`;
   $('mPeriodos').innerHTML=html || '<span class="muted small">Sin cuentas.</span>';
 }
+function masivoRolesSel(){ return [...document.querySelectorAll('#mRolChips .mRolChk:checked')].map(i=>i.value); }
 function masivoFiltrados(){
-  const mun=$('mMun').value, ebs=$('mEbs').value, rol=$('mRol').value, coord=$('mCoord').value;
+  const mun=$('mMun').value, ebs=$('mEbs').value, coord=$('mCoord').value;
+  const roles=masivoRolesSel();
   return ST.contratistas.filter(c=>{
     if(c.activo===false) return false;
     if(mun && c.municipio!==mun) return false;
     if(ebs && (c.ebs_num||'')!==ebs) return false;
-    if(rol && c.rol!==rol) return false;
+    if(roles.length && roles.indexOf(c.rol)<0) return false;
     if(coord && coordFor(c).key!==coord) return false;
     return true;
   }).sort((a,b)=>((a.municipio||'')+(a.ebs_num||'~')+(a.nombre||'')).localeCompare((b.municipio||'')+(b.ebs_num||'~')+(b.nombre||'')));
