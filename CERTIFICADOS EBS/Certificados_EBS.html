@@ -238,13 +238,17 @@ tr:hover td{background:#fafcfe}
     <!-- ── MASIVO ── -->
     <div class="panel" id="p-masivo">
       <div class="card">
-        <div class="card-h"><h2>Generación masiva por EBS</h2><span class="sub">Genera todos los certificados firmados en un ZIP, divididos por número de EBS</span></div>
+        <div class="card-h"><h2>Generación masiva</h2><span class="sub">Genera certificados firmados en un ZIP, filtrando por EBS y perfil</span></div>
         <div class="card-b">
           <div class="filters" style="margin-bottom:14px">
             <div class="field"><label>Municipio</label>
-              <select id="mMun" onchange="renderMasivoEbs()"><option value="">Todos</option></select></div>
+              <select id="mMun" onchange="renderMasivoList()"><option value="">Todos</option></select></div>
+            <div class="field"><label>EBS</label>
+              <select id="mEbs" onchange="renderMasivoList()"><option value="">Todos</option></select></div>
+            <div class="field"><label>Perfil (rol)</label>
+              <select id="mRol" onchange="renderMasivoList()"><option value="">Todos</option></select></div>
             <div class="field"><label>Coordinador</label>
-              <select id="mCoord" onchange="renderMasivoEbs()"><option value="">Todos</option><option value="DANILO">Danilo</option><option value="MELISA">Melisa</option></select></div>
+              <select id="mCoord" onchange="renderMasivoList()"><option value="">Todos</option><option value="DANILO">Danilo</option><option value="MELISA">Melisa</option></select></div>
             <div class="field"><label>% Ejecución</label><input type="number" id="mPct" value="100" min="0" max="100"></div>
           </div>
           <div class="field">
@@ -252,10 +256,16 @@ tr:hover td{background:#fafcfe}
             <div id="mPeriodos" class="chip-row"></div>
           </div>
           <div class="field">
-            <label>Equipos Básicos a incluir</label>
-            <div id="mEbsList"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+              <label style="margin:0">Contratistas a certificar <span id="mCount" class="small muted"></span></label>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-ghost btn-sm" onclick="masivoToggleAll(true)">Marcar todos</button>
+                <button class="btn btn-ghost btn-sm" onclick="masivoToggleAll(false)">Ninguno</button>
+              </div>
+            </div>
+            <div id="mList" class="tbl-scroll" style="max-height:360px;margin-top:8px"></div>
           </div>
-          <div class="hint info">Cada certificado consume un radicado consecutivo. El ZIP agrupa los PDF en carpetas <b>EBS-001</b>, <b>EBS-002</b>… con la firma y el sello aplicados.</div>
+          <div class="hint info">Cada certificado consume un radicado consecutivo. El ZIP agrupa los PDF por <b>EBS</b> (o por <b>perfil</b> si el contratista no tiene EBS), con la firma y el sello aplicados.</div>
           <div id="mProgress" class="hidden"><div class="progress"><i id="mBar"></i></div><div class="small" id="mStatus" style="margin-top:6px"></div></div>
           <div style="margin-top:14px">
             <button class="btn btn-primary" id="mBtn" onclick="runMasivo()">⚙ Generar ZIP de certificados</button>
@@ -600,7 +610,7 @@ function initFilters(){
   const ebsn=[...new Set(ST.contratistas.map(c=>c.ebs_num).filter(Boolean))].sort();
   const terrs=[...new Set(ST.contratistas.map(c=>c.territorio).filter(Boolean))].sort();
   fillSel('ctMun',muns,munDisp); fillSel('ctRol',roles,rolDisp); fillSel('ctEbs',ebsn);
-  fillSel('mMun',muns,munDisp);
+  fillSel('mMun',muns,munDisp); fillSel('mEbs',ebsn); fillSel('mRol',roles,rolDisp);
   $('rolesList').innerHTML=roles.map(r=>`<option value="${esc(r)}">`).join('');
   $('munsList').innerHTML=muns.map(r=>`<option value="${esc(r)}">`).join('');
   $('terrList').innerHTML=terrs.map(r=>`<option value="${esc(r)}">`).join('');
@@ -609,7 +619,7 @@ function fillSel(id,arr,disp){ const s=$(id); const first=s.querySelector('optio
 
 function renderAll(){
   renderGenPeriodos(); renderGenResults();
-  renderMasivoPeriodos(); renderMasivoEbs();
+  renderMasivoPeriodos(); renderMasivoList();
   renderContratistas(); renderEbs(); renderCuentasCfg(); renderEmitidos(); renderConfig();
   renderCarguePreview(); renderCargueHist();
 }
@@ -935,34 +945,39 @@ function renderMasivoPeriodos(){
   for(let k=1;k<=maxN;k++) html+=`<label class="chk"><input type="checkbox" value="${k}" onchange="this.closest('.chk').classList.toggle('on',this.checked)"> Cuenta ${k}</label>`;
   $('mPeriodos').innerHTML=html || '<span class="muted small">Sin cuentas.</span>';
 }
-function renderMasivoEbs(){
-  const mun=$('mMun').value, coord=$('mCoord').value;
-  let ebs=ST.ebs.slice();
-  if(mun) ebs=ebs.filter(e=>e.municipio===mun);
-  if(coord) ebs=ebs.filter(e=>(e.coordinador||'')===coord);
-  $('mEbsList').innerHTML = ebs.length? ebs.map(e=>{
-    const n=ST.contratistas.filter(c=>c.activo!==false && c.municipio===e.municipio && c.ebs_num===e.ebs_num).length;
-    const falta = !e.territorio || !e.gestor_nombre || !e.jefe_nombre;
-    return `<label class="chk on" style="margin:0 8px 8px 0;display:inline-flex">
-      <input type="checkbox" class="mEbsChk" value="${e.id}" checked>
-      EBS ${esc(e.ebs_num)} · ${esc(munDisp(e.municipio))} <span class="small">(${n} contr.)</span>
-      ${falta?'<span class="small" style="color:var(--red)">⚠ datos incompletos</span>':''}
-    </label>`;
-  }).join('') : '<span class="muted small">Sin EBS para el filtro.</span>';
+function masivoFiltrados(){
+  const mun=$('mMun').value, ebs=$('mEbs').value, rol=$('mRol').value, coord=$('mCoord').value;
+  return ST.contratistas.filter(c=>{
+    if(c.activo===false) return false;
+    if(mun && c.municipio!==mun) return false;
+    if(ebs && (c.ebs_num||'')!==ebs) return false;
+    if(rol && c.rol!==rol) return false;
+    if(coord && coordFor(c).key!==coord) return false;
+    return true;
+  }).sort((a,b)=>((a.municipio||'')+(a.ebs_num||'~')+(a.nombre||'')).localeCompare((b.municipio||'')+(b.ebs_num||'~')+(b.nombre||'')));
 }
+function renderMasivoList(){
+  const box=$('mList'); if(!box) return;
+  const list=masivoFiltrados();
+  $('mCount').textContent='('+list.length+')';
+  if(!list.length){ box.innerHTML='<span class="muted small">Sin contratistas para el filtro.</span>'; return; }
+  box.innerHTML='<table><thead><tr><th></th><th>Contratista</th><th>Rol</th><th>Mun</th><th>EBS</th><th>V. mensual</th><th>Estado</th></tr></thead><tbody>'+
+    list.map(c=>{
+      const cf=ebsCfgFor(c); const f=[];
+      if(!c.acta_inicio)f.push('sin acta'); if(!c.valor_mensual)f.push('sin valor mensual');
+      if(!cf||!cf.territorio)f.push('sin territorio'); if(!cf||!cf.gestor_nombre)f.push('sin gestor'); if(!cf||!cf.jefe_nombre)f.push('sin jefe');
+      const st=f.length?'<span class="small" style="color:#ffb432">⚠ '+esc(f.join(', '))+'</span>':'<span class="small" style="color:var(--green)">OK</span>';
+      return `<tr><td><input type="checkbox" class="mChk" value="${esc(c.id)}" ${c.acta_inicio?'checked':''}></td><td>${esc(c.nombre)}<div class="small muted">${esc(c.codigo_contrato||'')}</div></td><td>${esc(rolDisp(c.rol)||'—')}</td><td>${esc(c.municipio?munDisp(c.municipio):'—')}</td><td>${esc(c.ebs_num||'—')}</td><td class="mono">${c.valor_mensual?money(c.valor_mensual):'—'}</td><td>${st}</td></tr>`;
+    }).join('')+'</tbody></table>';
+}
+function masivoToggleAll(v){ document.querySelectorAll('#mList .mChk').forEach(i=>i.checked=v); }
 async function runMasivo(){
   const cuentaNums=[...$('mPeriodos').querySelectorAll('input:checked')].map(i=>+i.value);
   if(!cuentaNums.length){ toast('Selecciona al menos una cuenta','warn'); return; }
-  const ebsIds=[...document.querySelectorAll('.mEbsChk:checked')].map(i=>i.value);
-  if(!ebsIds.length){ toast('Selecciona al menos un EBS','warn'); return; }
+  const ids=[...document.querySelectorAll('#mList .mChk:checked')].map(i=>i.value);
+  if(!ids.length){ toast('Selecciona al menos un contratista','warn'); return; }
   const pct=+($('mPct').value||100);
-  const ebsSel=ST.ebs.filter(e=>ebsIds.includes(e.id));
-  // contratistas incluidos (con EBS, activos)
-  let jobs=[];
-  ebsSel.forEach(e=>{
-    const members=ST.contratistas.filter(c=>c.activo!==false && c.municipio===e.municipio && c.ebs_num===e.ebs_num);
-    members.forEach(c=>jobs.push({c,e}));
-  });
+  const jobs=ST.contratistas.filter(c=>ids.indexOf(c.id)>=0);
   if(!jobs.length){ toast('No hay contratistas para generar','warn'); return; }
 
   $('mBtn').disabled=true; $('mProgress').classList.remove('hidden');
@@ -970,28 +985,31 @@ async function runMasivo(){
   let radN=ST.radicador.consecutivo;
   const recs=[]; let saltados=0;
   for(let i=0;i<jobs.length;i++){
-    const {c,e}=jobs[i];
+    const c=jobs[i];
     const tr=c.transporte||ST.transporteDefault||0;
-    // cuentas de ESTE contrato que coinciden con las seleccionadas (30 días desde su acta)
+    // cuentas de ESTE contrato que coinciden con las seleccionadas (mes calendario desde su acta)
     const cuentas=cuentasDe(c).filter(q=>cuentaNums.includes(q.num));
     if(!cuentas.length){ saltados++; continue; }
     const rad=radicadoStr(radN);
     const rows=cuentas.map(q=>({etiqueta:'Cuenta '+q.num,cuenta:q.num,ini:fmtISO(q.ini),fin:fmtISO(q.fin),
       base:c.valor_mensual||0,pct,valor:(c.valor_mensual||0)*pct/100,transporte:tr,total:(c.valor_mensual||0)*pct/100+tr}));
-    const doc=buildCert(c,rad,rows,fmtISO(cuentas[cuentas.length-1].fin));
-    const folder='EBS-'+(e.ebs_num||'000')+'_'+munDisp(e.municipio).replace(/\s+/g,'');
+    const fexp=fmtISO(cuentas[cuentas.length-1].fin);
+    const doc=buildCert(c,rad,rows,fexp);
+    const cf=ebsCfgFor(c), co=coordFor(c);
+    const folder = c.ebs_num ? ('EBS-'+c.ebs_num+'_'+munDisp(c.municipio||'').replace(/\s+/g,''))
+                             : ('PERFIL-'+(rolDisp(c.rol)||'SIN_ROL').replace(/[^\w]+/g,'_'));
     const fname=folder+'/'+rad.replace(/[^\w-]/g,'')+'_'+(c.nombre||'').replace(/\s+/g,'_')+'.pdf';
     zip.file(fname, doc.output('blob'));
-    const co=coordFor(c); const fexp=fmtISO(cuentas[cuentas.length-1].fin);
     rows.forEach(r=>recs.push({radicado:rad,contratista_id:c.id,codigo_contrato:c.codigo_contrato,cedula:c.cedula,nombre:c.nombre,rol:c.rol,municipio:c.municipio,ebs_num:c.ebs_num,
       periodo_etiqueta:r.etiqueta+' ('+r.ini+' a '+r.fin+')',cuenta_num:r.cuenta,fecha_ini:r.ini,fecha_fin:r.fin,fecha_exp:fexp,
-      objeto:c.objeto,territorio:e.territorio,jefe_nombre:e.jefe_nombre,gestor_nombre:e.gestor_nombre,
+      objeto:c.objeto,territorio:(cf&&cf.territorio)||c.territorio||null,jefe_nombre:(cf&&cf.jefe_nombre)||null,gestor_nombre:(cf&&cf.gestor_nombre)||null,
       valor_base:c.valor_mensual,pct_ejec:pct,transporte:tr,total:r.total,coordinador:co.key,emitido_por:'masivo'}));
     radN++;
     const pc=Math.round((i+1)/jobs.length*100);
     $('mBar').style.width=pc+'%'; $('mStatus').textContent=`Generando ${i+1}/${jobs.length} · ${c.nombre}`;
     if(i%5===0) await new Promise(r=>setTimeout(r,0));
   }
+  if(radN===ST.radicador.consecutivo){ $('mBtn').disabled=false; $('mProgress').classList.add('hidden'); toast('Ninguno de los seleccionados tiene la(s) cuenta(s) elegida(s) (revisa el acta de inicio)','warn'); return; }
   $('mStatus').textContent='Comprimiendo ZIP…';
   const blob=await zip.generateAsync({type:'blob'},md=>{ $('mBar').style.width=Math.round(md.percent)+'%'; });
   const url=URL.createObjectURL(blob); const a=document.createElement('a');
@@ -1315,7 +1333,7 @@ async function saveEbs(){
   const res=await supa.from('certeb_ebs').update(rec).eq('id',id).select().single();
   if(res.error){toast('Error: '+res.error.message,'err');return;}
   const i=ST.ebs.findIndex(x=>x.id===id); ST.ebs[i]=res.data;
-  closeModal('mdEbs'); renderEbs(); renderMasivoEbs();
+  closeModal('mdEbs'); renderEbs(); renderMasivoList();
   toast('EBS actualizado','ok');
 }
 
