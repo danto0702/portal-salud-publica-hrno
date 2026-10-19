@@ -537,7 +537,8 @@ const ST = {
   valores:{}, coordinadores:{}, transporteDefault:0,
   diasPorCuenta:30,
   genSel:null,
-  cargues:[], carguePrev:null, cargueArchivo:null
+  cargues:[], carguePrev:null, cargueArchivo:null,
+  emitIdx:{}
 };
 
 const MUN_DISPLAY = {'ABREGO':'Ábrego','EL CARMEN':'El Carmen','CONVENCION':'Convención','TEORAMA':'Teorama'};
@@ -668,6 +669,26 @@ function cuentasDe(c){
 }
 function maxCuentas(){ return Math.max(1,...ST.contratistas.map(c=>cuentasDe(c).length)); }
 
+/* ── Memoria de certificados emitidos: evita duplicar contratista+cuenta ──
+   La identidad es contratista (id, o cédula si falta) + número de cuenta.
+   certEmitido(c,num) devuelve {radicado,fecha_emision} del más reciente, o null. */
+function buildEmitidosIndex(){
+  const m={};
+  (ST.emitidos||[]).forEach(e=>{
+    if(e.cuenta_num==null) return;
+    const k=(e.contratista_id||('CED:'+String(e.cedula||'').replace(/\D/g,'')))+'#'+e.cuenta_num;
+    const prev=m[k];
+    if(!prev || String(e.fecha_emision||'')>=String(prev.fecha_emision||'')) m[k]={radicado:e.radicado,fecha_emision:e.fecha_emision};
+  });
+  ST.emitIdx=m;
+}
+function certEmitido(c,cuentaNum){
+  if(!c||cuentaNum==null) return null;
+  const k=(c.id||('CED:'+String(c.cedula||'').replace(/\D/g,'')))+'#'+cuentaNum;
+  return (ST.emitIdx||{})[k]||null;
+}
+function cuentasEmitidasDe(c){ return cuentasDe(c).filter(q=>certEmitido(c,q.num)).map(q=>q.num); }
+
 /* ══════════════════════════════════════════════════════════════
    GENERAR — individual
    ══════════════════════════════════════════════════════════════ */
@@ -710,8 +731,16 @@ function renderGenPeriodos(){
   if(!c){ box.innerHTML='<span class="muted small">Selecciona un contratista.</span>'; return; }
   const cuentas=cuentasDe(c);
   if(!cuentas.length){ box.innerHTML='<span class="muted small" style="color:var(--red)">⚠ Falta el acta de inicio del contrato (pestaña Contratistas).</span>'; return; }
-  box.innerHTML=cuentas.map(q=>`
-    <div class="cta-row" data-num="${q.num}" style="width:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+  box.innerHTML=cuentas.map(q=>{
+    const em=certEmitido(c,q.num);
+    if(em){
+      return `<div class="cta-row" data-num="${q.num}" data-emitida="1" style="width:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;opacity:.8">
+        <label class="chk" style="flex:0 0 auto;cursor:not-allowed;background:rgba(255,180,50,.08);border-color:#ffb432"><input type="checkbox" value="${q.num}" disabled> Cuenta ${q.num}</label>
+        <span class="small" style="color:#b9810f">Ya certificada · radicado <b class="mono">${esc(em.radicado)}</b> — no se puede generar de nuevo</span>
+        <button class="btn btn-ghost btn-sm" onclick="openCorregir('${esc(em.radicado)}')" title="Editar el certificado existente">✎ Editar</button>
+      </div>`;
+    }
+    return `<div class="cta-row" data-num="${q.num}" style="width:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <label class="chk" style="flex:0 0 auto"><input type="checkbox" value="${q.num}" onchange="onGenPerChange(this)"> Cuenta ${q.num}</label>
       <span class="small" style="display:inline-flex;align-items:center;gap:6px">
         <input type="date" class="cta-ini" value="${fmtISO(q.ini)}" onchange="onGenDateEdit(${q.num})" style="width:auto;padding:4px 6px" title="Fecha de inicio de la cuenta">
@@ -719,8 +748,9 @@ function renderGenPeriodos(){
         <input type="date" class="cta-fin" value="${fmtISO(q.fin)}" onchange="onGenDateEdit(${q.num})" style="width:auto;padding:4px 6px" title="Fecha final de la cuenta">
         <span class="cta-dias muted">(${q.dias} días)</span>
       </span>
-    </div>`).join('')
-    + '<div class="small muted" style="width:100%;margin-top:4px">Las fechas se calculan desde el acta de inicio; puedes ajustarlas antes de generar.</div>';
+    </div>`;
+  }).join('')
+    + '<div class="small muted" style="width:100%;margin-top:4px">Las fechas se calculan desde el acta de inicio; puedes ajustarlas antes de generar. Las cuentas ya certificadas aparecen bloqueadas: usa <b>Editar</b> para modificarlas.</div>';
 }
 function onGenPerChange(el){ el.closest('.chk').classList.toggle('on',el.checked); setGenFechaFromPer(); calcGen(); }
 function onGenDateEdit(num){
@@ -778,7 +808,12 @@ function buildDocGen(){
   return buildCert(c, rad, rows, $('genFecha').value);
 }
 async function downloadGen(){
-  const c=ST.genSel; const doc=buildDocGen(); if(!doc)return;
+  const c=ST.genSel; if(!c){toast('Selecciona un contratista','warn');return;}
+  const selChk=selectedGenPeriodos();
+  const dup=selChk.find(q=>certEmitido(c,q.num));
+  if(dup){ const em=certEmitido(c,dup.num);
+    toast('La cuenta '+dup.num+' ya fue certificada (radicado '+em.radicado+'). Edítala desde Emitidos, no se genera de nuevo.','warn'); return; }
+  const doc=buildDocGen(); if(!doc)return;
   const rad=radicadoStr(ST.radicador.consecutivo);
   const sel=selectedGenPeriodos(); const pct=+($('genPct').value||0), tr=+($('genTransporte').value||0);
   const fname='Certificado_'+rad.replace(/[^\w-]/g,'')+'_'+(c.nombre||'').replace(/\s+/g,'_')+'.pdf';
@@ -790,10 +825,12 @@ async function downloadGen(){
     periodo_etiqueta:'Cuenta '+q.num+' ('+fmtISO(q.ini)+' a '+fmtISO(q.fin)+')',cuenta_num:q.num,fecha_ini:fmtISO(q.ini),fecha_fin:fmtISO(q.fin),fecha_exp:fexp,
     objeto:c.objeto,territorio:cf.territorio,jefe_nombre:cf.jefe_nombre,gestor_nombre:cf.gestor_nombre,
     valor_base:c.valor_mensual,pct_ejec:pct,transporte:tr,total:(c.valor_mensual||0)*pct/100+tr,coordinador:co.key,emitido_por:'modulo'}));
-  await supa.from('certeb_emitidos').insert(recs);
+  const ins=await supa.from('certeb_emitidos').insert(recs);
+  if(ins.error){ toast('No se registró (posible duplicado): '+ins.error.message,'err'); return; }
   await bumpRadicador(1);
   ST.emitidos.unshift(...recs); renderEmitidos();
   $('genRadicado').value=radicadoStr(ST.radicador.consecutivo);
+  renderGenPeriodos();
   toast('Certificado '+rad+' generado y registrado','ok');
 }
 async function bumpRadicador(n){
@@ -974,7 +1011,9 @@ function renderMasivoList(){
       if(!c.acta_inicio)f.push('sin acta'); if(!c.valor_mensual)f.push('sin valor mensual');
       if(!cf||!cf.territorio)f.push('sin territorio'); if(!cf||!cf.gestor_nombre)f.push('sin gestor'); if(!cf||!cf.jefe_nombre)f.push('sin jefe');
       const st=f.length?'<span class="small" style="color:#ffb432">⚠ '+esc(f.join(', '))+'</span>':'<span class="small" style="color:var(--green)">OK</span>';
-      return `<tr><td><input type="checkbox" class="mChk" value="${esc(c.id)}" ${c.acta_inicio?'checked':''}></td><td>${esc(c.nombre)}<div class="small muted">${esc(c.codigo_contrato||'')}</div></td><td>${esc(rolDisp(c.rol)||'—')}</td><td>${esc(c.municipio?munDisp(c.municipio):'—')}</td><td>${esc(c.ebs_num||'—')}</td><td class="mono">${c.valor_mensual?money(c.valor_mensual):'—'}</td><td>${st}</td></tr>`;
+      const emNums=cuentasEmitidasDe(c);
+      const emNote=emNums.length?` <span class="small" style="color:#b9810f">· ya certificadas: ${emNums.join(',')}</span>`:'';
+      return `<tr><td><input type="checkbox" class="mChk" value="${esc(c.id)}" ${c.acta_inicio?'checked':''}></td><td>${esc(c.nombre)}<div class="small muted">${esc(c.codigo_contrato||'')}</div></td><td>${esc(rolDisp(c.rol)||'—')}</td><td>${esc(c.municipio?munDisp(c.municipio):'—')}</td><td>${esc(c.ebs_num||'—')}</td><td class="mono">${c.valor_mensual?money(c.valor_mensual):'—'}</td><td>${st}${emNote}</td></tr>`;
     }).join('')+'</tbody></table>';
 }
 function masivoToggleAll(v){ document.querySelectorAll('#mList .mChk').forEach(i=>i.checked=v); }
@@ -990,12 +1029,15 @@ async function runMasivo(){
   $('mBtn').disabled=true; $('mProgress').classList.remove('hidden');
   const zip=new JSZip();
   let radN=ST.radicador.consecutivo;
-  const recs=[]; let saltados=0;
+  const recs=[]; let saltados=0, yaCert=0;
   for(let i=0;i<jobs.length;i++){
     const c=jobs[i];
     const tr=c.transporte||ST.transporteDefault||0;
     // cuentas de ESTE contrato que coinciden con las seleccionadas (mes calendario desde su acta)
-    const cuentas=cuentasDe(c).filter(q=>cuentaNums.includes(q.num));
+    const cuentasSel=cuentasDe(c).filter(q=>cuentaNums.includes(q.num));
+    // omitir las cuentas ya certificadas (memoria anti-duplicado)
+    const cuentas=cuentasSel.filter(q=>!certEmitido(c,q.num));
+    yaCert += (cuentasSel.length - cuentas.length);
     if(!cuentas.length){ saltados++; continue; }
     const rad=radicadoStr(radN);
     const rows=cuentas.map(q=>({etiqueta:'Cuenta '+q.num,cuenta:q.num,ini:fmtISO(q.ini),fin:fmtISO(q.fin),
@@ -1016,17 +1058,18 @@ async function runMasivo(){
     $('mBar').style.width=pc+'%'; $('mStatus').textContent=`Generando ${i+1}/${jobs.length} · ${c.nombre}`;
     if(i%5===0) await new Promise(r=>setTimeout(r,0));
   }
-  if(radN===ST.radicador.consecutivo){ $('mBtn').disabled=false; $('mProgress').classList.add('hidden'); toast('Ninguno de los seleccionados tiene la(s) cuenta(s) elegida(s) (revisa el acta de inicio)','warn'); return; }
+  if(radN===ST.radicador.consecutivo){ $('mBtn').disabled=false; $('mProgress').classList.add('hidden'); toast(yaCert?('Las cuentas seleccionadas ya estaban certificadas ('+yaCert+'); nada nuevo por generar'):'Ninguno de los seleccionados tiene la(s) cuenta(s) elegida(s) (revisa el acta de inicio)','warn'); return; }
   $('mStatus').textContent='Comprimiendo ZIP…';
   const blob=await zip.generateAsync({type:'blob'},md=>{ $('mBar').style.width=Math.round(md.percent)+'%'; });
   const url=URL.createObjectURL(blob); const a=document.createElement('a');
   a.href=url; a.download='Certificados_EBS_'+todayISO()+'.zip'; a.click(); URL.revokeObjectURL(url);
   // registrar + actualizar radicador
-  if(recs.length) await supa.from('certeb_emitidos').insert(recs);
+  if(recs.length){ const ins=await supa.from('certeb_emitidos').insert(recs);
+    if(ins.error){ toast('No se registró el lote (posible duplicado): '+ins.error.message,'err'); $('mBtn').disabled=false; return; } }
   const consumed=radN-ST.radicador.consecutivo;
   await bumpRadicador(consumed);
   ST.emitidos.unshift(...recs); renderEmitidos();
-  $('mStatus').textContent=`Listo: ${consumed} certificados generados${saltados?', '+saltados+' contratistas sin cuenta aplicable (sin acta o cuenta fuera de contrato)':''}.`;
+  $('mStatus').textContent=`Listo: ${consumed} certificados generados${yaCert?', '+yaCert+' cuenta(s) omitida(s) por estar ya certificadas':''}${saltados?', '+saltados+' contratista(s) sin cuenta aplicable':''}.`;
   $('mBtn').disabled=false;
   toast('ZIP generado: '+consumed+' certificados','ok');
 }
@@ -1377,6 +1420,7 @@ function emitidosAgrupados(){
   return [...map.values()];
 }
 function renderEmitidos(){
+  buildEmitidosIndex();
   const q=($('emSearch').value||'').toLowerCase().trim();
   let list=emitidosAgrupados();
   if(q)list=list.filter(g=>((g.radicado||'')+' '+(g.nombre||'')+' '+(g.codigo_contrato||'')).toLowerCase().includes(q));
