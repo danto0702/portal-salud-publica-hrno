@@ -368,9 +368,11 @@ tr:hover td{background:#fafcfe}
       <div class="card">
         <div class="card-h"><h2>Certificados emitidos</h2><button class="btn btn-ghost btn-sm" onclick="exportEmitidos()">⬇ Exportar Excel</button></div>
         <div class="card-b">
-          <div class="filters" style="margin-bottom:12px">
+          <div class="filters" style="margin-bottom:12px;align-items:end">
             <div class="field"><label>Buscar</label><input type="text" id="emSearch" placeholder="Radicado, nombre, contrato…" oninput="renderEmitidos()"></div>
+            <div class="field"><label class="chk" style="height:38px"><input type="checkbox" id="emSoloDup" onchange="renderEmitidos()"> Solo duplicados</label></div>
           </div>
+          <div id="emDupAviso"></div>
           <div class="tbl-scroll">
             <table><thead><tr><th>Radicado</th><th>Contratista</th><th>Contrato</th><th>Cuentas</th><th>Total</th><th>Coord.</th><th>Emitido</th><th>Acciones</th></tr></thead>
             <tbody id="emBody"></tbody></table>
@@ -1419,17 +1421,33 @@ function emitidosAgrupados(){
   });
   return [...map.values()];
 }
+// Detecta duplicados: misma identidad (contratista o cédula) + número de cuenta en MÁS de un radicado.
+function emKeyFila(f){ return (f.contratista_id||('CED:'+String(f.cedula||'').replace(/\D/g,'')))+'#'+f.cuenta_num; }
+function dupKeysEmitidos(){
+  const byKey={};
+  ST.emitidos.forEach(e=>{ if(e.cuenta_num==null) return;
+    const k=emKeyFila(e); (byKey[k]=byKey[k]||new Set()).add(e.radicado||'(sin)'); });
+  const dup={}; Object.keys(byKey).forEach(k=>{ if(byKey[k].size>1) dup[k]=byKey[k]; });
+  return dup;
+}
 function renderEmitidos(){
   buildEmitidosIndex();
+  const dupKeys=dupKeysEmitidos();
   const q=($('emSearch').value||'').toLowerCase().trim();
+  const soloDup=$('emSoloDup')&&$('emSoloDup').checked;
   let list=emitidosAgrupados();
+  list.forEach(g=>{ g._dup=[...new Set(g.filas.filter(f=>f.cuenta_num!=null && dupKeys[emKeyFila(f)]).map(f=>f.cuenta_num))].sort((a,b)=>a-b); });
+  // grupos/certificados en conflicto (sobre el total, no sobre el filtro)
+  const radConflicto=new Set(); Object.values(dupKeys).forEach(s=>s.forEach(r=>radConflicto.add(r)));
   if(q)list=list.filter(g=>((g.radicado||'')+' '+(g.nombre||'')+' '+(g.codigo_contrato||'')).toLowerCase().includes(q));
-  list.sort((a,b)=>String(b.fecha_emision||'').localeCompare(String(a.fecha_emision||'')));
+  if(soloDup)list=list.filter(g=>g._dup.length);
+  list.sort((a,b)=> (b._dup.length?1:0)-(a._dup.length?1:0) || String(b.fecha_emision||'').localeCompare(String(a.fecha_emision||'')));
   $('emBody').innerHTML=list.slice(0,500).map(g=>{
     const total=g.filas.reduce((s,f)=>s+(+f.total||0),0);
     const cuentas=g.filas.map(f=>f.cuenta_num?('C'+f.cuenta_num):(f.periodo_etiqueta||'')).join(', ');
-    return `<tr>
-      <td class="mono">${esc(g.radicado)}${g.corregido_en?' <span class="badge" style="background:#fff3cd;color:#8a5a00">corregido</span>':''}</td>
+    const dupBadge=g._dup.length?` <span class="badge" style="background:#fdecea;color:#b42318" title="Comparte contratista y cuenta con otro certificado — revísalo">⚠ Duplicado: C${g._dup.join(', C')}</span>`:'';
+    return `<tr${g._dup.length?' style="background:rgba(233,69,96,.07)"':''}>
+      <td class="mono">${esc(g.radicado)}${g.corregido_en?' <span class="badge" style="background:#fff3cd;color:#8a5a00">corregido</span>':''}${dupBadge}</td>
       <td>${esc(g.nombre)}</td><td class="mono">${esc(g.codigo_contrato||'')}</td>
       <td class="small">${esc(cuentas)}</td><td class="mono">${money(total)}</td>
       <td><span class="badge ${g.coordinador==='MELISA'?'b-mel':'b-dan'}">${g.coordinador==='MELISA'?'Melisa':'Danilo'}</span></td>
@@ -1439,13 +1457,17 @@ function renderEmitidos(){
         <button class="btn btn-primary btn-sm" onclick="openCorregir('${esc(g.radicado)}')" title="Corregir y descargar">✎ Corregir</button>
         ${ST.esSuper?`<button class="btn btn-ghost btn-sm" style="color:#e94560" onclick="borrarEmitido('${esc(g.radicado)}')" title="Borrar el número del certificado (solo superadministrador)">🗑</button>`:''}
       </td></tr>`;
-  }).join('') || '<tr><td colspan="8" class="muted" style="text-align:center;padding:20px">Sin certificados emitidos.</td></tr>';
+  }).join('') || '<tr><td colspan="8" class="muted" style="text-align:center;padding:20px">Sin certificados'+(soloDup?' duplicados':' emitidos')+'.</td></tr>';
+  const nGrupos=Object.keys(dupKeys).length;
+  $('emDupAviso').innerHTML = nGrupos
+    ? `<div class="hint" style="border-left:3px solid #e94560;background:#fdecea;color:#7a1020">⚠ Hay <b>${nGrupos}</b> caso(s) de contratista+cuenta certificados más de una vez, en <b>${radConflicto.size}</b> certificado(s). Están marcados en rojo abajo. Usa <b>✎ Corregir</b> para ajustar o (como superadministrador) 🗑 para anular el número sobrante.</div>`
+    : '<div class="hint info">Sin duplicados: no hay contratista+cuenta certificado más de una vez.</div>';
   const sum=ST.emitidos.reduce((s,e)=>s+(+e.total||0),0);
   $('emKpis').innerHTML=`
     <div class="kpi"><div class="n">${new Set(ST.emitidos.map(e=>e.radicado)).size}</div><div class="l">Certificados emitidos</div></div>
     <div class="kpi"><div class="n">${ST.emitidos.length}</div><div class="l">Cuentas certificadas</div></div>
     <div class="kpi"><div class="n">${new Set(ST.emitidos.map(e=>e.cedula)).size}</div><div class="l">Contratistas</div></div>
-    <div class="kpi"><div class="n" style="font-size:16px">${money(sum)}</div><div class="l">Valor certificado</div></div>`;
+    <div class="kpi"><div class="n" style="font-size:16px;color:${nGrupos?'#e94560':'inherit'}">${nGrupos}</div><div class="l">Duplicados a revisar</div></div>`;
 }
 // El superadministrador del portal (sesión compartida en este navegador) puede borrar certificados.
 // El borrado lo hace la función cc_borrar_certificado: guarda el registro en certeb_anulados y el
