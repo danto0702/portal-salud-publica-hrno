@@ -823,31 +823,133 @@ ruta('POST', '/api/trayectos/:id/llegada', async ({ db, sesion, params, cuerpo }
 }, TODOS);
 
 /**
- * Corrección de una marca ya registrada.
- * El conductor NO puede hacerlo: si pudiera editar su propia marca, el soporte
- * de pago no probaría nada. Reporta el error como novedad y coordinación corrige,
- * quedando el cambio en auditoría.
+ * Corrección de un viaje ya registrado (D38). Solo el administrador.
+ *
+ * El conductor NO puede corregir su propia marca: si pudiera, el soporte de
+ * pago no probaría nada. Y Coordinación tampoco — un viaje es lo que sostiene
+ * un día de operación, así que mover sus datos mueve lo que se le paga a un
+ * contratista, igual que borrarlo (D35).
+ *
+ * Lo que NO se puede tocar, a propósito: las coordenadas, la precisión del
+ * GPS y las fotografías. Son lo único del soporte que no se puede fabricar
+ * desde un escritorio; si se volvieran editables dejarían de probar dónde
+ * estuvo el vehículo.
+ *
+ * Cambiar `fecha_operacion` mueve el día pagable de un día a otro: se
+ * recalculan LOS DOS, el de antes y el de después. Recalcular solo uno dejaría
+ * el día viejo contando un viaje que ya no existe ahí.
  */
+const CAMPOS_TRAYECTO = {
+  fecha_operacion: 'Día de operación',
+  municipio_salida_id: 'Municipio de salida',
+  lugar_salida: 'Lugar de salida',
+  ts_salida: 'Hora de salida',
+  km_inicial: 'Kilometraje inicial',
+  municipio_llegada_id: 'Municipio de llegada',
+  lugar_llegada: 'Lugar de llegada',
+  ts_llegada: 'Hora de llegada',
+  km_final: 'Kilometraje final',
+  num_tripulantes: 'Personas a bordo',
+  tripulantes: 'Nombres de los tripulantes',
+  tipo_jornada: 'Tipo de jornada',
+  observaciones: 'Observaciones',
+};
+
 ruta('PUT', '/api/trayectos/:id', async ({ db, sesion, params, cuerpo }) => {
+  await asegurarEsquema(db);
   const antes = await db.prepare('SELECT * FROM trayectos WHERE id = ?').bind(params.id).first();
   if (!antes) throw noEncontrado('Trayecto no encontrado');
-  if (!cuerpo.motivo) throw malaPeticion('Toda corrección exige un motivo');
 
-  const campos = ['municipio_salida_id', 'lugar_salida', 'ts_salida',
-    'municipio_llegada_id', 'lugar_llegada', 'ts_llegada',
-    'km_inicial', 'km_final', 'num_tripulantes', 'observaciones', 'estado'];
-  const set = [], valores = [];
-  for (const c of campos) {
-    if (cuerpo[c] !== undefined) { set.push(`${c} = ?`); valores.push(cuerpo[c]); }
+  const motivo = String(cuerpo.motivo || '').trim();
+  if (motivo.length < 5) {
+    throw malaPeticion('Escriba por qué se corrige: queda registrado y es lo que ' +
+      'explica después el cambio en la liquidación.');
   }
+  if (antes.estado === 'anulado') {
+    throw malaPeticion('Ese viaje está anulado. Deshaga la anulación antes de corregirlo.');
+  }
+
+  // Solo se tocan los campos que vienen; lo demás se queda como está.
+  const nuevos = {};
+  for (const c of Object.keys(CAMPOS_TRAYECTO)) {
+    if (cuerpo[c] !== undefined) nuevos[c] = cuerpo[c] === '' ? null : cuerpo[c];
+  }
+  const valor = (c) => (c in nuevos ? nuevos[c] : antes[c]);
+
+  // ── Comprobaciones: una corrección no puede dejar el viaje imposible ──
+  const fecha = valor('fecha_operacion');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fecha || ''))) {
+    throw malaPeticion('El día de operación no es una fecha válida');
+  }
+  const kmI = valor('km_inicial'), kmF = valor('km_final');
+  if (kmI != null && kmF != null && Number(kmF) < Number(kmI)) {
+    throw malaPeticion(
+      `El kilometraje final (${kmF}) no puede ser menor que el inicial (${kmI})`);
+  }
+  const tS = valor('ts_salida'), tL = valor('ts_llegada');
+  if (tS && tL && String(tL) < String(tS)) {
+    throw malaPeticion('La hora de llegada es anterior a la de salida');
+  }
+  if (!tS) throw malaPeticion('Un viaje no puede quedarse sin hora de salida');
+  const tj = valor('tipo_jornada');
+  if (tj && !['ebs', 'jornada', 'vacunacion', 'disponible', 'traslado_ciudad',
+              'administrativo'].includes(tj)) {
+    throw malaPeticion('Tipo de jornada no válido');
+  }
+
+  // El estado NO se edita por aquí: anular tiene su propia ruta, con su motivo
+  // y su columna. Dejarlo en este UPDATE permitiría anular sin dejar rastro.
+  const set = [], valores = [];
+  for (const c of Object.keys(nuevos)) { set.push(`${c} = ?`); valores.push(nuevos[c]); }
   if (!set.length) return { ok: true, sin_cambios: true };
-  valores.push(params.id);
+  valores.push(antes.id);
   await db.prepare(`UPDATE trayectos SET ${set.join(', ')} WHERE id = ?`).bind(...valores).run();
 
+  // Historial visible, campo por campo. Solo lo que de verdad cambió: una fila
+  // por cada campo que el usuario abrió pero no tocó sería ruido.
+  const ts = ahora();
+  const cambiados = [];
+  for (const [campo, despues] of Object.entries(nuevos)) {
+    if (String(antes[campo] ?? '') === String(despues ?? '')) continue;
+    cambiados.push(campo);
+    await db.prepare(`
+      INSERT INTO trayecto_cambios (trayecto_id, ts, usuario_id, campo,
+                                    valor_antes, valor_despues, motivo)
+      VALUES (?,?,?,?,?,?,?)`)
+      .bind(antes.id, ts, sesion.id, campo,
+            antes[campo] != null ? String(antes[campo]) : null,
+            despues != null ? String(despues) : null, motivo).run();
+  }
+
+  // Los dos días: el de antes y el de después. Si solo se recalculara uno, el
+  // viejo seguiría contando un viaje que ya no está ahí.
   await recalcularDia(db, antes.fecha_operacion, antes.vehiculo_id);
-  await auditar(db, sesion, 'editar', 'trayectos', params.id, antes,
-                { ...cuerpo, motivo: cuerpo.motivo });
-  return { ok: true };
+  if (fecha !== antes.fecha_operacion) await recalcularDia(db, fecha, antes.vehiculo_id);
+
+  await auditar(db, sesion, 'editar', 'trayectos', antes.id,
+                { consecutivo: antes.consecutivo }, { motivo, campos: cambiados });
+
+  const dias = {};
+  for (const f of new Set([antes.fecha_operacion, fecha])) {
+    dias[f] = await db.prepare(
+      'SELECT dia_pagable, estado_dia FROM dias_operacion WHERE fecha = ? AND vehiculo_id = ?')
+      .bind(f, antes.vehiculo_id).first();
+  }
+  return { ok: true, cambiados, fecha_antes: antes.fecha_operacion, fecha: fecha, dias };
+}, ['principal']);
+
+/** El historial de correcciones de un viaje, para verlo en su propia ficha. */
+ruta('GET', '/api/trayectos/:id/cambios', async ({ db, params }) => {
+  await asegurarEsquema(db);
+  const r = await db.prepare(`
+    SELECT c.*, u.usuario,
+           p.nombres || ' ' || IFNULL(p.apellidos,'') AS nombre_usuario
+      FROM trayecto_cambios c
+      LEFT JOIN usuarios u ON u.id = c.usuario_id
+      LEFT JOIN personas p ON p.id = u.persona_id
+     WHERE c.trayecto_id = ?
+     ORDER BY c.ts DESC, c.id DESC`).bind(params.id).all();
+  return r.results;
 }, GESTION);
 
 /**

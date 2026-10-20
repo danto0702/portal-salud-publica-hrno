@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D38 | Corregir un viaje | **Solo el administrador**, con motivo obligatorio e **historial visible en el propio viaje**. Las coordenadas y las fotografías NO se pueden corregir |
 | D37 | Dashboard por persona y por vehículo | Secciones comparativas de las dos cosas **y** dos selectores que enfocan **todo** el tablero en un conductor o un vehículo. El recorte lo hace el servidor, no la pantalla |
 | D36 | Consecutivos | Salen del **máximo**, no de `COUNT(*)`: un número borrado deja hueco y la serie sigue. Con reintento, para cuando dos conductores marcan en el mismo segundo |
 | D35 | Quitar un viaje | **Solo el administrador**, y con motivo obligatorio. **Anular** deja el registro y se deshace; **borrar** elimina de verdad. En los dos casos se recalcula el día |
@@ -766,6 +767,63 @@ vacía de golpe al recuperar la señal.
 
 `prueba_api.mjs` reproduce el caso completo —registrar, borrar el primero, volver a registrar— y
 comprueba además que el número no retroceda ni se repita.
+
+### 5.4.10 Corregir un viaje (D38)
+
+La regla 3 de la API dice que **el conductor no puede corregir su propia marca**: si pudiera, el
+soporte de pago no probaría nada. La corrección existe para quien no marcó — pero hasta ahora el
+endpoint `PUT /api/trayectos/:id` estaba escrito en el Worker **y no tenía pantalla**: ninguna
+parte de la aplicación lo llamaba, así que en la práctica un viaje mal registrado solo se podía
+anular y rehacer.
+
+**Quién.** Solo el administrador. Corregir un viaje mueve lo que se le paga a un contratista, igual
+que borrarlo (D35), así que va con el mismo permiso. Esto **estrechó** el endpoint, que admitía a
+Coordinación; como no tenía pantalla, no le quitó una capacidad a nadie.
+
+**Qué se puede corregir:** día de operación, municipios y lugares de salida y llegada, las dos
+horas, los dos kilometrajes, personas a bordo y nombres de los tripulantes, tipo de jornada y
+observaciones.
+
+**Qué NO, a propósito:** las coordenadas, la precisión del GPS y las fotografías. Son lo único del
+soporte que no se puede fabricar desde un escritorio; si se volvieran editables dejarían de probar
+dónde estuvo el vehículo. El servidor las ignora aunque lleguen en la petición, y la prueba lo
+comprueba mandándolas.
+
+**El estado tampoco.** Anular tiene su propia ruta, con su motivo y sus columnas (D35). Dejar
+`estado` en este UPDATE habría permitido anular un viaje sin dejar rastro de anulación.
+
+**Historial visible.** Cada campo que cambia escribe una fila en `trayecto_cambios` —el espejo de
+`itinerario_cambios`— con el valor de antes, el de después, el motivo y el autor, y se consulta
+desde la ficha del propio viaje. La auditoría técnica no basta cuando lo que se corrige es un
+soporte de pago: tiene que verse al lado del dato, no en otra pantalla a la que nadie entra. Solo
+se escriben los campos que de verdad cambiaron; abrir el formulario y guardar sin tocar nada no
+ensucia el historial.
+
+**Mover el día recalcula los dos.** Cambiar `fecha_operacion` mueve el día pagable de un día a
+otro: se recalculan el de antes y el de después. Recalcular solo uno dejaría el día viejo contando
+un viaje que ya no está ahí. La pantalla lo advierte antes de guardar y lo confirma después.
+
+**Comprobaciones que impiden dejar el viaje imposible:** kilometraje final menor que el inicial,
+llegada anterior a la salida, fecha que no es fecha, tipo de jornada inexistente, viaje sin hora
+de salida. Un viaje **anulado** no se corrige: primero hay que restaurarlo.
+
+**Las horas, en hora local.** El campo trabaja en la hora del equipo y la base guarda UTC; la
+conversión va por el propio navegador en los dos sentidos, así que cuadra esté donde esté quien
+corrige.
+
+Se prueba en `prueba_api.mjs` y en `prueba_viajes.mjs`.
+
+### 5.4.11 Las fechas de las pruebas no se escriben a mano
+
+El suite tenía 21 fechas fijas escritas a mano. Varias comprobaciones dan por hecho que su fecha
+**no** es la de hoy —los kilómetros del día de hoy, cuál es el primer viaje de la lista—, así que
+el suite se rompía solo cuando el calendario alcanzaba una de ellas, y el fallo parecía un defecto
+del código recién escrito. Pasó dos veces en tres semanas: con el `2026-10-07` y con el
+`2026-10-20`.
+
+Ahora salen de `fx(n)` = hoy + 100 + n días. Lo que importa de esas fechas es su **orden** y que
+sean distintas entre sí, no su valor. Una comprobación al arrancar verifica que ninguna caiga en
+el día de hoy.
 
 ### 5.4.7 Novedades: el mismo período libre (D34)
 

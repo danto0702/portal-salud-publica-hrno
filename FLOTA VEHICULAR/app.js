@@ -17,7 +17,7 @@
  * peticiones e ignora en silencio lo que no entiende — un campo que no se
  * guarda y ningún mensaje de error. Por eso se comprueba y se avisa.
  */
-const VERSION_API_REQUERIDA = 14;
+const VERSION_API_REQUERIDA = 15;
 
 const esLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 const API = localStorage.getItem('flota_api') ||
@@ -3203,9 +3203,209 @@ function verTrayecto(id) {
       : '<div class="nota avi">Este viaje no tiene llegada registrada.</div>'}`,
     `${(x.fotos || '').split(',').filter(Boolean).length
       ? `<button class="btn sec" onclick="verFotos(${x.id},'${esc(x.placa)}')">Ver fotografías</button>` : ''}
+     <button class="btn sec" onclick="verCambiosTrayecto(${x.id})">Correcciones</button>
      ${sesion.rol === 'principal' ? (x.estado === 'anulado'
        ? `<button class="btn sec" onclick="restaurarTrayecto(${x.id})">Deshacer la anulación</button>`
-       : `<button class="btn rojo" onclick="modalQuitarTrayecto(${x.id})">Quitar este viaje</button>`) : ''}
+       : `<button class="btn sec" onclick="modalEditarTrayecto(${x.id})">Corregir datos</button>
+          <button class="btn rojo" onclick="modalQuitarTrayecto(${x.id})">Quitar este viaje</button>`) : ''}
+     <button class="btn sec" onclick="cerrarModal()">Cerrar</button>`);
+}
+
+/**
+ * Corregir los datos de un viaje (D38). Solo el administrador.
+ *
+ * Lo que NO aparece en el formulario, a propósito: las coordenadas, la
+ * precisión del GPS y las fotografías. Son lo único del soporte que no se
+ * puede fabricar desde un escritorio.
+ */
+const CAMPOS_TRAY = {
+  fecha_operacion: 'Día de operación', municipio_salida_id: 'Municipio de salida',
+  lugar_salida: 'Lugar de salida', ts_salida: 'Hora de salida',
+  km_inicial: 'Kilometraje inicial', municipio_llegada_id: 'Municipio de llegada',
+  lugar_llegada: 'Lugar de llegada', ts_llegada: 'Hora de llegada',
+  km_final: 'Kilometraje final', num_tripulantes: 'Personas a bordo',
+  tripulantes: 'Nombres de los tripulantes', tipo_jornada: 'Tipo de jornada',
+  observaciones: 'Observaciones',
+};
+
+/**
+ * ISO en UTC → valor de un campo <input type="datetime-local">.
+ *
+ * El campo trabaja en la hora del equipo y la base guarda UTC. La conversión
+ * va por el propio navegador en los dos sentidos, así que cuadra esté donde
+ * esté quien corrige; 'sv-SE' se usa solo porque da 'AAAA-MM-DD HH:MM'.
+ */
+const aLocal = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso.endsWith('Z') || iso.includes('+') ? iso : iso + 'Z');
+  if (isNaN(d)) return '';
+  return d.toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16);
+};
+const aUTC = (local) => {
+  if (!local) return null;
+  const d = new Date(local);
+  return isNaN(d) ? null : d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+};
+
+function modalEditarTrayecto(id) {
+  const x = trayectosCargados.find(t => t.id === id);
+  if (!x) return;
+  const muns = (sel) => cat.municipios.map(m =>
+    `<option value="${m.id}" ${sel == m.id ? 'selected' : ''}>${esc(m.nombre)}</option>`).join('');
+
+  abrirModal(`Corregir ${x.consecutivo || '#' + x.id}`, `
+    <div class="nota avi" style="margin-bottom:1rem">
+      Esto cambia un <b>soporte de pago</b>. Cada campo que toque queda registrado
+      con su nombre y el motivo, y se puede consultar después en el propio viaje.
+      <br>Las <b>coordenadas y las fotografías no se pueden cambiar</b>: son lo
+      único que prueba dónde estuvo el vehículo.
+    </div>
+
+    <div class="campo"><label class="lb">Día de operación</label>
+      <input type="date" class="inp" id="ed-fecha" value="${esc(x.fecha_operacion)}"
+        onchange="avisarCambioDia('${esc(x.fecha_operacion)}')">
+      <p class="ayuda" id="ed-aviso-dia"></p></div>
+
+    <h3 class="ficha-tit">Salida</h3>
+    <div class="g2" style="display:grid;gap:.6rem">
+      <div class="campo" style="margin:0"><label class="lb">Municipio</label>
+        <select class="inp" id="ed-mun-s"><option value="">— Sin registrar —</option>
+          ${muns(x.municipio_salida_id)}</select></div>
+      <div class="campo" style="margin:0"><label class="lb">Lugar</label>
+        <input class="inp" id="ed-lugar-s" value="${esc(x.lugar_salida || '')}"></div>
+      <div class="campo" style="margin:0"><label class="lb">Hora</label>
+        <input type="datetime-local" class="inp" id="ed-ts-s" value="${aLocal(x.ts_salida)}"></div>
+      <div class="campo" style="margin:0"><label class="lb">Kilometraje inicial</label>
+        <input type="number" class="inp" id="ed-km-i" value="${x.km_inicial ?? ''}"></div>
+    </div>
+
+    <h3 class="ficha-tit">Llegada</h3>
+    ${x.ts_llegada ? '' : `<div class="nota" style="margin-bottom:.6rem">
+      Este viaje está <b>en curso</b>: no tiene llegada. Si la completa aquí,
+      quedará cerrado.</div>`}
+    <div class="g2" style="display:grid;gap:.6rem">
+      <div class="campo" style="margin:0"><label class="lb">Municipio</label>
+        <select class="inp" id="ed-mun-l"><option value="">— Sin registrar —</option>
+          ${muns(x.municipio_llegada_id)}</select></div>
+      <div class="campo" style="margin:0"><label class="lb">Lugar</label>
+        <input class="inp" id="ed-lugar-l" value="${esc(x.lugar_llegada || '')}"></div>
+      <div class="campo" style="margin:0"><label class="lb">Hora</label>
+        <input type="datetime-local" class="inp" id="ed-ts-l" value="${aLocal(x.ts_llegada)}"></div>
+      <div class="campo" style="margin:0"><label class="lb">Kilometraje final</label>
+        <input type="number" class="inp" id="ed-km-f" value="${x.km_final ?? ''}"></div>
+    </div>
+
+    <h3 class="ficha-tit">Tripulación y jornada</h3>
+    <div class="g2" style="display:grid;gap:.6rem">
+      <div class="campo" style="margin:0"><label class="lb">Personas a bordo</label>
+        <input type="number" class="inp" id="ed-ntrip" value="${x.num_tripulantes ?? ''}"></div>
+      <div class="campo" style="margin:0"><label class="lb">Tipo de jornada</label>
+        <select class="inp" id="ed-tj"><option value="">— Sin registrar —</option>
+          ${Object.entries(TIPOS_JORNADA).map(([k, t]) =>
+            `<option value="${k}" ${x.tipo_jornada === k ? 'selected' : ''}>${t.et}</option>`).join('')}
+        </select></div>
+    </div>
+    <div class="campo"><label class="lb">Nombres de los tripulantes</label>
+      <input class="inp" id="ed-trip" value="${esc(x.tripulantes || '')}"></div>
+    <div class="campo"><label class="lb">Observaciones</label>
+      <textarea class="inp" id="ed-obs" rows="2">${esc(x.observaciones || '')}</textarea></div>
+
+    <div class="campo"><label class="lb">Por qué se corrige <span class="req">*</span></label>
+      <textarea class="inp" id="ed-motivo" rows="2"
+        placeholder="Ej: el conductor reportó error al digitar el odómetro"></textarea>
+      <p class="ayuda">Queda con su nombre, junto al dato corregido.</p></div>`,
+    `<button class="btn sec" onclick="verTrayecto(${id})">Volver</button>
+     <button class="btn" id="ed-btn" onclick="guardarCorreccion(${id})">Guardar la corrección</button>`);
+}
+
+/** Mover el día de operación mueve el día pagable: se dice antes de guardar. */
+function avisarCambioDia(original) {
+  const p = $('#ed-aviso-dia'), nueva = $('#ed-fecha').value;
+  if (!p) return;
+  if (!nueva || nueva === original) { p.className = 'ayuda'; p.textContent = ''; return; }
+  p.className = 'ayuda mal';
+  p.textContent = `El viaje deja de contar el ${original} y pasa a contar el ${nueva}. ` +
+    'Si era el único de ese día, el día pagable se mueve con él.';
+}
+
+async function guardarCorreccion(id) {
+  const motivo = $('#ed-motivo').value.trim();
+  if (motivo.length < 5) return aviso('Escriba por qué se corrige', 'mal', 'Falta el motivo');
+
+  const kmI = $('#ed-km-i').value, kmF = $('#ed-km-f').value;
+  if (kmI && kmF && Number(kmF) < Number(kmI)) {
+    return aviso(`El kilometraje final no puede ser menor que ${num(Number(kmI))}`,
+                 'mal', 'Kilometraje al revés');
+  }
+  const tsS = aUTC($('#ed-ts-s').value), tsL = aUTC($('#ed-ts-l').value);
+  if (!tsS) return aviso('Un viaje no puede quedarse sin hora de salida', 'mal', 'Falta la hora');
+  if (tsL && tsL < tsS) {
+    return aviso('La hora de llegada es anterior a la de salida', 'mal', 'Horas al revés');
+  }
+
+  const btn = $('#ed-btn'); btn.disabled = true; btn.textContent = 'Guardando...';
+  try {
+    const r = await api('/api/trayectos/' + id, { metodo: 'PUT', cuerpo: {
+      motivo,
+      fecha_operacion: $('#ed-fecha').value,
+      municipio_salida_id: $('#ed-mun-s').value ? Number($('#ed-mun-s').value) : null,
+      lugar_salida: $('#ed-lugar-s').value.trim() || null,
+      ts_salida: tsS,
+      km_inicial: kmI ? Number(kmI) : null,
+      municipio_llegada_id: $('#ed-mun-l').value ? Number($('#ed-mun-l').value) : null,
+      lugar_llegada: $('#ed-lugar-l').value.trim() || null,
+      ts_llegada: tsL,
+      km_final: kmF ? Number(kmF) : null,
+      num_tripulantes: $('#ed-ntrip').value ? Number($('#ed-ntrip').value) : null,
+      tripulantes: $('#ed-trip').value.trim() || null,
+      tipo_jornada: $('#ed-tj').value || null,
+      observaciones: $('#ed-obs').value.trim() || null,
+    } });
+    cerrarModal();
+    const n = r.cambiados?.length || 0;
+    aviso(!n ? 'No cambió ningún dato'
+      : r.fecha !== r.fecha_antes
+        ? `${n} dato(s) corregido(s). El viaje pasó del ${r.fecha_antes} al ${r.fecha}.`
+        : `${n} dato(s) corregido(s)`, 'ok', 'Listo');
+    verTrayectos();
+  } catch (e) {
+    aviso(e.message, 'mal', 'No se pudo corregir');
+    btn.disabled = false; btn.textContent = 'Guardar la corrección';
+  }
+}
+
+/** El historial de correcciones, en la propia ficha del viaje. */
+async function verCambiosTrayecto(id) {
+  const x = trayectosCargados.find(t => t.id === id);
+  abrirModal(`Correcciones · ${x?.consecutivo || '#' + id}`,
+    '<div class="cargando">Cargando...</div>', '');
+  let c;
+  try { c = await api(`/api/trayectos/${id}/cambios`); }
+  catch (e) { return abrirModal('Correcciones', `<div class="nota avi">${esc(e.message)}</div>`); }
+
+  const legible = (campo, v) => {
+    if (v == null || v === '') return 'vacío';
+    if (campo === 'ts_salida' || campo === 'ts_llegada') return fechaHora(v);
+    if (campo === 'municipio_salida_id' || campo === 'municipio_llegada_id') {
+      return cat.municipios.find(m => String(m.id) === String(v))?.nombre || v;
+    }
+    if (campo === 'tipo_jornada') return TIPOS_JORNADA[v]?.et || v;
+    return v;
+  };
+
+  abrirModal(`Correcciones · ${x?.consecutivo || '#' + id}`, c.length ? c.map(y => `
+    <div style="border-left:3px solid var(--ambar);padding:.5rem .75rem;margin-bottom:.6rem;background:var(--surface-2);border-radius:0 8px 8px 0">
+      <div style="font-weight:700;font-size:.85rem">${esc(CAMPOS_TRAY[y.campo] || y.campo)}</div>
+      <div style="font-size:.8rem;color:var(--text-soft);margin:.15rem 0">
+        <s style="color:var(--muted)">${esc(legible(y.campo, y.valor_antes))}</s>
+        → <b>${esc(legible(y.campo, y.valor_despues))}</b>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted)">
+        ${esc(y.nombre_usuario?.trim() || y.usuario || 'usuario')} · ${fechaHora(y.ts)}
+      </div>
+      ${y.motivo ? `<div style="font-size:.78rem;margin-top:.25rem;font-style:italic">"${esc(y.motivo)}"</div>` : ''}
+    </div>`).join('') : '<div class="vacio">Este viaje no se ha corregido.</div>',
+    `<button class="btn sec" onclick="verTrayecto(${id})">Volver</button>
      <button class="btn sec" onclick="cerrarModal()">Cerrar</button>`);
 }
 

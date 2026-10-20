@@ -61,10 +61,27 @@ function verificar(nombre, condicion, detalle) {
 // tarde y la medianoche de Colombia la prueba pediría el día siguiente y no
 // encontraría nada. Misma cuenta que hoyISO() en src/lib.js.
 const hoy = new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
+
+/**
+ * Fechas de los datos de prueba: SIEMPRE lejos de hoy.
+ *
+ * Varias comprobaciones dan por hecho que su fecha NO es la de hoy —los
+ * kilómetros del día de hoy, por ejemplo, o cuál es el primer viaje de la
+ * lista—. Con fechas fijas escritas a mano, el suite se rompía solo cuando el
+ * calendario las alcanzaba, y el fallo parecía un defecto del código recién
+ * escrito. Ya pasó dos veces: con el 2026-10-07 y con el 2026-10-20.
+ *
+ * `fx(n)` devuelve hoy + 100 + n días. Lo que importa de estas fechas es su
+ * orden y que sean distintas entre sí, no su valor.
+ */
+const fx = (n) => new Date(Date.parse(hoy + 'T12:00:00Z') + (100 + n) * 86400000)
+  .toISOString().slice(0, 10);
 // JPEG de 1x1: suficiente para ejercitar la ruta de fotografías
 const FOTO = { mime: 'image/jpeg', datos: '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==' };
 
 console.log('\n── Salud e instalación ───────────────────────────────────────');
+verificar('ninguna fecha de prueba cae en el día de hoy',
+  !Array.from({ length: 60 }, (_, i) => fx(i)).includes(hoy), hoy);
 verificar('la base arranca SIN fuera_servicio, como la de producción',
   !existeTabla('fuera_servicio'));
 let r = await api('GET', '/api/fuera-servicio');
@@ -267,7 +284,7 @@ r = await api('POST', '/api/itinerario', {
 verificar('detecta choque: dos programaciones el mismo día', r.estado === 400, r.datos);
 
 r = await api('POST', '/api/itinerario', {
-  fecha: '2026-12-01', vehiculo_id: vehiculo, municipio_id: 3,
+  fecha: fx(38), vehiculo_id: vehiculo, municipio_id: 3,
   destino_nombre: 'VEREDA NUEVA SIN CATÁLOGO',
 }, tCoord);
 verificar('crea un destino nuevo sobre la marcha', r.estado === 200 && r.datos.destino_id > 17, r.datos);
@@ -300,12 +317,12 @@ verificar('el conductor puede leerlos', r.estado === 200 && r.datos.length === 1
 verificar('trae el destino resuelto', r.datos[0].destino === 'SANTA INÉS', r.datos[0]);
 
 r = await api('POST', '/api/itinerario', {
-  fecha: '2026-11-03', vehiculo_id: vehiculo, predeterminado_id: pred,
+  fecha: fx(10), vehiculo_id: vehiculo, predeterminado_id: pred,
 }, tCoord);
 verificar('adjudicar con un predeterminado', r.estado === 200, r.datos);
 const itPred = r.datos.id;
 
-r = await api('GET', '/api/itinerario?desde=2026-11-03&hasta=2026-11-03', null, tCoord);
+r = await api('GET', `/api/itinerario?desde=${fx(10)}&hasta=${fx(10)}`, null, tCoord);
 verificar('el predeterminado llenó tipo, municipio y destino',
   r.datos[0] && r.datos[0].tipo_jornada === 'ebs' && r.datos[0].destino === 'SANTA INÉS'
   && r.datos[0].municipio_id === 3, r.datos[0]);
@@ -322,44 +339,44 @@ verificar('desactivado deja de aparecer', r.datos.length === 0, r.datos);
 
 console.log('\n── Mover y duplicar ──────────────────────────────────────────');
 r = await api('POST', '/api/itinerario/mover', {
-  id: itPred, fecha: '2026-11-04', vehiculo_id: vehiculo,
+  id: itPred, fecha: fx(11), vehiculo_id: vehiculo,
 }, tCoord);
 verificar('mueve a un día libre', r.estado === 200 && !r.datos.intercambio, r.datos);
 
-r = await api('GET', '/api/itinerario?desde=2026-11-03&hasta=2026-11-04', null, tCoord);
+r = await api('GET', `/api/itinerario?desde=${fx(10)}&hasta=${fx(11)}`, null, tCoord);
 verificar('quedó solo en el día nuevo',
-  r.datos.length === 1 && r.datos[0].fecha === '2026-11-04', r.datos.map(x => x.fecha));
+  r.datos.length === 1 && r.datos[0].fecha === fx(11), r.datos.map(x => x.fecha));
 
 r = await api('GET', `/api/itinerario/${itPred}/cambios`, null, tCoord);
 verificar('el movimiento queda en el historial',
-  r.datos.some(c => c.campo === 'fecha' && c.valor_despues === '2026-11-04'), r.datos);
+  r.datos.some(c => c.campo === 'fecha' && c.valor_despues === fx(11)), r.datos);
 
 r = await api('POST', '/api/itinerario/mover', {
-  id: itPred, fecha: '2026-11-05', vehiculo_id: vehiculo, duplicar: true,
+  id: itPred, fecha: fx(12), vehiculo_id: vehiculo, duplicar: true,
 }, tCoord);
 verificar('duplica en otro día', r.estado === 200 && r.datos.duplicado, r.datos);
 const itDup = r.datos.id;
 
-r = await api('GET', '/api/itinerario?desde=2026-11-04&hasta=2026-11-05', null, tCoord);
+r = await api('GET', `/api/itinerario?desde=${fx(11)}&hasta=${fx(12)}`, null, tCoord);
 verificar('ahora hay dos, con el mismo destino',
   r.datos.length === 2 && r.datos[0].destino === r.datos[1].destino,
   r.datos.map(x => `${x.fecha}:${x.destino}`));
 
 r = await api('POST', '/api/itinerario/mover', {
-  id: itPred, fecha: '2026-11-05', vehiculo_id: vehiculo, duplicar: true,
+  id: itPred, fecha: fx(12), vehiculo_id: vehiculo, duplicar: true,
 }, tCoord);
 verificar('no duplica sobre una celda ocupada', r.estado === 400, r.datos);
 
 // Intercambio: las dos existentes cambian de lugar
 r = await api('POST', '/api/itinerario/mover', {
-  id: itPred, fecha: '2026-11-05', vehiculo_id: vehiculo,
+  id: itPred, fecha: fx(12), vehiculo_id: vehiculo,
 }, tCoord);
 verificar('mover sobre celda ocupada intercambia', r.estado === 200 && r.datos.intercambio, r.datos);
 
-r = await api('GET', '/api/itinerario?desde=2026-11-04&hasta=2026-11-05', null, tCoord);
+r = await api('GET', `/api/itinerario?desde=${fx(11)}&hasta=${fx(12)}`, null, tCoord);
 const porFecha = Object.fromEntries(r.datos.map(x => [x.fecha, x.id]));
 verificar('cada una quedó en el lugar de la otra',
-  porFecha['2026-11-05'] === itPred && porFecha['2026-11-04'] === itDup, porFecha);
+  porFecha[fx(12)] === itPred && porFecha[fx(11)] === itDup, porFecha);
 verificar('ninguna se perdió en el intercambio', r.datos.length === 2, r.datos.length);
 
 console.log('\n── Borrado definitivo ────────────────────────────────────────');
@@ -372,25 +389,25 @@ verificar('coordinación sí puede cancelar', r.estado === 200 && r.datos.borrad
 r = await api('DELETE', `/api/itinerario/${itPred}?definitivo=1`, null, tokenPrincipal);
 verificar('el administrador borra definitivamente', r.estado === 200 && r.datos.borrado, r.datos);
 
-r = await api('GET', '/api/itinerario?desde=2026-11-04&hasta=2026-11-05', null, tCoord);
+r = await api('GET', `/api/itinerario?desde=${fx(11)}&hasta=${fx(12)}`, null, tCoord);
 verificar('el borrado desaparece de verdad', r.datos.length === 1, r.datos.map(x => x.id));
 
 console.log('\n── Carga por lote (plantilla de Excel) ───────────────────────');
 r = await api('POST', '/api/itinerario/lote', {
   operaciones: [
-    { accion: 'crear', fecha: '2026-12-10', vehiculo_id: vehiculo, municipio_id: 1,
+    { accion: 'crear', fecha: fx(47), vehiculo_id: vehiculo, municipio_id: 1,
       destino_nombre: 'LA LAGUNA', tipo_jornada: 'ebs' },
-    { accion: 'crear', fecha: '2026-12-11', vehiculo_id: vehiculo, tipo_jornada: 'disponible' },
-    { accion: 'crear', fecha: '2026-12-12', vehiculo_id: 999999, tipo_jornada: 'ebs' },
+    { accion: 'crear', fecha: fx(48), vehiculo_id: vehiculo, tipo_jornada: 'disponible' },
+    { accion: 'crear', fecha: fx(49), vehiculo_id: 999999, tipo_jornada: 'ebs' },
   ],
 }, tCoord);
 verificar('el lote crea lo válido', r.estado === 200 && r.datos.creadas === 2, r.datos);
 verificar('y reporta la fila mala sin tumbar el resto',
   r.datos.errores.length === 1, r.datos.errores);
 
-r = await api('GET', '/api/itinerario?desde=2026-12-10&hasta=2026-12-12', null, tCoord);
+r = await api('GET', `/api/itinerario?desde=${fx(47)}&hasta=${fx(49)}`, null, tCoord);
 verificar('quedaron las dos en el itinerario', r.datos.length === 2, r.datos.length);
-const idLote = r.datos.find(x => x.fecha === '2026-12-10').id;
+const idLote = r.datos.find(x => x.fecha === fx(47)).id;
 
 r = await api('POST', '/api/itinerario/lote', {
   operaciones: [{ accion: 'actualizar', id: idLote, tipo_jornada: 'vacunacion',
@@ -516,13 +533,25 @@ verificar('el conductor marca llegada', r.estado === 200 && r.datos.ts_llegada, 
 r = await api('PUT', `/api/trayectos/${trayecto}`, { km_final: 999999, motivo: 'me equivoqué' }, tCond);
 verificar('el conductor NO corrige su propia marca', r.estado === 403, r.datos);
 
-r = await api('PUT', `/api/trayectos/${trayecto}`, { km_final: 145250 }, tCoord);
-verificar('toda corrección exige motivo', r.estado === 400, r.datos);
-
+// Corregir un viaje mueve lo que se le paga a un contratista, así que es del
+// administrador, igual que borrarlo (D38).
 r = await api('PUT', `/api/trayectos/${trayecto}`, {
   km_final: 145250, motivo: 'El conductor reportó error de digitación',
 }, tCoord);
-verificar('coordinación sí corrige, con motivo', r.estado === 200, r.datos);
+verificar('coordinación NO corrige un viaje', r.estado === 403, r.datos);
+
+r = await api('PUT', `/api/trayectos/${trayecto}`, { km_final: 145250 }, tokenPrincipal);
+verificar('toda corrección exige motivo', r.estado === 400, r.datos);
+r = await api('PUT', `/api/trayectos/${trayecto}`, { km_final: 145250, motivo: 'ups' },
+              tokenPrincipal);
+verificar('y un motivo de verdad, no dos letras', r.estado === 400, r.datos);
+
+r = await api('PUT', `/api/trayectos/${trayecto}`, {
+  km_final: 145250, motivo: 'El conductor reportó error de digitación',
+}, tokenPrincipal);
+verificar('el administrador sí corrige, con motivo', r.estado === 200, r.datos);
+verificar('y dice qué campos cambiaron',
+  r.datos.cambiados && r.datos.cambiados.includes('km_final'), r.datos.cambiados);
 
 console.log('\n── Fotografías y tripulación ─────────────────────────────────');
 r = await api('GET', `/api/trayectos/${trayecto}/fotos`, null, tCond);
@@ -531,7 +560,7 @@ verificar('guarda las dos fotografías', r.estado === 200 && r.datos.length === 
 verificar('con su momento y sus coordenadas',
   r.datos.some(f => f.momento === 'salida' && f.lat === 8.0796), r.datos[0]);
 
-r = await api('GET', '/api/trayectos?desde=2026-01-01&hasta=2027-12-31', null, tCoord);
+r = await api('GET', '/api/trayectos?desde=2000-01-01&hasta=2100-01-01', null, tCoord);
 const tr = r.datos.find(x => x.id === trayecto);
 verificar('el listado guarda los nombres de la tripulación',
   (tr.tripulantes || '').includes('ANA GÓMEZ'), tr.tripulantes);
@@ -555,7 +584,7 @@ verificar('el propio conductor sí puede verlas', r.estado === 200, r.estado);
 await api('PUT', '/api/parametros/foto_obligatoria', { valor: '0' }, tokenPrincipal);
 r = await api('POST', '/api/trayectos/salida',
   { municipio_id: 1, lugar: 'SIN FOTO', km_inicial: 200, num_tripulantes: 2,
-    tripulantes: 'X, Y', fecha_operacion: '2026-10-20', vehiculo_id: vehiculo }, tCond);
+    tripulantes: 'X, Y', fecha_operacion: fx(3), vehiculo_id: vehiculo }, tCond);
 verificar('si se apaga la exigencia, se puede marcar sin foto', r.estado === 200, r.datos);
 await api('POST', `/api/trayectos/${r.datos.id}/llegada`, { km_final: 260 }, tCond);
 await api('PUT', '/api/parametros/foto_obligatoria', { valor: '1' }, tokenPrincipal);
@@ -596,7 +625,7 @@ r = await api('DELETE', `/api/itinerario/${itinerario}`, { motivo: 'x' }, tCoord
 verificar('tampoco deja cancelarlo', r.estado === 400, r.datos);
 
 r = await api('POST', '/api/itinerario/mover', {
-  id: itinerario, fecha: '2026-11-20', vehiculo_id: vehiculo,
+  id: itinerario, fecha: fx(27), vehiculo_id: vehiculo,
 }, tCoord);
 verificar('tampoco deja moverlo', r.estado === 400, r.datos);
 
@@ -633,10 +662,10 @@ verificar('calcula los kilómetros del día', dia && dia.km_dia === 50, dia && d
 
 // Día DISPONIBLE: se paga igual aunque no haya desplazamiento (D11)
 await api('POST', '/api/itinerario', {
-  fecha: '2026-10-05', vehiculo_id: vehiculo, conductor_id: personaConductor,
+  fecha: fx(0), vehiculo_id: vehiculo, conductor_id: personaConductor,
   municipio_id: 1, tipo_jornada: 'disponible',
 }, tCoord);
-r = await api('GET', '/api/dias?desde=2026-10-05&hasta=2026-10-05', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(0)}&hasta=${fx(0)}`, null, tCoord);
 const diaDisp = r.datos[0];
 verificar('un día DISPONIBLE sin desplazamiento es pagable',
   diaDisp && diaDisp.dia_pagable === 1 && diaDisp.ejecutado === 0, diaDisp);
@@ -645,24 +674,24 @@ verificar('y queda marcado como disponible, no como operativo',
 
 // Día programado con desplazamiento pero NO ejecutado: no se paga solo
 await api('POST', '/api/itinerario', {
-  fecha: '2026-10-06', vehiculo_id: vehiculo, municipio_id: 1,
+  fecha: fx(1), vehiculo_id: vehiculo, municipio_id: 1,
   destino_nombre: 'LA LAGUNA', tipo_jornada: 'ebs',
 }, tCoord);
-r = await api('GET', '/api/dias?desde=2026-10-06&hasta=2026-10-06', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(1)}&hasta=${fx(1)}`, null, tCoord);
 verificar('un día programado y NO ejecutado no es pagable',
   r.datos[0] && r.datos[0].dia_pagable === 0, r.datos[0]);
 
 r = await api('PUT', `/api/dias/${r.datos[0].id}`, { dia_pagable: 1 }, tokenPrincipal);
 verificar('el ajuste manual exige motivo', r.estado === 400, r.datos);
 
-r = await api('GET', '/api/dias?desde=2026-10-06&hasta=2026-10-06', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(1)}&hasta=${fx(1)}`, null, tCoord);
 const idAjuste = r.datos[0].id;
 r = await api('PUT', `/api/dias/${idAjuste}`, {
   dia_pagable: 1, motivo_ajuste: 'El conductor operó sin señal, soporte en papel',
 }, tokenPrincipal);
 verificar('el principal ajusta el día con motivo', r.estado === 200, r.datos);
 
-r = await api('GET', '/api/dias?desde=2026-10-06&hasta=2026-10-06', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(1)}&hasta=${fx(1)}`, null, tCoord);
 verificar('el ajuste queda marcado como manual',
   r.datos[0].ajuste_manual === 1 && r.datos[0].dia_pagable === 1, r.datos[0]);
 
@@ -673,21 +702,19 @@ console.log('\n── Sincronización sin señal ──────────�
 r = await api('POST', '/api/sync', {
   marcas: [{
     local_id: 'abc', hito: 'salida', vehiculo_id: vehiculo,
-    conductor_id: personaConductor, fecha_operacion: '2026-10-07',
-    ts_dispositivo: '2026-10-07T05:45:00Z', lat: 8.07, lon: -73.22, precision: 40,
+    conductor_id: personaConductor, fecha_operacion: fx(2),
+    ts_dispositivo: `${fx(2)}T05:45:00Z`, lat: 8.07, lon: -73.22, precision: 40,
   }],
 }, tCond);
 verificar('sincroniza una marca capturada sin señal',
   r.estado === 200 && r.datos.resultados[0].ok, r.datos);
 
-// Se busca la marca, no se da por hecho que sea la primera: el 2026-10-07 que
-// esta sección usa puede coincidir con el día en que se corre la prueba, y
-// entonces el viaje de hoy —que se registró más tarde— ordena antes.
-r = await api('GET', '/api/trayectos?desde=2026-10-07&hasta=2026-10-07', null, tCoord);
+// Se busca la marca por lo que es, no por su posición en la lista.
+r = await api('GET', `/api/trayectos?desde=${fx(2)}&hasta=${fx(2)}`, null, tCoord);
 const offline = r.datos.find(x => x.origen_salida === 'offline_sincronizado');
 verificar('la marca offline queda etiquetada como tal', !!offline, r.datos.length);
 verificar('y conserva la hora real del dispositivo',
-  offline && offline.ts_salida === '2026-10-07T05:45:00Z', offline && offline.ts_salida);
+  offline && offline.ts_salida === `${fx(2)}T05:45:00Z`, offline && offline.ts_salida);
 
 // El período es libre, así que la consulta necesita tope: un año de flota son
 // miles de filas y la pantalla las pide desde un celular.
@@ -709,7 +736,7 @@ verificar('al conductor el rango solo le cuenta los suyos',
   r.estado === 200 && r.datos.total < 10, r.datos);
 
 console.log('\n── Dashboard ─────────────────────────────────────────────────');
-r = await api('GET', '/api/dashboard?desde=2026-01-01&hasta=2026-12-31', null, tCoord);
+r = await api('GET', '/api/dashboard?desde=2000-01-01&hasta=2100-01-01', null, tCoord);
 verificar('el dashboard responde', r.estado === 200 && r.datos.por_vehiculo, r.datos);
 const v = r.datos.por_vehiculo[0];
 verificar('separa días pagables de días con desplazamiento',
@@ -739,7 +766,7 @@ await api('POST', '/api/usuarios',
 const tOtro = (await api('POST', '/api/auth/login',
   { usuario: 'otro', clave: 'OtroCond2026' })).datos.token;
 
-r = await api('GET', '/api/trayectos?desde=2026-01-01&hasta=2026-12-31', null, tOtro);
+r = await api('GET', '/api/trayectos?desde=2000-01-01&hasta=2100-01-01', null, tOtro);
 verificar('un conductor no ve los trayectos de otro', r.estado === 200 && r.datos.length === 0,
           r.datos.length);
 
@@ -847,68 +874,68 @@ const vehFS = r.datos.id;
 // Un día DISPONIBLE se paga sin que el conductor marque nada: es justo el que
 // quedaría cobrando aunque el vehículo estuviera en el taller.
 await api('POST', '/api/itinerario', {
-  fecha: '2026-11-10', vehiculo_id: vehFS, tipo_jornada: 'disponible', municipio_id: 1,
+  fecha: fx(17), vehiculo_id: vehFS, tipo_jornada: 'disponible', municipio_id: 1,
 }, tCoord);
-r = await api('GET', '/api/dias?desde=2026-11-10&hasta=2026-11-10', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(17)}&hasta=${fx(17)}`, null, tCoord);
 verificar('antes de registrar la avería, el día DISPONIBLE se paga',
   r.datos[0] && r.datos[0].dia_pagable === 1, r.datos[0]);
 
 r = await api('POST', '/api/fuera-servicio', {
   vehiculo_id: vehFS, causa: 'averia',
-  fecha_inicio: '2026-11-08', fecha_fin: '2026-11-12',
+  fecha_inicio: fx(15), fecha_fin: fx(19),
   descripcion: 'Caja de velocidades', taller: 'Taller Ocaña',
 }, tCoord);
 verificar('coordinación registra el período fuera de servicio', r.estado === 200, r.datos);
 const fsId = r.datos.id;
 verificar('y avisa de los días que ya estaban programados',
-  r.datos.programados.length === 1 && r.datos.programados[0].fecha === '2026-11-10',
+  r.datos.programados.length === 1 && r.datos.programados[0].fecha === fx(17),
   r.datos.programados);
 
-r = await api('GET', '/api/dias?desde=2026-11-10&hasta=2026-11-10', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(17)}&hasta=${fx(17)}`, null, tCoord);
 verificar('el día deja de ser pagable', r.datos[0] && r.datos[0].dia_pagable === 0, r.datos[0]);
 verificar('y queda marcado como fuera de servicio',
   r.datos[0] && r.datos[0].estado_dia === 'fuera_servicio', r.datos[0]);
 
-r = await api('GET', '/api/dias?desde=2026-11-08&hasta=2026-11-12', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(15)}&hasta=${fx(19)}`, null, tCoord);
 verificar('los cinco días del rango quedan registrados', r.datos.length === 5, r.datos.length);
 verificar('ninguno es pagable', r.datos.every(d => d.dia_pagable === 0), r.datos);
 
 // El mantenimiento preventivo se distingue de la avería en el estado del día.
 r = await api('POST', '/api/fuera-servicio', {
   vehiculo_id: vehFS, causa: 'mantenimiento',
-  fecha_inicio: '2026-11-20', fecha_fin: '2026-11-21',
+  fecha_inicio: fx(27), fecha_fin: fx(28),
 }, tCoord);
 verificar('un mantenimiento preventivo también se registra', r.estado === 200, r.datos);
-r = await api('GET', '/api/dias?desde=2026-11-20&hasta=2026-11-20', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(27)}&hasta=${fx(27)}`, null, tCoord);
 verificar('y el día se distingue como mantenimiento',
   r.datos[0] && r.datos[0].estado_dia === 'mantenimiento', r.datos[0]);
 
 // Solapes: dos períodos del mismo vehículo contarían el día dos veces.
 r = await api('POST', '/api/fuera-servicio', {
   vehiculo_id: vehFS, causa: 'accidente',
-  fecha_inicio: '2026-11-11', fecha_fin: '2026-11-15',
+  fecha_inicio: fx(18), fecha_fin: fx(22),
 }, tCoord);
 verificar('rechaza un período que se solapa con otro', r.estado === 400, r.datos);
 verificar('y dice con cuál choca',
-  /2026-11-08/.test(r.datos.error || ''), r.datos);
+  (r.datos.error || '').includes(fx(15)), r.datos);
 
 r = await api('POST', '/api/fuera-servicio', {
-  vehiculo_id: vehFS, causa: 'averia', fecha_inicio: '2026-12-05', fecha_fin: '2026-12-01',
+  vehiculo_id: vehFS, causa: 'averia', fecha_inicio: fx(42), fecha_fin: fx(38),
 }, tCoord);
 verificar('rechaza un fin anterior al inicio', r.estado === 400, r.datos);
 
 r = await api('POST', '/api/fuera-servicio', {
-  vehiculo_id: vehFS, causa: 'inventada', fecha_inicio: '2026-12-05',
+  vehiculo_id: vehFS, causa: 'inventada', fecha_inicio: fx(42),
 }, tCoord);
 verificar('rechaza una causa que no existe', r.estado === 400, r.datos);
 
 // Mover las fechas tiene que liberar los días que dejan de estar cubiertos.
 r = await api('PUT', `/api/fuera-servicio/${fsId}`, {
-  fecha_inicio: '2026-11-08', fecha_fin: '2026-11-09',
+  fecha_inicio: fx(15), fecha_fin: fx(16),
   motivo_cierre: 'Salió del taller antes de lo previsto',
 }, tCoord);
 verificar('se acorta el período', r.estado === 200 && r.datos.cerrado === true, r.datos);
-r = await api('GET', '/api/dias?desde=2026-11-10&hasta=2026-11-10', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(17)}&hasta=${fx(17)}`, null, tCoord);
 verificar('el día que se libera vuelve a ser pagable',
   r.datos[0] && r.datos[0].dia_pagable === 1, r.datos[0]);
 verificar('y vuelve a contar como disponible',
@@ -981,7 +1008,7 @@ verificar('y separa los de mantenimiento',
   resFS && resFS.dias_mantenimiento === 2, resFS);
 
 r = await api('POST', '/api/fuera-servicio', {
-  vehiculo_id: vehFS, causa: 'documentos', fecha_inicio: '2026-12-01',
+  vehiculo_id: vehFS, causa: 'documentos', fecha_inicio: fx(38),
 }, tCoord);
 verificar('un período sin fecha de fin se acepta', r.estado === 200, r.datos);
 r = await api('GET', '/api/fuera-servicio', null, tCoord);
@@ -993,7 +1020,7 @@ verificar('el conductor no ve el resumen de toda la flota', r.estado === 403, r.
 
 console.log('\n── Dashboard por conductor y por vehículo ────────────────────');
 
-r = await api('GET', '/api/dashboard?desde=2026-01-01&hasta=2026-12-31', null, tCoord);
+r = await api('GET', '/api/dashboard?desde=2000-01-01&hasta=2100-01-01', null, tCoord);
 const dash = r.datos;
 verificar('el dashboard trae el detalle por conductor',
   Array.isArray(dash.por_conductor) && dash.por_conductor.length > 0,
@@ -1022,7 +1049,7 @@ verificar('las dos tablas suman los mismos días con desplazamiento',
 // ── Enfocar en un conductor ──
 const foco = dash.por_conductor.find(c => c.dias_con_desplazamiento > 0);
 r = await api('GET',
-  `/api/dashboard?desde=2026-01-01&hasta=2026-12-31&conductor_id=${foco.id}`, null, tCoord);
+  `/api/dashboard?desde=2000-01-01&hasta=2100-01-01&conductor_id=${foco.id}`, null, tCoord);
 const soloCond = r.datos;
 verificar('al enfocar un conductor, la tabla trae solo a él',
   soloCond.por_conductor.length === 1 && soloCond.por_conductor[0].id === foco.id,
@@ -1047,7 +1074,7 @@ verificar('los vencimientos enfocados son los de esa persona, no los de los veh�
 // ── Enfocar en un vehículo ──
 const vFoco = dash.por_vehiculo.find(v => v.dias_con_desplazamiento > 0) || dash.por_vehiculo[0];
 r = await api('GET',
-  `/api/dashboard?desde=2026-01-01&hasta=2026-12-31&vehiculo_id=${vFoco.id}`, null, tCoord);
+  `/api/dashboard?desde=2000-01-01&hasta=2100-01-01&vehiculo_id=${vFoco.id}`, null, tCoord);
 const soloVeh = r.datos;
 verificar('al enfocar un vehículo, la tabla trae solo ese',
   soloVeh.por_vehiculo.length === 1 && soloVeh.por_vehiculo[0].id === vFoco.id,
@@ -1062,14 +1089,14 @@ verificar('los vencimientos enfocados son los de ese vehículo',
   soloVeh.vencimientos.every(v => v.ambito === 'vehiculo'), soloVeh.vencimientos);
 
 // Los dos a la vez: ese conductor con ese vehículo.
-r = await api('GET', '/api/dashboard?desde=2026-01-01&hasta=2026-12-31' +
+r = await api('GET', '/api/dashboard?desde=2000-01-01&hasta=2100-01-01' +
   `&conductor_id=${foco.id}&vehiculo_id=${vFoco.id}`, null, tCoord);
 verificar('se pueden combinar los dos filtros',
   r.estado === 200 && r.datos.totales.ejecutados <= soloCond.totales.ejecutados
   && r.datos.totales.ejecutados <= soloVeh.totales.ejecutados,
   `${r.datos.totales.ejecutados} ≤ ${soloCond.totales.ejecutados} y ${soloVeh.totales.ejecutados}`);
 
-r = await api('GET', '/api/dashboard?desde=2026-01-01&hasta=2026-12-31&conductor_id=999999',
+r = await api('GET', '/api/dashboard?desde=2000-01-01&hasta=2100-01-01&conductor_id=999999',
               null, tCoord);
 verificar('un conductor que no existe devuelve vacío, no todo',
   r.estado === 200 && r.datos.por_conductor.length === 0
@@ -1083,14 +1110,14 @@ console.log('\n── Anular y borrar viajes (solo el administrador) ───�
 // Un viaje propio para esta sección, con su día programado, para poder ver
 // cómo se mueve el día pagable al quitarlo.
 await api('POST', '/api/itinerario', {
-  fecha: '2026-11-25', vehiculo_id: vehiculo, conductor_id: personaConductor,
+  fecha: fx(32), vehiculo_id: vehiculo, conductor_id: personaConductor,
   municipio_id: 1, destino_nombre: 'LA PLAYA', tipo_jornada: 'ebs',
 }, tCoord);
 r = await api('POST', '/api/sync', {
   marcas: [
     { local_id: 'b1', hito: 'salida', vehiculo_id: vehiculo, conductor_id: personaConductor,
-      fecha_operacion: '2026-11-25', ts_dispositivo: '2026-11-25T06:00:00Z',
-      municipio_id: 1, lugar: 'BASE', km: 200000, num_tripulantes: 2,
+      fecha_operacion: fx(32), ts_dispositivo: `${fx(32)}T06:00:00Z`,
+      municipio_id: 1, lugar: 'BASE', km_inicial: 200000, num_tripulantes: 2,
       tripulantes: 'UNO, DOS', lat: 8.07, lon: -73.22 },
   ],
 }, tCondFS);
@@ -1098,13 +1125,13 @@ const idSalida = r.datos.resultados[0].id;
 await api('POST', '/api/sync', {
   marcas: [
     { local_id: 'b2', hito: 'llegada', trayecto_id: idSalida, vehiculo_id: vehiculo,
-      conductor_id: personaConductor, fecha_operacion: '2026-11-25',
-      ts_dispositivo: '2026-11-25T14:00:00Z', municipio_id: 1, lugar: 'LA PLAYA',
-      km: 200080, lat: 8.15, lon: -73.19 },
+      conductor_id: personaConductor, fecha_operacion: fx(32),
+      ts_dispositivo: `${fx(32)}T14:00:00Z`, municipio_id: 1, lugar: 'LA PLAYA',
+      km_final: 200080, lat: 8.15, lon: -73.19 },
   ],
 }, tCondFS);
 
-r = await api('GET', '/api/dias?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(32)}&hasta=${fx(32)}`, null, tCoord);
 verificar('el día del viaje queda pagable', r.datos[0] && r.datos[0].dia_pagable === 1, r.datos[0]);
 
 r = await api('DELETE', `/api/trayectos/${idSalida}`, { motivo: 'Se registró mal' }, tCoord);
@@ -1121,16 +1148,16 @@ verificar('el administrador lo anula', r.estado === 200 && r.datos.definitivo ==
 verificar('y responde cómo quedó el día',
   r.datos.dia && r.datos.dia.dia_pagable === 0, r.datos.dia);
 
-r = await api('GET', '/api/dias?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(32)}&hasta=${fx(32)}`, null, tCoord);
 verificar('el día deja de ser pagable al anular el viaje',
   r.datos[0] && r.datos[0].dia_pagable === 0 && r.datos[0].ejecutado === 0, r.datos[0]);
 
-r = await api('GET', '/api/trayectos?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+r = await api('GET', `/api/trayectos?desde=${fx(32)}&hasta=${fx(32)}`, null, tCoord);
 verificar('el viaje anulado desaparece de la lista', r.datos.length === 0, r.datos.length);
 
-r = await api('GET', '/api/trayectos?desde=2026-11-25&hasta=2026-11-25&anulados=1', null, tCoord);
+r = await api('GET', `/api/trayectos?desde=${fx(32)}&hasta=${fx(32)}&anulados=1`, null, tCoord);
 verificar('y coordinación no puede destaparlo', r.datos.length === 0, r.datos.length);
-r = await api('GET', '/api/trayectos?desde=2026-11-25&hasta=2026-11-25&anulados=1',
+r = await api('GET', `/api/trayectos?desde=${fx(32)}&hasta=${fx(32)}&anulados=1`,
               null, tokenPrincipal);
 const anulado = r.datos[0];
 verificar('pero el administrador sí lo ve', !!anulado && anulado.estado === 'anulado', r.datos.length);
@@ -1145,7 +1172,7 @@ r = await api('POST', `/api/trayectos/${idSalida}/restaurar`, {}, tCoord);
 verificar('coordinación NO puede deshacer la anulación', r.estado === 403, r.datos);
 r = await api('POST', `/api/trayectos/${idSalida}/restaurar`, {}, tokenPrincipal);
 verificar('el administrador deshace la anulación', r.estado === 200, r.datos);
-r = await api('GET', '/api/dias?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(32)}&hasta=${fx(32)}`, null, tCoord);
 verificar('y el día vuelve a ser pagable', r.datos[0] && r.datos[0].dia_pagable === 1, r.datos[0]);
 r = await api('POST', `/api/trayectos/${idSalida}/restaurar`, {}, tokenPrincipal);
 verificar('no se puede deshacer dos veces', r.estado === 400, r.datos);
@@ -1153,7 +1180,7 @@ verificar('no se puede deshacer dos veces', r.estado === 400, r.datos);
 // Una novedad colgada del viaje: tiene que sobrevivir al borrado.
 r = await api('POST', '/api/eventos', {
   tipo: 'reten', descripcion: 'Retén en la vía', trayecto_id: idSalida,
-  vehiculo_id: vehiculo, ts_evento: '2026-11-25T10:00:00Z',
+  vehiculo_id: vehiculo, ts_evento: `${fx(32)}T10:00:00Z`,
 }, tCondFS);
 const idEvento = r.datos.id;
 
@@ -1162,14 +1189,14 @@ r = await api('DELETE', `/api/trayectos/${idSalida}?definitivo=1`,
 verificar('el administrador lo borra de verdad',
   r.estado === 200 && r.datos.definitivo === true, r.datos);
 
-r = await api('GET', '/api/trayectos?desde=2026-11-25&hasta=2026-11-25&anulados=1',
+r = await api('GET', `/api/trayectos?desde=${fx(32)}&hasta=${fx(32)}&anulados=1`,
               null, tokenPrincipal);
 verificar('ya no está ni destapando los anulados', r.datos.length === 0, r.datos.length);
-r = await api('GET', '/api/dias?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+r = await api('GET', `/api/dias?desde=${fx(32)}&hasta=${fx(32)}`, null, tCoord);
 verificar('el día vuelve a quedar sin ejecutar',
   r.datos[0] && r.datos[0].ejecutado === 0 && r.datos[0].dia_pagable === 0, r.datos[0]);
 
-r = await api('GET', '/api/eventos?desde=2026-11-25&hasta=2026-11-25', null, tCoord);
+r = await api('GET', `/api/eventos?desde=${fx(32)}&hasta=${fx(32)}`, null, tCoord);
 const ev = r.datos.find(x => x.id === idEvento);
 verificar('la novedad sobrevive al viaje borrado: lo de la vía pasó', !!ev, r.datos.length);
 verificar('y queda desenganchada, no apuntando a un viaje que no existe',
@@ -1177,6 +1204,122 @@ verificar('y queda desenganchada, no apuntando a un viaje que no existe',
 
 r = await api('DELETE', '/api/trayectos/999999', { motivo: 'no existe' }, tokenPrincipal);
 verificar('un viaje que no existe responde 404', r.estado === 404, r.estado);
+
+console.log('\n── Corregir un viaje (solo el administrador) ─────────────────');
+
+// Un viaje propio, con su día programado, para ver cómo se mueve el pago.
+await api('POST', '/api/itinerario', {
+  fecha: fx(55), vehiculo_id: vehiculo, conductor_id: personaConductor,
+  municipio_id: 1, destino_nombre: 'EL TARRA', tipo_jornada: 'ebs',
+}, tCoord);
+r = await api('POST', '/api/sync', { marcas: [{
+  local_id: 'ed1', hito: 'salida', vehiculo_id: vehiculo, conductor_id: personaConductor,
+  fecha_operacion: fx(55), ts_dispositivo: `${fx(55)}T06:00:00Z`,
+  municipio_id: 1, lugar: 'BASE', km_inicial: 500000, num_tripulantes: 2,
+  tripulantes: 'UNO, DOS', lat: 8.07, lon: -73.22,
+}] }, tCondFS);
+const idEd = r.datos.resultados[0].id;
+await api('POST', '/api/sync', { marcas: [{
+  local_id: 'ed2', hito: 'llegada', trayecto_id: idEd, vehiculo_id: vehiculo,
+  conductor_id: personaConductor, fecha_operacion: fx(55),
+  ts_dispositivo: `${fx(55)}T15:00:00Z`, municipio_id: 1, lugar: 'EL TARRA',
+  km_final: 500120, lat: 8.15, lon: -73.19,
+}] }, tCondFS);
+
+r = await api('PUT', `/api/trayectos/${idEd}`, { km_final: 500150, motivo: 'prueba' }, tCondFS);
+verificar('el conductor no corrige su viaje', r.estado === 403, r.datos);
+r = await api('PUT', `/api/trayectos/${idEd}`, { km_final: 500150, motivo: 'prueba de rol' }, tCoord);
+verificar('coordinación tampoco', r.estado === 403, r.datos);
+
+// ── Lo que no se puede dejar imposible ──
+r = await api('PUT', `/api/trayectos/${idEd}`,
+  { km_final: 400000, motivo: 'El odómetro estaba mal leído' }, tokenPrincipal);
+verificar('rechaza un kilometraje final menor que el inicial', r.estado === 400, r.datos);
+r = await api('PUT', `/api/trayectos/${idEd}`,
+  { ts_llegada: `${fx(55)}T04:00:00Z`, motivo: 'La hora estaba mal' }, tokenPrincipal);
+verificar('rechaza una llegada anterior a la salida', r.estado === 400, r.datos);
+r = await api('PUT', `/api/trayectos/${idEd}`,
+  { fecha_operacion: 'el martes', motivo: 'Se cargó al día equivocado' }, tokenPrincipal);
+verificar('rechaza una fecha que no es fecha', r.estado === 400, r.datos);
+r = await api('PUT', `/api/trayectos/${idEd}`,
+  { tipo_jornada: 'inventada', motivo: 'Cambio de tipo de jornada' }, tokenPrincipal);
+verificar('rechaza un tipo de jornada que no existe', r.estado === 400, r.datos);
+r = await api('PUT', `/api/trayectos/${idEd}`,
+  { ts_salida: '', motivo: 'Quitar la hora de salida' }, tokenPrincipal);
+verificar('no deja un viaje sin hora de salida', r.estado === 400, r.datos);
+
+// La evidencia no se toca ni mandándola explícitamente.
+r = await api('PUT', `/api/trayectos/${idEd}`,
+  { lat_salida: 0, lon_salida: 0, motivo: 'Mover las coordenadas' }, tokenPrincipal);
+verificar('acepta la petición pero NO toca las coordenadas', r.estado === 200, r.datos);
+r = await api('GET', `/api/trayectos?desde=${fx(55)}&hasta=${fx(55)}`, null, tCoord);
+verificar('las coordenadas siguen siendo las del conductor',
+  r.datos[0] && r.datos[0].lat_salida === 8.07, r.datos[0] && r.datos[0].lat_salida);
+
+// ── La corrección buena ──
+r = await api('PUT', `/api/trayectos/${idEd}`, {
+  km_final: 500150, lugar_llegada: 'EL TARRA - IPS', num_tripulantes: 3,
+  tripulantes: 'UNO, DOS, TRES', observaciones: 'Corregido con la planilla en mano',
+  motivo: 'El conductor reportó error al digitar el odómetro',
+}, tokenPrincipal);
+verificar('el administrador corrige', r.estado === 200, r.datos);
+verificar('y dice exactamente qué campos cambiaron',
+  r.datos.cambiados.length === 5 && r.datos.cambiados.includes('km_final')
+  && r.datos.cambiados.includes('tripulantes'), r.datos.cambiados);
+
+r = await api('GET', `/api/trayectos?desde=${fx(55)}&hasta=${fx(55)}`, null, tCoord);
+verificar('el dato queda corregido', r.datos[0].km_final === 500150, r.datos[0].km_final);
+
+r = await api('GET', `/api/trayectos/${idEd}/cambios`, null, tCoord);
+verificar('queda historial visible, no solo auditoría técnica',
+  r.estado === 200 && r.datos.length === 5, r.datos.length);
+const camKm = r.datos.find(c => c.campo === 'km_final');
+verificar('con el valor de antes y el de después',
+  camKm && camKm.valor_antes === '500120' && camKm.valor_despues === '500150', camKm);
+verificar('con el motivo', camKm && /error al digitar/.test(camKm.motivo), camKm && camKm.motivo);
+verificar('y con quién lo hizo', camKm && camKm.usuario === 'danilo', camKm && camKm.usuario);
+
+// Volver a guardar lo mismo no ensucia el historial.
+r = await api('PUT', `/api/trayectos/${idEd}`,
+  { km_final: 500150, motivo: 'Se abrió y se guardó sin tocar nada' }, tokenPrincipal);
+verificar('guardar sin cambiar nada no agrega filas al historial',
+  r.datos.cambiados.length === 0, r.datos.cambiados);
+r = await api('GET', `/api/trayectos/${idEd}/cambios`, null, tCoord);
+verificar('el historial sigue igual', r.datos.length === 5, r.datos.length);
+
+// ── Mover el día: tiene que recalcular los DOS ──
+r = await api('GET', `/api/dias?desde=${fx(55)}&hasta=${fx(55)}`, null, tCoord);
+verificar('antes de mover, el día viejo cuenta el viaje',
+  r.datos[0] && r.datos[0].ejecutado === 1, r.datos[0]);
+
+r = await api('PUT', `/api/trayectos/${idEd}`, {
+  fecha_operacion: fx(56), motivo: 'Quedó cargado al día equivocado',
+}, tokenPrincipal);
+verificar('se puede mover a otro día', r.estado === 200, r.datos);
+verificar('y responde cómo quedaron los dos días',
+  r.datos.dias && Object.keys(r.datos.dias).length === 2, r.datos.dias);
+
+r = await api('GET', `/api/dias?desde=${fx(55)}&hasta=${fx(55)}`, null, tCoord);
+verificar('el día viejo deja de contarlo',
+  !r.datos[0] || r.datos[0].ejecutado === 0, r.datos[0]);
+r = await api('GET', `/api/dias?desde=${fx(56)}&hasta=${fx(56)}`, null, tCoord);
+verificar('y el día nuevo lo cuenta', r.datos[0] && r.datos[0].ejecutado === 1, r.datos[0]);
+
+// ── Un viaje anulado no se corrige a escondidas ──
+await api('DELETE', `/api/trayectos/${idEd}`, { motivo: 'Prueba de anulación' }, tokenPrincipal);
+r = await api('PUT', `/api/trayectos/${idEd}`,
+  { km_final: 500999, motivo: 'Corregir un anulado' }, tokenPrincipal);
+verificar('un viaje anulado no se corrige: primero hay que restaurarlo',
+  r.estado === 400 && /anulado/i.test(r.datos.error || ''), r.datos);
+await api('POST', `/api/trayectos/${idEd}/restaurar`, {}, tokenPrincipal);
+
+// El estado no se puede mover por la ruta de corrección: anular tiene la suya.
+r = await api('PUT', `/api/trayectos/${idEd}`,
+  { estado: 'anulado', motivo: 'Anular por la puerta de atrás' }, tokenPrincipal);
+verificar('la corrección no puede anular por la puerta de atrás',
+  r.estado === 200 && r.datos.sin_cambios === true, r.datos);
+r = await api('GET', `/api/trayectos?desde=${fx(56)}&hasta=${fx(56)}`, null, tCoord);
+verificar('el viaje sigue vivo', r.datos.length === 1, r.datos.length);
 
 console.log('\n── El consecutivo sobrevive a un viaje borrado ───────────────');
 
@@ -1199,11 +1342,11 @@ async function marcarSalida(fecha, dia) {
     local_id: 'c' + dia, hito: 'salida', vehiculo_id: vehiculo,
     conductor_id: personaConductor, fecha_operacion: fecha,
     ts_dispositivo: `${fecha}T06:00:00Z`, municipio_id: 1, lugar: 'BASE',
-    km: 300000, lat: 8.07, lon: -73.22,
+    km_inicial: 300000, lat: 8.07, lon: -73.22,
   }] }, tCondFS);
 }
 
-r = await marcarSalida('2026-12-10', 1);
+r = await marcarSalida(fx(47), 1);
 verificar('se registra una salida', r.datos.resultados[0].ok, r.datos);
 const antesDeBorrar = trayectosDe();
 
@@ -1215,7 +1358,7 @@ r = await api('DELETE', `/api/trayectos/${primero.id}?definitivo=1`,
 verificar('el administrador borra el viaje de prueba', r.estado === 200, r.datos);
 
 // Y ahora la salida siguiente: es justo la que fallaba.
-r = await marcarSalida('2026-12-11', 2);
+r = await marcarSalida(fx(48), 2);
 verificar('tras borrar uno, la SIGUIENTE salida se registra igual',
   r.estado === 200 && r.datos.resultados[0].ok, r.datos);
 
@@ -1228,9 +1371,9 @@ verificar('y no retrocede: el número borrado deja un hueco, no se reutiliza',
 // Varias salidas seguidas, como una cola que se vacía al volver la señal.
 r = await api('POST', '/api/sync', { marcas: [1, 2, 3].map(i => ({
   local_id: 'lote' + i, hito: 'salida', vehiculo_id: vehiculo,
-  conductor_id: personaConductor, fecha_operacion: '2026-12-1' + (i + 1),
-  ts_dispositivo: `2026-12-1${i + 1}T06:00:00Z`, municipio_id: 1, lugar: 'BASE',
-  km: 300000, lat: 8.07, lon: -73.22,
+  conductor_id: personaConductor, fecha_operacion: fx(48 + i),
+  ts_dispositivo: `${fx(48 + i)}T06:00:00Z`, municipio_id: 1, lugar: 'BASE',
+  km_inicial: 300000, lat: 8.07, lon: -73.22,
 })) }, tCondFS);
 verificar('un lote de marcas en una sola petición no choca entre sí',
   r.datos.resultados.every(x => x.ok), r.datos.resultados);

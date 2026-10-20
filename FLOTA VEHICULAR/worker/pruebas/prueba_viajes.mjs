@@ -315,6 +315,79 @@ try {
   await pag.waitForTimeout(1300);
   verificar('y el viaje vuelve a contar', await cuenta() === antes, `${await cuenta()}`);
 
+  // ── Corregir un viaje ──────────────────────────────────────────────────
+  console.log('\n══ Corregir los datos de un viaje ══');
+
+  const corregible = await pag.evaluate(() =>
+    trayectosCargados.find(x => x.estado === 'cerrado' && x.km_final));
+  await pag.evaluate(id => verTrayecto(id), corregible.id);
+  await pag.waitForSelector('.modal-caja');
+  verificar('el administrador ve el botón de corregir',
+    await pag.locator('.modal-pie button:has-text("Corregir datos")').count() === 1);
+  verificar('y el de ver las correcciones',
+    await pag.locator('.modal-pie button:has-text("Correcciones")').count() === 1);
+
+  await pag.click('.modal-pie button:has-text("Corregir datos")');
+  await pag.waitForSelector('#ed-motivo');
+  const forma = await pag.locator('.modal-caja').innerText();
+  verificar('se advierte que esto cambia un soporte de pago',
+    /soporte de pago/i.test(forma));
+  verificar('y que las coordenadas y las fotos no se pueden cambiar',
+    /no se pueden cambiar/i.test(forma));
+  verificar('no hay campos de latitud ni longitud',
+    await pag.locator('#ed-lat, #ed-lon').count() === 0);
+
+  // La hora viene en la hora del equipo, no en UTC crudo.
+  const horaForm = await pag.inputValue('#ed-ts-s');
+  const horaReal = await pag.evaluate(id =>
+    new Date(trayectosCargados.find(t => t.id === id).ts_salida)
+      .toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16), corregible.id);
+  verificar('la hora de salida sale en la hora local, no en UTC',
+    horaForm === horaReal, `${horaForm} contra ${horaReal}`);
+
+  // Sin motivo no deja.
+  await pag.fill('#ed-km-f', String(corregible.km_final + 7));
+  await pag.click('#ed-btn');
+  await pag.waitForTimeout(500);
+  verificar('sin motivo no deja guardar', await pag.locator('#ed-motivo').count() === 1);
+
+  // Kilometraje al revés: lo para la propia pantalla, sin ir al servidor.
+  await pag.fill('#ed-motivo', 'Error al digitar el odómetro');
+  await pag.fill('#ed-km-f', String((corregible.km_inicial || 0) - 50));
+  await pag.click('#ed-btn');
+  await pag.waitForTimeout(500);
+  verificar('avisa si el kilometraje final queda por debajo del inicial',
+    await pag.locator('#ed-motivo').count() === 1);
+
+  // Mover el día avisa de lo que pasa con el pago.
+  const otroDia = await pag.evaluate(f => nDias(f, -1), corregible.fecha_operacion);
+  await pag.fill('#ed-km-f', String(corregible.km_final + 7));
+  await pag.fill('#ed-fecha', otroDia);
+  await pag.waitForTimeout(300);
+  verificar('al mover el día se avisa que el día pagable se mueve con él',
+    /día pagable se mueve/i.test(await pag.locator('#ed-aviso-dia').innerText()));
+  await pag.fill('#ed-fecha', corregible.fecha_operacion);
+  await pag.waitForTimeout(300);
+
+  await pag.fill('#ed-lugar-l', 'LUGAR CORREGIDO');
+  await pag.click('#ed-btn');
+  await pag.waitForSelector('.modal-caja', { state: 'hidden' });
+  await pag.waitForTimeout(1400);
+  const tras = await pag.evaluate(id => trayectosCargados.find(t => t.id === id), corregible.id);
+  verificar('el dato queda corregido', tras.km_final === corregible.km_final + 7,
+    `${tras.km_final} contra ${corregible.km_final + 7}`);
+  verificar('y el lugar también', tras.lugar_llegada === 'LUGAR CORREGIDO', tras.lugar_llegada);
+
+  await pag.evaluate(id => verCambiosTrayecto(id), corregible.id);
+  await pag.waitForSelector('.modal-caja');
+  await pag.waitForTimeout(600);
+  const hist = await pag.locator('.modal-caja').innerText();
+  verificar('el historial muestra la corrección', /Kilometraje final/i.test(hist), hist.slice(0, 120));
+  verificar('con el motivo que se escribió', /odómetro/i.test(hist));
+  verificar('y con quién la hizo', /danilo/i.test(hist));
+  await pag.click('.modal-pie .btn:has-text("Cerrar")');
+  await pag.waitForSelector('.modal-caja', { state: 'hidden' });
+
   verificar('ninguna excepción en la consola', errores.length === 0, errores[0]);
 } finally {
   await ctx.close();

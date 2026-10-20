@@ -33,7 +33,7 @@
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 14;
+const VERSION_API = 15;
 
 /**
  * Juegos de roles que usan las rutas.
@@ -216,6 +216,24 @@ async function asegurarEsquema(db) {
     'CREATE INDEX IF NOT EXISTS idx_fs_veh ON fuera_servicio(vehiculo_id, fecha_inicio)').run();
   await db.prepare(
     'CREATE INDEX IF NOT EXISTS idx_fs_abierto ON fuera_servicio(fecha_fin, vehiculo_id)').run();
+
+  // Historial visible de correcciones de un viaje (D38). Igual que
+  // itinerario_cambios: la auditoría técnica no basta cuando lo que se corrige
+  // es el soporte de un pago — tiene que verse en el propio viaje, al lado del
+  // dato corregido, no en otra pantalla a la que nadie entra.
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS trayecto_cambios (
+      id            INTEGER PRIMARY KEY,
+      trayecto_id   INTEGER NOT NULL REFERENCES trayectos(id) ON DELETE CASCADE,
+      ts            TEXT NOT NULL,
+      usuario_id    INTEGER NOT NULL,
+      campo         TEXT NOT NULL,
+      valor_antes   TEXT,
+      valor_despues TEXT,
+      motivo        TEXT
+    )`).run();
+  await db.prepare(
+    'CREATE INDEX IF NOT EXISTS idx_traycam ON trayecto_cambios(trayecto_id, ts)').run();
 
   // Columnas de anulación de viajes (D35). SQLite no tiene
   // ADD COLUMN IF NOT EXISTS: se intenta y se ignora el error de «ya existe»,

@@ -267,6 +267,21 @@ CREATE TABLE trayectos (
   anulado_en          TEXT,
   motivo_anulacion    TEXT
 );
+-- Historial visible de correcciones (D38). Como itinerario_cambios: cuando lo
+-- que se corrige es el soporte de un pago, la auditoria tecnica no basta; el
+-- rastro tiene que verse en el propio viaje.
+CREATE TABLE trayecto_cambios (
+  id            INTEGER PRIMARY KEY,
+  trayecto_id   INTEGER NOT NULL REFERENCES trayectos(id) ON DELETE CASCADE,
+  ts            TEXT NOT NULL,
+  usuario_id    INTEGER NOT NULL,
+  campo         TEXT NOT NULL,
+  valor_antes   TEXT,
+  valor_despues TEXT,
+  motivo        TEXT
+);
+CREATE INDEX idx_traycam ON trayecto_cambios(trayecto_id, ts);
+
 CREATE INDEX idx_tray_fecha ON trayectos(fecha_operacion);
 CREATE INDEX idx_tray_veh   ON trayectos(vehiculo_id, fecha_operacion);
 CREATE INDEX idx_tray_cond  ON trayectos(conductor_id, fecha_operacion);
