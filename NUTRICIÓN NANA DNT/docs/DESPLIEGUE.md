@@ -30,6 +30,20 @@ provisional y lo dice.
 La contraseña provisional **no se puede volver a consultar**. Si se pierde, en «Gestionar»
 hay un botón «Contraseña nueva» que genera otra.
 
+### Si alguien olvida su contraseña
+
+No hay correo de recuperación: el restablecimiento depende de usted.
+
+1. La persona entra a `login.html` → «Olvidé mi contraseña» y escribe su correo.
+2. A usted le aparece en **Administración → Usuarios**, en el recuadro rojo
+   «🔑 Contraseñas por restablecer», con su nombre, su cargo y su teléfono.
+3. Pulsa **Generar contraseña** y se la dicta o se la envía por donde acostumbren.
+4. Al entrar, el módulo le exige elegir una propia antes de dejarla continuar.
+
+En la tabla de usuarios, quien todavía no ha elegido contraseña propia lleva la marca
+**🔑 provisional** junto a su estado. Si ve una solicitud repetida o que ya resolvió por
+teléfono, **Descartar** la saca de la bandeja sin generar nada.
+
 > Un responsable **sin municipio asignado no ve ningún caso**. Es el error más probable del
 > primer día, así que el sistema ya no deja guardarlo así.
 

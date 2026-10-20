@@ -578,9 +578,19 @@ var DNTGestion = (function () {
   async function panelUsuarios() {
     try {
       var lista = await DNTDatos.usuarios();
+      var claves = await DNTDatos.solicitudesClave();
+      var porId = {};
+      lista.forEach(function (u) { porId[u.id] = u; });
       var pendientes = lista.filter(function (u) { return u.estado === 'pendiente'; });
       var el = $('panelAdmin'); el.className = '';
       el.innerHTML =
+        (claves.length
+          ? '<div class="tarjeta" style="border-left:5px solid var(--rojo)">' +
+            '<h3>🔑 Contraseñas por restablecer</h3>' +
+            '<p class="tarjeta-sub">El restablecimiento no pasa por el correo: usted genera la ' +
+              'contraseña provisional y se la entrega. Quien la reciba tendrá que cambiarla al entrar.</p>' +
+            claves.map(function (c) { return tarjetaClave(c, porId[c.perfil_id]); }).join('') + '</div>'
+          : '') +
         (pendientes.length
           ? '<div class="tarjeta" style="border-left:5px solid var(--naranja)">' +
             '<h3>⏳ Solicitudes pendientes de aprobación</h3>' +
@@ -601,7 +611,10 @@ var DNTGestion = (function () {
               '<td><span class="sem ' + (u.rol === 'admin' ? 'rojo' : u.rol === 'coordinador' ? 'azul' : 'verde') +
                 '">' + esc(ROLES[u.rol] || u.rol) + '</span></td>' +
               '<td><span class="sem ' + ({ activo: 'verde', pendiente: 'amarillo', inactivo: 'gris', rechazado: 'rojo' }[u.estado]) +
-                '">' + esc(u.estado) + '</span></td>' +
+                '">' + esc(u.estado) + '</span>' +
+                (u.clave_provisional
+                  ? ' <span class="sem naranja" title="Todavía no ha elegido contraseña propia">🔑 provisional</span>'
+                  : '') + '</td>' +
               '<td style="font-size:.79rem">' + (u.rol === 'responsable'
                 ? (u.municipios.length ? u.municipios.map(DNTAuth.nombreMunicipio).join(', ')
                    : '<span class="sem naranja">Sin asignar</span>')
@@ -620,7 +633,47 @@ var DNTGestion = (function () {
         b.onclick = function () { dialogoUsuario(lista.filter(function (u) { return u.id === b.dataset.u; })[0]); };
       });
       $('btnNuevoUsuario').onclick = dialogoCrearUsuario;
+      Array.prototype.forEach.call(el.querySelectorAll('[data-clave]'), function (b) {
+        b.onclick = function () {
+          var c = claves.filter(function (x) { return x.id === b.dataset.clave; })[0];
+          generarClave(c, porId[c.perfil_id]);
+        };
+      });
+      Array.prototype.forEach.call(el.querySelectorAll('[data-descartar]'), function (b) {
+        b.onclick = async function () {
+          if (!confirm('¿Descartar la solicitud sin generar contraseña?')) return;
+          try {
+            await DNTDatos.descartarSolicitudClave(b.dataset.descartar);
+            A.toast('Solicitud descartada.', 'ok'); pintarAdmin();
+          } catch (e) { A.toast(e.message, 'error'); }
+        };
+      });
     } catch (e) { errorAdmin(e); }
+  }
+
+  /** Una solicitud de contraseña en la bandeja del administrador. */
+  function tarjetaClave(c, u) {
+    return '<div class="chk-item pendiente"><div class="chk-cab">' +
+      '<span class="chk-cod">clave</span>' +
+      '<div class="chk-txt">' + esc(u ? u.nombre : c.email) +
+        '<div class="chk-detalle">' + esc(c.email) +
+        (u && u.cargo ? ' · ' + esc(u.cargo) : '') +
+        '<br>Solicitada el ' + A.fecha(c.solicitado_en) +
+        (u && u.telefono ? ' · tel. ' + esc(u.telefono) : '') +
+        '</div></div></div>' +
+      '<div class="chk-acciones">' +
+        '<button class="btn chico" data-clave="' + esc(c.id) + '">Generar contraseña</button> ' +
+        '<button class="btn sec chico" data-descartar="' + esc(c.id) + '">Descartar</button>' +
+      '</div></div>';
+  }
+
+  async function generarClave(c, u) {
+    try {
+      var r = await DNTAuth.reiniciarClave(c.perfil_id);
+      DNTAuth.registrar('clave_reiniciada', { entidad: 'dnt_perfiles', entidad_id: c.perfil_id });
+      avisoClave(c.email, r.clave);
+      pintarAdmin();
+    } catch (e) { A.toast(e.message, 'error'); }
   }
 
   /** Casillas de municipio, compartidas por el alta y la gestión. */
@@ -648,7 +701,8 @@ var DNTGestion = (function () {
         '«Gestionar».</p>' +
       '<div class="tarjeta" style="text-align:center;font-family:ui-monospace,Menlo,Consolas,monospace;' +
         'font-size:1.5rem;font-weight:700;letter-spacing:.06em">' + esc(clave) + '</div>' +
-      '<p class="ayuda">Pídale que la cambie al entrar, desde «Olvidé mi contraseña».</p>',
+      '<p class="ayuda">Es provisional: al entrar, el módulo le pedirá que elija una propia ' +
+        'antes de dejarlo continuar.</p>',
       [{ texto: 'Copiar', accion: function () {
           navigator.clipboard.writeText(clave).then(
             function () { A.toast('Contraseña copiada.', 'ok'); },

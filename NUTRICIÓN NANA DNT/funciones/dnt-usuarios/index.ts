@@ -17,9 +17,9 @@
 // la crea sólo si no existe) y después toca el perfil. El cliente ya no tiene
 // que adivinar si hubo sesión.
 //
-// verify_jwt va en false porque «solicitar» debe funcionar sin sesión. La
-// autorización se hace adentro: «crear», «clave» y «estado» exigen que quien
-// llame sea administrador del módulo según dnt_rol_de().
+// verify_jwt va en false porque «solicitar» y «olvide» deben funcionar sin
+// sesión. La autorización se hace adentro: «crear», «clave» y «estado» exigen
+// que quien llame sea administrador del módulo según dnt_rol_de().
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 
@@ -37,6 +37,9 @@ const ESTADOS = ['activo', 'pendiente', 'inactivo', 'rechazado'];
 // Freno contra el registro masivo: «solicitar» es público. No pretende ser una
 // defensa fina, sólo evitar que una madrugada aparezcan mil cuentas.
 const TOPE_PENDIENTES = 60;
+
+// Lo mismo para las solicitudes de contraseña, que tambien son publicas.
+const TOPE_SOLICITUDES_CLAVE = 40;
 
 function json(datos: unknown, status = 200) {
   return new Response(JSON.stringify(datos), {
@@ -153,6 +156,38 @@ async function fijarMunicipios(usuario: string, municipios: string[], porQuien: 
   });
 }
 
+/** Cuántas filas cumplen un filtro, sin traerlas. */
+async function cuantas(ruta: string): Promise<number> {
+  const r = await svc(ruta, { headers: { Prefer: 'count=exact', Range: '0-0' } });
+  return parseInt((r.headers.get('content-range') || '').split('/')[1] || '0', 10);
+}
+
+/**
+ * Marca que la contraseña vigente la puso el administrador. El modulo obliga a
+ * cambiarla al entrar, asi que una provisional no se queda de definitiva.
+ */
+async function marcarProvisional(usuario: string, provisional: boolean) {
+  await svc(`/rest/v1/dnt_perfiles?id=eq.${usuario}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      clave_provisional: provisional,
+      actualizado_en: new Date().toISOString(),
+    }),
+  });
+}
+
+/** Cierra la solicitud de contraseña que estuviera pendiente. */
+async function cerrarSolicitudClave(usuario: string, porQuien: string | null) {
+  await svc(`/rest/v1/dnt_solicitudes_clave?perfil_id=eq.${usuario}&estado=eq.pendiente`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      estado: 'atendida', atendida_por: porQuien, atendida_en: new Date().toISOString(),
+    }),
+  });
+}
+
 /** Auditoría. Nunca hace fallar la operación que la originó. */
 async function anotar(usuario: string | null, evento: string, detalle: Record<string, unknown>) {
   try {
@@ -187,11 +222,7 @@ Deno.serve(async (req: Request) => {
       const muni = await municipiosValidos([municipio]);
       if (!muni.length) return json({ error: 'Seleccione un municipio válido.' }, 400);
 
-      const cuenta = await svc('/rest/v1/dnt_perfiles?select=id&estado=eq.pendiente', {
-        headers: { Prefer: 'count=exact', Range: '0-0' },
-      });
-      const total = parseInt((cuenta.headers.get('content-range') || '').split('/')[1] || '0', 10);
-      if (total >= TOPE_PENDIENTES) {
+      if (await cuantas('/rest/v1/dnt_perfiles?select=id&estado=eq.pendiente') >= TOPE_PENDIENTES) {
         return json({ error: 'Hay demasiadas solicitudes sin revisar. Comuníquese con la Coordinación de Salud Pública.' }, 429);
       }
 
@@ -226,6 +257,43 @@ Deno.serve(async (req: Request) => {
 
       await anotar(id, 'solicitud_acceso', { email: correo, municipio: muni[0], cuenta_nueva: creada });
       return json({ ok: true, estado: 'pendiente', cuenta_nueva: creada });
+    }
+
+    // ── Olvidé mi contraseña (pública, sin sesión) ───────────────────────
+    // No manda correo: deja la solicitud en la bandeja del administrador, que
+    // genera la provisional y se la entrega a la persona. El correo de Supabase
+    // llegaba a buzones institucionales que nadie revisa, y el enlace caducaba
+    // antes de que lo abrieran.
+    if (accion === 'olvide') {
+      const correo = limpiarCorreo(cuerpo.email);
+
+      // La respuesta es siempre la misma, exista o no la cuenta: si cambiara,
+      // este endpoint diria quien esta registrado a cualquiera que pregunte.
+      const generica = { ok: true };
+      if (!correoValido(correo)) return json(generica);
+
+      const id: string | null = await rpc('dnt_auth_id_por_correo', { p_email: correo });
+      if (!id) return json(generica);
+      const perfil = await perfilDe(id);
+      if (!perfil) return json(generica);
+
+      if (await cuantas('/rest/v1/dnt_solicitudes_clave?select=id&estado=eq.pendiente')
+            >= TOPE_SOLICITUDES_CLAVE) {
+        return json({ error: 'Hay demasiadas solicitudes sin atender. Comuníquese con la Coordinación de Salud Pública.' }, 429);
+      }
+
+      const r = await svc('/rest/v1/dnt_solicitudes_clave', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ perfil_id: id, email: correo }),
+      });
+      // 409 es el indice unico parcial: ya tenia una pendiente. No es un error,
+      // es exactamente lo que se queria evitar.
+      if (!r.ok && r.status !== 409) {
+        return json({ error: `No se pudo registrar la solicitud: ${await r.text()}` }, 500);
+      }
+      if (r.ok) await anotar(id, 'solicitud_clave', { email: correo });
+      return json(generica);
     }
 
     // ── De aquí en adelante, sólo el administrador ───────────────────────
@@ -271,6 +339,11 @@ Deno.serve(async (req: Request) => {
       });
       if (!r.ok) return json({ error: `No se pudo guardar el perfil: ${await r.text()}` }, 500);
 
+      // Si se le genero contrasena, es provisional: la cambia al entrar.
+      // Si reutiliza la cuenta del portal, no se le toco nada.
+      await marcarProvisional(id, !!clave);
+      if (clave) await cerrarSolicitudClave(id, quien);
+
       await fijarMunicipios(id, municipios, quien);
       await anotar(quien, 'usuario_creado', { objetivo: id, email: correo, rol, municipios, cuenta_nueva: creada });
 
@@ -291,6 +364,8 @@ Deno.serve(async (req: Request) => {
       });
       if (!r.ok) return json({ error: `No se pudo cambiar la contraseña: ${await r.text()}` }, 500);
 
+      await marcarProvisional(objetivo, true);
+      await cerrarSolicitudClave(objetivo, quien);
       await anotar(quien, 'clave_reiniciada', { objetivo, email: perfil.email });
       return json({ ok: true, clave });
     }

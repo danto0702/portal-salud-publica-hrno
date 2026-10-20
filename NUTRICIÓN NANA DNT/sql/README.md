@@ -1,6 +1,9 @@
 # Migraciones aplicadas en Supabase — proyecto SI-APS HRNO
 
 Todas las migraciones ya fueron aplicadas al proyecto `wttljozqyaxlzilomnef` (SI-APS HRNO).
+
+> La 18 va partida en cinco porque el servicio corta las migraciones largas por
+> tiempo de espera. Son un solo cambio: el restablecimiento de contraseñas.
 Este directorio conserva el histórico para control de cambios y para poder reconstruir
 el esquema en otro proyecto.
 
@@ -34,6 +37,9 @@ order by table_name, ordinal_position;
 | 15 | `dnt_15_gestion_usuarios` | `dnt_rol_de()` y `dnt_auth_id_por_correo()`, apoyo de la función de borde |
 | 16 | `dnt_16_perimetros_cefalico_abdominal` | Perímetro abdominal, y puntaje Z y clasificación del cefálico |
 | 17 | `dnt_17_vista_casos_con_perimetros` | `dnt_v_casos_detalle` arrastra los dos perímetros de la última medición |
+| 18a | `dnt_18a_clave_provisional` | `clave_provisional` y `clave_cambiada_en` en los perfiles |
+| 18b | `dnt_18b_solicitudes_clave` | Tabla `dnt_solicitudes_clave` con una sola pendiente por persona |
+| 18c–e | `dnt_18c_sol_clave_select` · `_update` · `_delete` | RLS: sólo el administrador las ve y las cierra |
 
 ## Carga histórica
 

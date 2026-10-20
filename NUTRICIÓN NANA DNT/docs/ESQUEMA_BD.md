@@ -23,6 +23,7 @@ Row Level Security activo.
 | `dnt_equipos` | Hoja de vida y calibración de equipos antropométricos |
 | `dnt_capacitaciones` | Talento humano capacitado, para el indicador trimestral |
 | `dnt_importaciones` | Historial de cargues de Excel con sus alertas |
+| `dnt_solicitudes_clave` | «Olvidé mi contraseña»: una pendiente por persona, la cierra el administrador |
 | `dnt_log` | Auditoría: ingresos, consultas, cargues, descargas, cierres, permisos |
 
 ## Vistas
@@ -79,12 +80,30 @@ El código vive en `funciones/dnt-usuarios/`.
 | Acción | Quién | Qué hace |
 |---|---|---|
 | `solicitar` | cualquiera, sin sesión | Crea o vincula la cuenta y deja el perfil *pendiente*. Tope de 60 solicitudes sin revisar |
+| `olvide` | cualquiera, sin sesión | Deja una solicitud de contraseña en la bandeja del administrador. Responde siempre igual, exista o no la cuenta. Tope de 40 sin atender |
 | `crear` | admin | Alta completa: cuenta, perfil *activo*, rol y municipios. Devuelve la contraseña provisional |
-| `clave` | admin | Contraseña provisional nueva |
+| `clave` | admin | Contraseña provisional nueva. Marca `clave_provisional` y cierra la solicitud |
 | `estado` | admin | Rol, estado y municipios en una sola operación. Al activar, confirma el correo |
 
-`verify_jwt` va en `false` porque `solicitar` debe funcionar sin sesión; la autorización se
-hace adentro, contra `dnt_rol_de()`.
+`verify_jwt` va en `false` porque `solicitar` y `olvide` deben funcionar sin sesión; la
+autorización se hace adentro, contra `dnt_rol_de()`.
+
+## Restablecimiento de contraseñas
+
+No pasa por el correo de Supabase. El enlace llegaba a buzones institucionales que nadie
+revisa y caducaba antes de que lo abrieran, y el proyecto además exige confirmar el correo:
+eran dos dependencias de un buzón que no se consulta.
+
+1. La persona lo pide desde el ingreso. Queda una fila en `dnt_solicitudes_clave`.
+2. El administrador la ve en **Administración → Usuarios** y genera la provisional.
+3. `dnt_perfiles.clave_provisional` queda en `true`, y la solicitud en *atendida*.
+4. Al entrar, el módulo la manda a elegir contraseña propia y no la deja pasar antes.
+   Al guardarla, `clave_provisional` vuelve a `false` y se sella `clave_cambiada_en`.
+
+El paso 4 se aplica en los dos caminos: al ingresar desde `login.html` y al abrir la
+aplicación con una sesión ya abierta, porque `DNTAuth.verificar()` también devuelve al
+cambio. Un índice único parcial impide que una persona llene la bandeja con solicitudes
+repetidas.
 
 ## Almacenamiento
 
