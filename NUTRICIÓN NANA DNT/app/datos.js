@@ -374,6 +374,25 @@
       detalle: { municipios: codigos } });
   }
 
+  /** Solicitudes de contraseña pendientes. Sólo las ve el administrador. */
+  async function solicitudesClave() {
+    return lanzar(await sb().from('dnt_solicitudes_clave')
+      .select('id,perfil_id,email,estado,solicitado_en')
+      .eq('estado', 'pendiente').order('solicitado_en'));
+  }
+
+  /** Cierra una solicitud sin generar contraseña (duplicada, o ya resuelta). */
+  async function descartarSolicitudClave(id) {
+    var r = await sb().from('dnt_solicitudes_clave').update({
+      estado: 'descartada',
+      atendida_por: DNTAuth.usuario().id,
+      atendida_en: new Date().toISOString()
+    }).eq('id', id);
+    lanzar(r);
+    DNTAuth.registrar('solicitud_clave_descartada',
+      { entidad: 'dnt_solicitudes_clave', entidad_id: id });
+  }
+
   async function responsables() {
     return lanzar(await sb().from('dnt_perfiles').select('id,nombre,email,rol')
       .eq('estado', 'activo').order('nombre'));
@@ -416,6 +435,7 @@
     inventario: inventario, equipos: equipos, jornadas: jornadas, capacitaciones: capacitaciones,
     saldoInventario: saldoInventario,
     usuarios: usuarios, actualizarUsuario: actualizarUsuario,
+    solicitudesClave: solicitudesClave, descartarSolicitudClave: descartarSolicitudClave,
     asignarMunicipios: asignarMunicipios, responsables: responsables,
     indicadores: indicadores, auditoria: auditoria,
     registrarImportacion: registrarImportacion, importaciones: importaciones

@@ -111,18 +111,21 @@
     <!-- ── Recuperación ── -->
     <form id="formOlvide" class="oculto">
       <h2 style="font-size:1.1rem">Recuperar contraseña</h2>
-      <p class="tarjeta-sub">Le enviaremos un enlace al correo registrado.</p>
+      <p class="tarjeta-sub">No se envía ningún correo. Su solicitud le llega a la Coordinación
+        de Salud Pública, que le entrega una contraseña provisional para que vuelva a entrar.</p>
       <div class="campo">
         <label for="oCorreo">Correo institucional</label>
         <input type="email" id="oCorreo" required autocomplete="email">
       </div>
-      <button class="btn" style="width:100%" id="btnRecuperar">Enviar enlace</button>
+      <button class="btn" style="width:100%" id="btnRecuperar">Solicitar contraseña</button>
       <div class="cambia"><button type="button" class="volver">Volver al ingreso</button></div>
     </form>
 
-    <!-- ── Nueva contraseña (llegando desde el enlace del correo) ── -->
+    <!-- ── Nueva contraseña: cambio obligatorio de la provisional ── -->
     <form id="formNueva" class="oculto">
       <h2 style="font-size:1.1rem">Definir nueva contraseña</h2>
+      <p class="tarjeta-sub">La contraseña que tiene ahora se la asignó el administrador.
+        Elija una propia para continuar.</p>
       <div class="campo">
         <label for="nClave">Nueva contraseña</label>
         <input type="password" id="nClave" required minlength="8" autocomplete="new-password">
@@ -156,7 +159,8 @@
     sin_perfil:  ['ojo',   'Su cuenta existe en el portal pero todavía no tiene acceso a este módulo. Solicite el acceso con el botón de abajo.'],
     pendiente:   ['ojo',   'Su solicitud está pendiente de aprobación. El administrador debe autorizarla y asignarle municipio.'],
     rechazado:   ['grave', 'Su solicitud de acceso fue rechazada. Comuníquese con la Coordinación de Salud Pública.'],
-    inactivo:    ['grave', 'Su usuario está inactivo. Comuníquese con el administrador.']
+    inactivo:    ['grave', 'Su usuario está inactivo. Comuníquese con el administrador.'],
+    cambie_clave:['ojo',   'Su contraseña es provisional. Elija una propia para continuar.']
   };
 
   function mostrar(tipo, texto) {
@@ -178,8 +182,11 @@
   if (motivo && MOTIVOS[motivo]) mostrar(MOTIVOS[motivo][0], MOTIVOS[motivo][1]);
   else if (motivo) mostrar('grave', 'No fue posible validar la sesión: ' + motivo);
 
-  // Enlace de recuperación de contraseña
-  if (location.hash.indexOf('type=recovery') >= 0) panel('formNueva');
+  // Contraseña provisional: la app devuelve aquí hasta que elija una propia.
+  if (motivo === 'cambie_clave') {
+    panel('formNueva');
+    mostrar(MOTIVOS.cambie_clave[0], MOTIVOS.cambie_clave[1]);
+  }
 
   $('irRegistro').onclick = function () { panel('formRegistro'); };
   $('irOlvide').onclick   = function () { panel('formOlvide'); };
@@ -196,7 +203,13 @@
     e.preventDefault(); limpiar();
     var btn = $('btnIngresar'); ocupado(btn, 'Verificando…');
     try {
-      await DNTAuth.ingresar($('correo').value, $('clave').value);
+      var ses = await DNTAuth.ingresar($('correo').value, $('clave').value);
+      if (ses && ses.debeCambiarClave) {
+        panel('formNueva');
+        mostrar(MOTIVOS.cambie_clave[0], MOTIVOS.cambie_clave[1]);
+        libre(btn);
+        return;
+      }
       location.href = 'index.html';
     } catch (err) {
       var m = MOTIVOS[err.message];
@@ -239,7 +252,9 @@
     try {
       await DNTAuth.recuperar($('oCorreo').value);
       panel('formIngreso');
-      mostrar('ok', 'Si el correo está registrado, recibirá un enlace para restablecer la contraseña.');
+      mostrar('ok', '<strong>Solicitud registrada</strong>Si ese correo tiene cuenta en el módulo, ' +
+        'la Coordinación de Salud Pública le entregará una contraseña provisional. ' +
+        'Comuníquese con ella si lo necesita pronto.');
     } catch (err) { mostrar('grave', err.message); } finally { libre(btn); }
   };
 
@@ -249,6 +264,9 @@
     var btn = $('btnNueva'); ocupado(btn, 'Guardando…');
     try {
       await DNTAuth.cambiarClave($('nClave').value);
+      // Si venía de la provisional, la sesión ya está abierta: entra directo.
+      var s = await DNTAuth.sb.auth.getSession();
+      if (s.data && s.data.session) { location.href = 'index.html'; return; }
       panel('formIngreso');
       mostrar('ok', 'Contraseña actualizada. Ya puede ingresar.');
     } catch (err) { mostrar('grave', err.message); } finally { libre(btn); }

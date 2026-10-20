@@ -23,7 +23,8 @@
   /** Carga el perfil del módulo y los municipios del usuario autenticado. */
   async function cargarPerfil(userId) {
     var perfil = await sb.from('dnt_perfiles')
-      .select('id,nombre,email,rol,estado,cargo,telefono').eq('id', userId).maybeSingle();
+      .select('id,nombre,email,rol,estado,cargo,telefono,clave_provisional')
+      .eq('id', userId).maybeSingle();
     if (perfil.error) throw new Error(perfil.error.message);
 
     // El superadministrador del portal entra como admin aunque no tenga perfil propio.
@@ -54,6 +55,9 @@
       rol: perfil.data.rol,
       municipios: muni.data || [],
       alcance: alcance,
+      // La contraseña la puso el administrador: hay que cambiarla antes de
+      // entrar. No se expulsa la sesión, porque para cambiarla hace falta.
+      debeCambiarClave: perfil.data.clave_provisional === true,
       cargado_en: Date.now()
     };
   }
@@ -65,6 +69,7 @@
     if (!session) { location.href = urlLogin(); return null; }
     try {
       _sesion = await cargarPerfil(session.user.id);
+      if (_sesion.debeCambiarClave) { location.href = urlLogin('cambie_clave'); return null; }
       return _sesion;
     } catch (e) {
       await sb.auth.signOut();
@@ -155,15 +160,34 @@
   /** Rol, estado y municipios en una sola operación, con sus validaciones. */
   function fijarAcceso(datos)   { return llamar('estado', datos); }
 
-  async function recuperar(email) {
-    var destino = location.href.replace(/[^/]*$/, 'login.html');
-    var r = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: destino });
-    if (r.error) throw r.error;
-  }
+  /**
+   * Olvidé mi contraseña. Deja la solicitud en la bandeja del administrador;
+   * no envía ningún correo. El enlace de Supabase llegaba a buzones
+   * institucionales que nadie revisa y caducaba antes de que lo abrieran.
+   *
+   * La respuesta es siempre la misma, exista o no la cuenta.
+   */
+  function recuperar(email) { return llamar('olvide', { email: email }); }
 
+  /**
+   * Cambio de contraseña por la propia persona. Al guardarla deja de ser
+   * provisional: es lo que levanta la obligación de cambiarla al entrar.
+   */
   async function cambiarClave(nueva) {
     var r = await sb.auth.updateUser({ password: nueva });
     if (r.error) throw r.error;
+
+    var s = await sb.auth.getSession();
+    var uid = s.data && s.data.session && s.data.session.user.id;
+    if (!uid) return;
+    await sb.from('dnt_perfiles').update({
+      clave_provisional: false,
+      clave_cambiada_en: new Date().toISOString()
+    }).eq('id', uid);
+    if (_sesion) {
+      _sesion.debeCambiarClave = false;
+      if (_sesion.usuario) _sesion.usuario.clave_provisional = false;
+    }
   }
 
   async function salir() {
