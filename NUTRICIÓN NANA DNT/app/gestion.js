@@ -866,12 +866,17 @@ var DNTGestion = (function () {
         '<div class="tarjeta"><h3>🔍 Auditoría del módulo</h3>' +
           '<p class="tarjeta-sub">Últimos 300 eventos. Registra ingresos, consultas de caso, cargues, ' +
           'descargas de documentos, cierres y cambios de permisos.</p>' +
+          '<div class="aviso ojo" style="margin-bottom:12px"><span class="ic">!</span><div>' +
+            '<strong>«clave modificada» sin un «clave reiniciada» al lado es un cambio hecho fuera del módulo</strong>' +
+            'Por ejemplo, desde la consola de Supabase. La cuenta queda marcada como provisional, ' +
+            'así que a esa persona el módulo le exigirá elegir contraseña al entrar.</div></div>' +
           '<div class="tabla-env"><table class="t"><thead><tr><th>Fecha y hora</th><th>Evento</th>' +
           '<th>Entidad</th><th>Municipio</th><th>Detalle</th></tr></thead><tbody>' +
           (lista.length ? lista.map(function (l) {
             return '<tr><td style="font-size:.79rem" class="mono">' +
               new Date(l.creado_en).toLocaleString('es-CO') + '</td>' +
               '<td><span class="sem ' + (/eliminad/.test(l.evento) ? 'rojo' :
+                /clave/.test(l.evento) ? 'naranja' :
                 /cerrad|cierre/.test(l.evento) ? 'naranja' : 'gris') + '">' +
                 esc(l.evento.replace(/_/g, ' ')) + '</span></td>' +
               '<td style="font-size:.79rem">' + esc(l.entidad || '—') + '</td>' +
