@@ -105,6 +105,24 @@ aplicación con una sesión ya abierta, porque `DNTAuth.verificar()` también de
 cambio. Un índice único parcial impide que una persona llene la bandeja con solicitudes
 repetidas.
 
+### Cambios hechos fuera del módulo
+
+Quien entre a la consola de Supabase puede cambiarle la contraseña a cualquiera sin pasar
+por aquí. Eso no se puede impedir desde el código —es la consola del proveedor— pero el
+trigger `dnt_audita_clave` sobre `auth.users` hace que no sirva en silencio:
+
+- Deja un evento `clave_modificada` en `dnt_log`, con el correo afectado.
+- Pone `clave_provisional` en `true`, así que al entrar el módulo exige elegir otra y la
+  persona se entera de que alguien le tocó la cuenta.
+
+Los cambios hechos desde el módulo también pasan por el trigger, pero acto seguido el
+propio flujo levanta la marca (`cambiarClave`) o la confirma (acción `clave`). **Un
+`clave_modificada` sin su evento del módulo al lado se hizo por fuera.** La auditoría
+los pinta en naranja y lo explica sobre la tabla.
+
+La función captura cualquier excepción y deja pasar: una falla de la auditoría nunca puede
+tumbar el ingreso.
+
 ## Almacenamiento
 
 Bucket privado `dnt-soportes`, máximo 15 MB por archivo, sólo PDF, JPEG, PNG y WEBP.

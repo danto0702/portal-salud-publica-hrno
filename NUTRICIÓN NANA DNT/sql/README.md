@@ -40,6 +40,7 @@ order by table_name, ordinal_position;
 | 18a | `dnt_18a_clave_provisional` | `clave_provisional` y `clave_cambiada_en` en los perfiles |
 | 18b | `dnt_18b_solicitudes_clave` | Tabla `dnt_solicitudes_clave` con una sola pendiente por persona |
 | 18c–e | `dnt_18c_sol_clave_select` · `_update` · `_delete` | RLS: sólo el administrador las ve y las cierra |
+| 19 | `dnt_19_auditar_cambio_de_clave` · `_19b` | Todo cambio de contraseña queda en `dnt_log` y marca la cuenta como provisional |
 
 ## Carga histórica
 
