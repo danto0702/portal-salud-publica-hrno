@@ -565,10 +565,14 @@ let entidad=load(LS.ent,{});
 let store=load(LS.data,{2:[],3:[],4:[],5:[],6:[],7:[]});
 [2,3,4,5,6,7].forEach(t=>{ if(!Array.isArray(store[t])) store[t]=[]; });
 const DEFAULT_URL='https://script.google.com/macros/s/AKfycbzY0TV2zP1TGibldZoe9TQB8ocqdJl07I7EL9DVia1FhzPRYRhd78DfiaXUesidExaX6w/exec';
-const ADMIN_MASTER='SPhrno.2026';   // contraseña genérica institucional del módulo administrador (siempre válida)
-let config=load(LS.cfg,{url:DEFAULT_URL,token:'',autoSync:true,adminPass:ADMIN_MASTER});
+// ── Integración con Portal Salud Pública (Supabase) ──────────────────────────
+const _SP_URL='https://wttljozqyaxlzilomnef.supabase.co';
+const _SP_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0dGxqb3pxeWF4bHppbG9tbmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDg5NTEsImV4cCI6MjA5NDg4NDk1MX0.kAQkgGq7RmZxTM9KlwI6KI7BjhEBy-8w6OdHVkOPBDM';
+const _SP_AUTH_LS='sb-wttljozqyaxlzilomnef-auth-token';
+const _SP_CLAVE='ser124drec.admin_pass';
+let config=load(LS.cfg,{url:DEFAULT_URL,token:'',autoSync:true,adminPass:''});
 if(config.autoSync===undefined) config.autoSync=true;
-if(config.adminPass===undefined){ config.adminPass=ADMIN_MASTER; save(LS.cfg,config); }   // por defecto en equipos nuevos
+if(config.adminPass===undefined){ config.adminPass=''; save(LS.cfg,config); }
 if(!config.url){ config.url=DEFAULT_URL; save(LS.cfg,config); }  // URL de Google Sheets predeterminada
 let edit={2:null,3:null,4:null,5:null,6:null,7:null};   // uid del registro en edición por tipo (null = ninguno)
 let supervisor=load(LS.sup,{tipoIdSuperv:'CC',numIdSuperv:'',nomSuperv:''});   // supervisor único para todos los contratos (Tipo 3)
@@ -1573,17 +1577,48 @@ function bulkAsignarRubro(){
   save(LS.data,store); renderAdmin(); renderTable(3);
   toast(`Rubro asignado a ${n} contrato(s)`,'ok');
 }
+/* ---- Supabase: verificar sesión superadmin del portal ---- */
+async function _spAdmin(){
+  try{
+    const raw=localStorage.getItem(_SP_AUTH_LS); if(!raw) return null;
+    const s=JSON.parse(raw);
+    const tok=s?.access_token; if(!tok) return null;
+    const exp=s?.expires_at; if(exp && Date.now()/1000>exp) return null;
+    const uid=s?.user?.id; if(!uid) return null;
+    const r=await fetch(_SP_URL+'/rest/v1/portal_usuarios?id=eq.'+uid+'&select=rol_base,activo,nombre',
+      {headers:{'apikey':_SP_KEY,'Authorization':'Bearer '+tok}});
+    if(!r.ok) return null;
+    const [u]=await r.json();
+    return (u?.rol_base==='superadmin'&&u?.activo)?{token:tok,nombre:u.nombre}:null;
+  }catch{return null;}
+}
+async function _spSetPass(pass,token){
+  try{
+    await fetch(_SP_URL+'/rest/v1/portal_config',{method:'POST',
+      headers:{'apikey':_SP_KEY,'Authorization':'Bearer '+token,
+               'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({clave:_SP_CLAVE,modulo_id:'pisis.ser124',
+        descripcion:'Contraseña admin SER124DREC',valor:pass,updated_at:new Date().toISOString()})});
+  }catch{}
+}
+
 /* ---- Contraseña admin ---- */
 function adminUnlock(){
   const v=document.getElementById('adm_pass_in').value;
-  if(v===(config.adminPass||'') || v===ADMIN_MASTER){ adminOK=true; renderAdmin(); } else toast('Contraseña incorrecta','err');
+  _spAdmin().then(sa=>{
+    if(sa){ adminOK=true; renderAdmin(); toast('Acceso como superadmin del portal ('+sa.nombre+')','ok'); return; }
+    if(v===(config.adminPass||'')){ adminOK=true; renderAdmin(); }
+    else toast('Contraseña incorrecta','err');
+  });
 }
 function guardarAdminPass(){
   const p=document.getElementById('adm_pass_set').value;
   const q=(document.getElementById('adm_rec_q').value||'').trim();
   const a=(document.getElementById('adm_rec_a').value||'').trim();
   config.adminPass=p; config.recoveryQ=q; config.recoveryA=a;
-  save(LS.cfg,config); toast(p?'Contraseña guardada':'Contraseña eliminada (módulo abierto). La genérica institucional sigue funcionando.','ok');
+  save(LS.cfg,config);
+  _spAdmin().then(sa=>{ if(sa) _spSetPass(p,sa.token); });
+  toast(p?'Contraseña guardada':'Contraseña eliminada (módulo abierto).','ok');
 }
 function adminReset(){
   const a=document.getElementById('adm_rec_in'); if(!a) return;
@@ -1644,7 +1679,7 @@ function renderAdmin(){
         ${config.recoveryA?`<label style="font-size:11px;color:var(--text3);font-weight:600">${esc(config.recoveryQ||'Pregunta de recuperación')}</label>
           <div style="display:flex;gap:8px;margin-top:6px"><input id="adm_rec_in" placeholder="Tu respuesta" onkeydown="if(event.key==='Enter')adminReset()"><button class="btn btn-ghost" onclick="adminReset()">Restablecer</button></div>
           <div class="hint" style="margin-top:6px">Si la respuesta es correcta, se borra la contraseña y el módulo queda abierto.</div>`
-        :`<div class="section-note" style="border-left-color:var(--yellow)">No hay pregunta de recuperación configurada. Puedes ingresar con la <b>contraseña genérica institucional</b> (consúltala con la Coordinación de Salud Pública) y luego definir la tuya aquí.</div>`}
+        :`<div class="section-note" style="border-left-color:var(--yellow)">No hay pregunta de recuperación configurada. Si eres <b>superadmin del portal</b>, puedes acceder directamente sin contraseña. De lo contrario, solicita restablecimiento a la Coordinación de Salud Pública.</div>`}
       </div></div></div>`;
     return;
   }
