@@ -190,6 +190,23 @@ tbody tr:last-child td{border-bottom:none}
   .hero-inner{flex-direction:column;align-items:flex-start}
   .header{padding:0 14px} .main{padding:20px 14px 50px}
 }
+
+/* ── Barra de resolución activa ────────────────────────────────────── */
+.res-bar{background:var(--surface2);border-bottom:1px solid var(--border);padding:0 20px;}
+.res-bar-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:10px;height:38px;}
+.res-etiqueta{font-size:.72rem;color:var(--text3);font-weight:600;white-space:nowrap;}
+.res-nombre{font-size:.8rem;font-weight:700;color:var(--primary);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.btn-res{background:none;border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:3px 10px;font-size:.72rem;cursor:pointer;white-space:nowrap;transition:all .15s;}
+.btn-res:hover{border-color:var(--primary);color:var(--primary);}
+/* ── Items de resolución en modal ───────────────────────────────────── */
+.res-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;
+  border:1px solid var(--border);border-radius:8px;margin-bottom:8px;transition:border-color .15s;}
+.res-item.activa{border-color:var(--primary);background:rgba(233,69,96,.06);}
+.res-item-nombre{font-size:.82rem;font-weight:700;}
+.res-item-meta{font-size:.72rem;color:var(--text3);margin-top:2px;}
+.res-item-btns{display:flex;gap:6px;align-items:center;flex-shrink:0;}
+.res-badge-activa{font-size:.72rem;font-weight:700;color:var(--green);padding:3px 8px;
+  border:1px solid var(--green);border-radius:5px;}
 </style>
 </head>
 <body>
@@ -225,6 +242,14 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </section>
 
+<div class="res-bar">
+  <div class="res-bar-inner">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+    <span class="res-etiqueta">Resolución activa:</span>
+    <span class="res-nombre" id="resNombreBar">—</span>
+    <button class="btn-res" onclick="abrirGestorRes()">&#8644; Cambiar resolución</button>
+  </div>
+</div>
 <nav class="tabbar"><div class="tabbar-inner" id="tabbar">
   <button class="tab active" data-tab="entidad"><span class="tnum">1</span> Entidad y período</button>
   <button class="tab" data-tab="t2"><span class="tnum">2</span> Incorporación <span class="cnt" id="c_2">0</span></button>
@@ -392,6 +417,34 @@ tbody tr:last-child td{border-bottom:none}
 </main>
 
 <div id="toasts"></div>
+<div class="modal-bg" id="gestorResBg">
+<div class="modal" style="max-width:540px">
+  <div class="modal-h">Gestionar resoluciones</div>
+  <div class="modal-b" style="max-height:70vh;overflow-y:auto">
+    <div id="gestorResList"></div>
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:.8rem;font-weight:700;color:var(--text2);margin-bottom:10px">Nueva resolución</div>
+      <div class="grid g2">
+        <div class="field col-2">
+          <label>Nombre completo</label>
+          <input id="nueva_res_nombre" placeholder="Ej: Resolución 0212 de 2025">
+        </div>
+        <div class="field">
+          <label>Vigencia (año)</label>
+          <input id="nueva_res_vigencia" placeholder="2025" maxlength="4" style="max-width:100px">
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn btn-primary" onclick="crearResolucion()">+ Crear resolución</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-f">
+    <button class="btn btn-ghost btn-sm" onclick="cerrarGestorRes()">Cerrar</button>
+  </div>
+</div>
+</div>
+
 <div class="modal-bg" id="modalBg"><div class="modal">
   <div class="modal-h" id="modalTitle"></div><div class="modal-b" id="modalBody"></div>
   <div class="modal-f"><button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancelar</button><button class="btn btn-danger btn-sm" id="modalOk">Confirmar</button></div>
@@ -515,7 +568,24 @@ function excelFields(t){ return SCHEMA[t].fields.filter(f=>!f.global); }
 function excelCols(t){ return ['ID_RECURSO','NIT_ENTIDAD','INDICADOR', ...excelFields(t).map(f=>f.k.toUpperCase())]; }
 
 /* ══════════════════════ UTILIDADES ══════════════════════ */
-const LS={ent:'ser124_entidad',data:'ser124_data',cfg:'ser124_config',sup:'ser124_supervisor',rub:'ser124_rubros',undo:'ser124_undo_plano'};
+// ── Multi-resolución ─────────────────────────────────────────────────────────
+const LS_RESS='ser124_resoluciones';
+const LS_ACTIVA='ser124_res_activa';
+function computeLS(rid){
+  const p='ser124_'+rid+'_';
+  return {ent:p+'entidad',data:p+'data',cfg:p+'config',sup:p+'supervisor',rub:p+'rubros',undo:p+'undo_plano'};
+}
+(function migrateV1(){
+  if(localStorage.getItem(LS_RESS)) return;
+  const id='r0272_2026';
+  const ress=[{id,nombre:'Resolución 0272 de 2026',vigencia:'2026',creada:new Date().toISOString().slice(0,10)}];
+  const OLD={ent:'ser124_entidad',data:'ser124_data',cfg:'ser124_config',sup:'ser124_supervisor',rub:'ser124_rubros',undo:'ser124_undo_plano'};
+  const NW=computeLS(id);
+  Object.keys(OLD).forEach(k=>{ const v=localStorage.getItem(OLD[k]); if(v!==null) localStorage.setItem(NW[k],v); });
+  localStorage.setItem(LS_RESS,JSON.stringify(ress));
+  localStorage.setItem(LS_ACTIVA,id);
+})();
+let LS=computeLS(localStorage.getItem(LS_ACTIVA)||'r0272_2026');
 function up(s){ // MAYUSCULAS sin tildes (conserva N-tilde), sin pipe
   return String(s==null?'':s)
     .replace(/ñ/g,'').replace(/Ñ/g,'')   // protege la N-tilde
@@ -731,6 +801,102 @@ function go(tab){
   if(tab==='admin') renderAdmin();
   window.scrollTo({top:0,behavior:'smooth'});
 }
+/* ══════════════════════ RESOLUCIONES ══════════════════════ */
+function resolActiva(){
+  const ress=JSON.parse(localStorage.getItem(LS_RESS)||'[]');
+  const id=localStorage.getItem(LS_ACTIVA);
+  return ress.find(r=>r.id===id)||ress[0]||{id:'r0272_2026',nombre:'Resolución 0272 de 2026',vigencia:'2026'};
+}
+function listarRess(){ return JSON.parse(localStorage.getItem(LS_RESS)||'[]'); }
+function guardarRess(ress){ localStorage.setItem(LS_RESS,JSON.stringify(ress)); }
+
+function renderResBar(){
+  const el=document.getElementById('resNombreBar');
+  if(el) el.textContent=resolActiva().nombre;
+}
+function abrirGestorRes(){
+  document.getElementById('gestorResBg').classList.add('show');
+  renderGestorRes();
+}
+function cerrarGestorRes(){
+  document.getElementById('gestorResBg').classList.remove('show');
+}
+function renderGestorRes(){
+  const ress=listarRess();
+  const activa=localStorage.getItem(LS_ACTIVA);
+  const cont=document.getElementById('gestorResList');
+  if(!ress.length){ cont.innerHTML='<div style="color:var(--text3);font-size:.8rem">No hay resoluciones registradas.</div>'; return; }
+  cont.innerHTML=ress.map(r=>`
+    <div class="res-item ${r.id===activa?'activa':''}">
+      <div class="res-item-info">
+        <div class="res-item-nombre">${esc(r.nombre)}</div>
+        <div class="res-item-meta">Vigencia ${esc(r.vigencia)} &middot; Creada ${r.creada||'—'}</div>
+      </div>
+      <div class="res-item-btns">
+        ${r.id===activa
+          ?'<span class="res-badge-activa">&#10003; Activa</span>'
+          :`<button class="btn btn-primary btn-sm" onclick="cambiarResolucion('${r.id}')">Activar</button>`}
+        ${ress.length>1?`<button class="btn btn-danger btn-sm" onclick="eliminarRes('${r.id}')">Eliminar</button>`:''}
+      </div>
+    </div>`).join('');
+}
+function cambiarResolucion(id){
+  localStorage.setItem(LS_ACTIVA,id);
+  LS=computeLS(id);
+  entidad=load(LS.ent,{});
+  store=load(LS.data,{2:[],3:[],4:[],5:[],6:[],7:[]});
+  [2,3,4,5,6,7].forEach(t=>{ if(!Array.isArray(store[t])) store[t]=[]; });
+  config=load(LS.cfg,{url:DEFAULT_URL,token:'',autoSync:true,adminPass:''});
+  if(!config.url) config.url=DEFAULT_URL;
+  supervisor=load(LS.sup,{tipoIdSuperv:'CC',numIdSuperv:'',nomSuperv:''});
+  rubros=load(LS.rub,[]);
+  undoPlano=load(LS.undo,null);
+  adminOK=false;
+  edit={2:null,3:null,4:null,5:null,6:null,7:null};
+  renderResBar(); pintarEntidad(); pintarConfig(); pintarSync(); pintarSupervisor(); pintarUndoPlano();
+  ORDER.forEach(t=>{ renderTable(t); toggleCond(t); });
+  updateAll();
+  renderResBar();
+  cerrarGestorRes();
+  go('entidad');
+  toast('Resolución activa: '+resolActiva().nombre,'ok');
+}
+function crearResolucion(){
+  const nombre=document.getElementById('nueva_res_nombre').value.trim();
+  const vigencia=document.getElementById('nueva_res_vigencia').value.trim();
+  if(!nombre){ toast('Escribe el nombre de la resolución','err'); return; }
+  if(!vigencia||!/^\d{4}$/.test(vigencia)){ toast('Escribe el año de vigencia (4 dígitos)','err'); return; }
+  const slug=nombre.toLowerCase()
+    .replace(/resolución|resolucion/gi,'res')
+    .replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,20);
+  const id=slug+'_'+vigencia;
+  const ress=listarRess();
+  if(ress.find(r=>r.id===id)){ toast('Ya existe una resolución con ese nombre y vigencia','err'); return; }
+  ress.push({id,nombre,vigencia,creada:new Date().toISOString().slice(0,10)});
+  guardarRess(ress);
+  document.getElementById('nueva_res_nombre').value='';
+  document.getElementById('nueva_res_vigencia').value='';
+  renderGestorRes();
+  toast('Resolución creada: '+nombre,'ok');
+}
+function eliminarRes(id){
+  const ress=listarRess();
+  const r=ress.find(x=>x.id===id);
+  if(!r) return;
+  if(!confirm('¿Eliminar "'+r.nombre+'"?\nSe borrarán TODOS sus datos (registros, rubros, configuración). Esta acción no se puede deshacer.')) return;
+  const ls=computeLS(id);
+  Object.values(ls).forEach(k=>localStorage.removeItem(k));
+  const nuevas=ress.filter(x=>x.id!==id);
+  guardarRess(nuevas);
+  if(localStorage.getItem(LS_ACTIVA)===id && nuevas.length){
+    cambiarResolucion(nuevas[0].id);
+  } else {
+    renderGestorRes();
+  }
+  toast('Resolución eliminada','ok');
+}
+document.getElementById('gestorResBg').addEventListener('click',e=>{ if(e.target.id==='gestorResBg') cerrarGestorRes(); });
+
 document.getElementById('tabbar').addEventListener('click',e=>{ const b=e.target.closest('.tab'); if(b) go(b.dataset.tab); });
 
 /* ══════════════════════ SELECT HELPER ══════════════════════ */
