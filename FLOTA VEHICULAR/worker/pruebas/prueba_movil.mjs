@@ -257,7 +257,19 @@ try {
     await pag.locator('#itin-dia .itin-ren.libre').count() === antesLibres - 1);
   verificar('y no se abrió ninguna ventana',
     await pag.locator('.modal-caja:visible').count() === 0);
-  await pag.locator('.pincel-chip.activo').first().click();   // apagar
+
+  // Con el pincel encendido cada toque programa: tiene que verse mientras
+  // dure. En un teléfono no hay cursor que cambie, así que sin esta barra se
+  // quedaba encendido sin que nadie lo notara y programaba a cada toque.
+  verificar('mientras el pincel está encendido lo dice una barra fija',
+    await pag.locator('#barra-pincel').count() === 1);
+  verificar('y la barra lleva la cuenta de lo que ha programado',
+    /lleva/i.test(await pag.locator('#barra-pincel').innerText()),
+    (await pag.locator('#barra-pincel').innerText()).replace(/\n/g, ' '));
+  await pag.click('#barra-pincel button:has-text("Apagar")');
+  await pag.waitForTimeout(400);
+  verificar('se puede apagar desde la propia barra',
+    await pag.locator('#barra-pincel').count() === 0);
 
   // ── Lo que se recuerda, y el escritorio ──────────────────────────────────
   console.log('\n══ Se recuerda la elección; el escritorio queda igual ══');

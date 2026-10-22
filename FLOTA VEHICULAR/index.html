@@ -577,6 +577,20 @@ table.ficha th{border-bottom:1px solid var(--border)}
   color:var(--azul);margin:1.1rem 0 .3rem;
 }
 
+/* Barra fija del pincel: con el pincel encendido cada toque programa un día,
+   así que mientras dure tiene que verse, no basta un mensaje que se desvanece. */
+#barra-pincel{
+  position:fixed;left:0;right:0;bottom:0;z-index:150;
+  display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  padding:.6rem 1rem;background:var(--azul);color:#fff;
+  box-shadow:0 -4px 12px rgba(16,32,48,.18);
+}
+#barra-pincel .sub{font-size:.78rem;opacity:.9;margin-top:.1rem}
+#barra-pincel .btn{background:#fff;color:var(--azul);border-color:#fff;flex:0 0 auto}
+@supports(padding:max(0px)){
+  #barra-pincel{padding-bottom:max(.6rem,env(safe-area-inset-bottom))}
+}
+
 /* Tabla con columnas agrupadas: la del detalle por conductor mide cuatro
    cosas distintas y sin separarlas se leen como una sola lista de números. */
 thead tr.grupo th{

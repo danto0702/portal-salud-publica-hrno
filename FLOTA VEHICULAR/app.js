@@ -17,7 +17,7 @@
  * peticiones e ignora en silencio lo que no entiende — un campo que no se
  * guarda y ningún mensaje de error. Por eso se comprueba y se avisa.
  */
-const VERSION_API_REQUERIDA = 15;
+const VERSION_API_REQUERIDA = 16;
 
 const esLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 const API = localStorage.getItem('flota_api') ||
@@ -1589,7 +1589,9 @@ async function verItinerario() {
         <button class="btn sec sm" onclick="$('#archivo-itin').click()">Cargar</button>
         <input type="file" id="archivo-itin" accept=".xlsx,.xls" style="display:none"
           onchange="cargarPlantilla(this)">
-        <button class="btn sm" onclick="modalCopiarSemana()">Copiar período</button>
+        <button class="btn sec sm" onclick="modalRecientes()"
+          title="Qué se programó hace poco, quién lo hizo y cómo deshacerlo">Creado hace poco</button>
+        <button class="btn sec sm" onclick="modalCopiarSemana()">Copiar período</button>
       </div>
     </div>
 
@@ -1684,9 +1686,35 @@ async function verItinerario() {
 }
 
 /** Marca el modo pintar en la vista que esté puesta, matriz o por día. */
+/**
+ * Marca el modo pintar, y lo DICE mientras dure (D39).
+ *
+ * Con el pincel encendido cada toque sobre un día lo programa, sin ventana de
+ * confirmación. El único aviso era un mensaje que se desvanece y un cambio de
+ * cursor —que en un teléfono no existe—, así que se podía quedar encendido sin
+ * que nadie lo notara y programar de más a cada toque. Ahora hay una barra
+ * fija que no se va hasta que se apaga, con el contador de lo que lleva hecho.
+ */
+let pintadasEnSesion = 0;
+
 function marcarPintando(si) {
   $('#itin-env')?.classList.toggle('pintando', si);
   $('#itin-dia')?.classList.toggle('pintando', si);
+
+  let barra = $('#barra-pincel');
+  if (!si) { barra?.remove(); pintadasEnSesion = 0; return; }
+  if (!barra) {
+    barra = document.createElement('div');
+    barra.id = 'barra-pincel';
+    document.body.appendChild(barra);
+  }
+  barra.innerHTML = `
+    <div>
+      <b>Pincel encendido: ${esc(pincel?.nombre || '')}</b>
+      <div class="sub">Cada ${tactil() ? 'toque' : 'clic'} sobre un día lo programa.
+        ${pintadasEnSesion ? `Lleva <b>${pintadasEnSesion}</b>.` : ''}</div>
+    </div>
+    <button class="btn" onclick="activarPincel(${pincel?.id})">Apagar</button>`;
 }
 
 /**
@@ -1925,8 +1953,10 @@ async function pincelFin() {
   await Promise.all(tareas);                 // sin esto se redibuja antes de tiempo
   if (!pintadasEnTrazo) return;
   aviso(`${pintadasEnTrazo} día(s) programado(s)`, 'ok', 'Listo');
+  pintadasEnSesion += pintadasEnTrazo;
   pintadasEnTrazo = 0;
   await verItinerario();
+  marcarPintando(!!pincel);          // refresca el contador de la barra
 }
 
 document.addEventListener('pointermove', ev => { itinPointerMove(ev); pincelMove(ev); },
@@ -2419,6 +2449,142 @@ async function verCambios(id) {
     </div>`).join('') : '<div class="vacio">Sin modificaciones.</div>');
 }
 
+// ── Revisar y deshacer lo programado hace poco (D39) ────────────────────────
+//
+// El itinerario se puede crear en bloque por tres caminos —copiar un período,
+// la plantilla de Excel y el pincel— y ninguno tenía vuelta atrás: deshacer
+// una copia de dos semanas era borrar cien celdas a mano. Esta pantalla
+// responde «qué se creó, cuándo y quién» y permite quitarlo de una vez.
+
+let recientesCargadas = [];
+let recientesHoras = 48;
+
+async function modalRecientes(horas) {
+  recientesHoras = horas || recientesHoras;
+  abrirModal('Creado hace poco', '<div class="cargando">Buscando...</div>', '');
+  try {
+    const r = await api('/api/itinerario/recientes?horas=' + recientesHoras);
+    recientesCargadas = r.itinerarios;
+  } catch (e) {
+    return abrirModal('Creado hace poco', `<div class="nota avi">${esc(e.message)}</div>`);
+  }
+  pintarRecientes();
+}
+
+function pintarRecientes() {
+  const admin = sesion.rol === 'principal';
+  // Se agrupa por el momento y el autor solo PARA MIRAR. El borrado va por
+  // identificadores señalados uno a uno, no por el grupo: dos operaciones
+  // seguidas no deben irse juntas por un redondeo de la hora.
+  const grupos = new Map();
+  for (const it of recientesCargadas) {
+    const clave = `${it.creado_en.slice(0, 16)}|${it.creado_por}`;
+    if (!grupos.has(clave)) grupos.set(clave, []);
+    grupos.get(clave).push(it);
+  }
+
+  abrirModal('Creado hace poco', `
+    <div class="fila" style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:.8rem">
+      <div><label class="lb">Creado en las últimas</label>
+        <select class="inp" onchange="modalRecientes(Number(this.value))">
+          ${[24, 48, 72, 168, 720].map(h => `<option value="${h}" ${recientesHoras === h ? 'selected' : ''}
+            >${h < 48 ? '24 horas' : h < 168 ? h / 24 + ' días' : h === 168 ? '7 días' : '30 días'}</option>`).join('')}
+        </select></div>
+      <span style="font-size:.8rem;color:var(--muted);padding-bottom:.45rem">
+        ${num(recientesCargadas.length)} programación(es)</span>
+    </div>
+
+    ${!recientesCargadas.length
+      ? '<div class="vacio">No se ha programado nada en ese lapso.</div>'
+      : [...grupos.entries()].map(([clave, filas]) => {
+        const p = filas[0];
+        const fechas = filas.map(x => x.fecha).sort();
+        const conViajes = filas.filter(x => x.viajes > 0).length;
+        return `
+        <div class="card" style="padding:.6rem .8rem;margin-bottom:.6rem">
+          <div style="display:flex;justify-content:space-between;gap:.6rem;flex-wrap:wrap;align-items:flex-start">
+            <div>
+              <b style="font-size:.9rem">${num(filas.length)} programación(es)</b>
+              <div style="font-size:.78rem;color:var(--text-soft)">
+                del ${esc(fechas[0])} al ${esc(fechas[fechas.length - 1])}
+                · ${new Set(filas.map(x => x.placa)).size} vehículo(s)</div>
+              <div style="font-size:.74rem;color:var(--muted);margin-top:.2rem">
+                ${esc(p.creado_por_nombre?.trim() || p.creado_por_usuario || 'usuario')}
+                · ${fechaHora(p.creado_en)}
+                ${filas.length >= 10 ? ' · <b>creadas de un golpe</b>' : ''}
+              </div>
+              ${conViajes ? `<div style="font-size:.74rem;color:var(--verde);margin-top:.2rem">
+                ${conViajes} ya tiene(n) viajes registrados: esas no se pueden quitar.</div>` : ''}
+            </div>
+            ${admin ? `<button class="btn sec sm"
+              onclick="confirmarQuitarRecientes('${clave}')">Quitar estas</button>` : ''}
+          </div>
+          <details style="margin-top:.5rem">
+            <summary style="cursor:pointer;font-size:.78rem;color:var(--azul)">Ver el detalle</summary>
+            <div class="tabla-env" style="margin-top:.4rem;border:0;max-height:220px;overflow:auto">
+              <table><thead><tr><th>Día</th><th>Vehículo</th><th>Destino</th><th></th></tr></thead>
+                <tbody>${filas.map(x => `<tr>
+                  <td>${esc(x.fecha)}</td><td class="placa">${esc(x.placa)}</td>
+                  <td>${esc(x.destino || TIPOS_JORNADA[x.tipo_jornada]?.et || '')}</td>
+                  <td>${x.viajes ? '<span class="etq verde">con viajes</span>' : ''}</td>
+                </tr>`).join('')}</tbody></table>
+            </div>
+          </details>
+        </div>`; }).join('')}`,
+    `<button class="btn sec" onclick="cerrarModal()">Cerrar</button>`);
+}
+
+function confirmarQuitarRecientes(clave) {
+  const filas = recientesCargadas.filter(
+    x => `${x.creado_en.slice(0, 16)}|${x.creado_por}` === clave);
+  const quitables = filas.filter(x => !x.viajes);
+  const fechas = quitables.map(x => x.fecha).sort();
+
+  abrirModal('Quitar lo programado', `
+    <div class="nota avi" style="margin-bottom:1rem">
+      Se van a quitar <b>${num(quitables.length)} programación(es)</b>
+      ${fechas.length ? `del <b>${esc(fechas[0])}</b> al <b>${esc(fechas[fechas.length - 1])}</b>` : ''}.
+      ${filas.length - quitables.length
+        ? `<br>${filas.length - quitables.length} se dejan: esos días ya tienen viajes registrados.`
+        : ''}
+      <br><br>Esto no se puede deshacer.
+    </div>
+    <div class="campo"><label class="lb">Por qué se quitan <span class="req">*</span></label>
+      <textarea class="inp" id="rec-motivo" rows="2"
+        placeholder="Ej: se copió el período por error"></textarea></div>`,
+    `<button class="btn sec" onclick="pintarRecientes()">Volver</button>
+     ${quitables.length ? `<button class="btn rojo" id="rec-btn"
+       onclick="quitarRecientes('${clave}')">Quitar ${quitables.length}</button>` : ''}`);
+}
+
+async function quitarRecientes(clave) {
+  const motivo = $('#rec-motivo').value.trim();
+  if (motivo.length < 5) return aviso('Escriba por qué se quitan', 'mal', 'Falta el motivo');
+  const ids = recientesCargadas
+    .filter(x => `${x.creado_en.slice(0, 16)}|${x.creado_por}` === clave && !x.viajes)
+    .map(x => x.id);
+
+  const btn = $('#rec-btn'); btn.disabled = true; btn.textContent = 'Quitando...';
+  try {
+    const r = await api('/api/itinerario/borrar-lote', { metodo: 'POST', cuerpo: { ids, motivo } });
+    cerrarModal();
+    aviso(`${r.borradas} quitada(s)` +
+      (r.omitidas.length ? `, ${r.omitidas.length} no se pudo` : ''), 'ok', 'Listo');
+    verItinerario();
+  } catch (e) {
+    aviso(e.message, 'mal', 'No se pudo quitar');
+    btn.disabled = false; btn.textContent = 'Quitar';
+  }
+}
+
+/**
+ * Copiar un período (D39).
+ *
+ * Crea decenas de programaciones de un golpe y antes no enseñaba cuántas ni
+ * hasta dónde: se escogía una fecha y se tocaba «Copiar». Ahora hay dos
+ * pasos — primero se pregunta al servidor qué HARÍA, sin escribir nada, y lo
+ * que se confirma es ese número.
+ */
 function modalCopiarSemana() {
   const hasta = nDias(itinDesde, itinDias - 1);
   abrirModal('Copiar programación', `
@@ -2427,9 +2593,45 @@ function modalCopiarSemana() {
       Los días que ya tengan programación se dejan como están.
     </p>
     <div class="campo"><label class="lb">Copiar a partir del</label>
-      <input class="inp" type="date" id="cp-desde" value="${nDias(itinDesde, itinDias)}"></div>`,
+      <input class="inp" type="date" id="cp-desde" value="${nDias(itinDesde, itinDias)}"></div>
+    <div id="cp-previa"></div>`,
     `<button class="btn sec" onclick="cerrarModal()">Cancelar</button>
-     <button class="btn" id="cp-btn" onclick="copiarSemana('${itinDesde}','${hasta}')">Copiar</button>`);
+     <button class="btn" id="cp-btn"
+       onclick="ensayarCopia('${itinDesde}','${hasta}')">Ver qué se va a copiar</button>`);
+}
+
+/** Primer paso: se pregunta qué haría, sin escribir nada. */
+async function ensayarCopia(desde, hasta) {
+  const destino = $('#cp-desde').value;
+  if (!destino) return aviso('Indique desde qué día copiar', 'mal', 'Falta la fecha');
+  const btn = $('#cp-btn'); btn.disabled = true; btn.textContent = 'Revisando...';
+  try {
+    const r = await api('/api/itinerario/copiar', {
+      metodo: 'POST', cuerpo: { desde, hasta, destino_desde: destino, ensayo: true },
+    });
+    $('#cp-previa').innerHTML = r.creados ? `
+      <div class="nota avi" style="margin-top:.4rem">
+        Se van a crear <b>${num(r.creados)} programación(es)</b> nuevas,
+        del <b>${esc(r.primera)}</b> al <b>${esc(r.ultima)}</b>, para
+        ${r.vehiculos} vehículo(s).
+        ${r.omitidos ? `<br>${r.omitidos} se omiten porque esos días ya tienen programación.` : ''}
+        <br><br>Si no era esto, toque <b>Cancelar</b>.
+      </div>` : `
+      <div class="nota" style="margin-top:.4rem">
+        No hay nada que copiar: todos esos días ya tienen programación.
+      </div>`;
+    btn.disabled = false;
+    if (r.creados) {
+      btn.textContent = `Sí, crear ${r.creados}`;
+      btn.classList.add('rojo');
+      btn.setAttribute('onclick', `copiarSemana('${desde}','${hasta}')`);
+    } else {
+      btn.textContent = 'Ver qué se va a copiar';
+    }
+  } catch (e) {
+    aviso(e.message, 'mal', 'No se pudo revisar');
+    btn.disabled = false; btn.textContent = 'Ver qué se va a copiar';
+  }
 }
 
 async function copiarSemana(desde, hasta) {
@@ -2440,7 +2642,8 @@ async function copiarSemana(desde, hasta) {
       cuerpo: { desde, hasta, destino_desde: $('#cp-desde').value },
     });
     cerrarModal();
-    aviso(`${r.creados} copiada(s)${r.omitidos ? `, ${r.omitidos} omitida(s) por tener programación` : ''}`, 'ok', 'Listo');
+    aviso(`${r.creados} copiada(s)${r.omitidos ? `, ${r.omitidos} omitida(s) por tener programación` : ''}. ` +
+      'Si no era lo que quería, use «Creado hace poco» para deshacerlo.', 'ok', 'Listo');
     verItinerario();
   } catch (e) {
     aviso(e.message, 'mal', 'No se pudo copiar');

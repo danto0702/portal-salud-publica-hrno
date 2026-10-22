@@ -1205,6 +1205,70 @@ verificar('y queda desenganchada, no apuntando a un viaje que no existe',
 r = await api('DELETE', '/api/trayectos/999999', { motivo: 'no existe' }, tokenPrincipal);
 verificar('un viaje que no existe responde 404', r.estado === 404, r.estado);
 
+console.log('\n── Revisar y deshacer lo programado en bloque ────────────────');
+
+// Copiar un período: primero el ensayo, que no debe escribir nada.
+const vCopia = (await api('GET', '/api/vehiculos', null, tCoord)).datos[0].id;
+for (const n of [60, 61, 62]) {
+  await api('POST', '/api/itinerario', {
+    fecha: fx(n), vehiculo_id: vCopia, municipio_id: 1,
+    destino_nombre: 'ORIGEN COPIA', tipo_jornada: 'ebs',
+  }, tCoord);
+}
+r = await api('POST', '/api/itinerario/copiar', {
+  desde: fx(60), hasta: fx(62), destino_desde: fx(70), ensayo: true,
+}, tCoord);
+verificar('el ensayo dice cuántas crearía', r.estado === 200 && r.datos.creados === 3, r.datos);
+verificar('y entre qué fechas',
+  r.datos.primera === fx(70) && r.datos.ultima === fx(72), r.datos);
+r = await api('GET', `/api/itinerario?desde=${fx(70)}&hasta=${fx(72)}`, null, tCoord);
+verificar('el ensayo NO escribió nada', r.datos.length === 0, r.datos.length);
+
+r = await api('POST', '/api/itinerario/copiar', {
+  desde: fx(60), hasta: fx(62), destino_desde: fx(70),
+}, tCoord);
+verificar('la copia de verdad sí escribe', r.datos.creados === 3, r.datos);
+
+// Lo creado hace poco sale en la revisión, con quién y cuándo.
+r = await api('GET', '/api/itinerario/recientes?horas=24', null, tCoord);
+const copiadas = r.datos.itinerarios.filter(x => x.fecha >= fx(70) && x.fecha <= fx(72));
+verificar('lo recién creado aparece en la revisión', copiadas.length === 3, copiadas.length);
+verificar('con quién lo creó',
+  copiadas[0].creado_por_usuario === 'coordina', copiadas[0].creado_por_usuario);
+verificar('y dice si el día ya tiene viajes', copiadas.every(x => x.viajes === 0), copiadas[0]);
+
+// Quitarlo en bloque: solo el administrador, con motivo.
+const idsCopia = copiadas.map(x => x.id);
+r = await api('POST', '/api/itinerario/borrar-lote',
+  { ids: idsCopia, motivo: 'Se copió por error' }, tCoord);
+verificar('coordinación NO quita en bloque', r.estado === 403, r.datos);
+r = await api('POST', '/api/itinerario/borrar-lote', { ids: idsCopia, motivo: 'ups' },
+              tokenPrincipal);
+verificar('exige un motivo de verdad', r.estado === 400, r.datos);
+r = await api('POST', '/api/itinerario/borrar-lote', { ids: [], motivo: 'Nada señalado' },
+              tokenPrincipal);
+verificar('no hace nada si no se señaló ninguna', r.estado === 400, r.datos);
+
+r = await api('POST', '/api/itinerario/borrar-lote',
+  { ids: idsCopia, motivo: 'Se copió el período por error' }, tokenPrincipal);
+verificar('el administrador deshace la copia de un golpe',
+  r.estado === 200 && r.datos.borradas === 3, r.datos);
+r = await api('GET', `/api/itinerario?desde=${fx(70)}&hasta=${fx(72)}`, null, tCoord);
+verificar('y los días quedan limpios', r.datos.length === 0, r.datos.length);
+
+// Un día con viajes registrados NO se toca, aunque venga señalado: el
+// vehículo salió, y quitarle la programación descuadraría el día pagable.
+r = await api('GET', '/api/itinerario/recientes?horas=720', null, tCoord);
+const conViajes = r.datos.itinerarios.find(x => x.viajes > 0);
+verificar('hay una programación con viajes para contrastar', !!conViajes, conViajes);
+r = await api('POST', '/api/itinerario/borrar-lote',
+  { ids: [conViajes.id], motivo: 'Intentar quitar un día que sí se operó' }, tokenPrincipal);
+verificar('un día con viajes registrados no se quita',
+  r.datos.borradas === 0 && /viajes/.test(r.datos.omitidas[0].motivo || ''), r.datos);
+r = await api('GET', `/api/itinerario?desde=${conViajes.fecha}&hasta=${conViajes.fecha}`,
+              null, tCoord);
+verificar('y sigue ahí', r.datos.some(x => x.id === conViajes.id), r.datos.length);
+
 console.log('\n── Corregir un viaje (solo el administrador) ─────────────────');
 
 // Un viaje propio, con su día programado, para ver cómo se mueve el pago.

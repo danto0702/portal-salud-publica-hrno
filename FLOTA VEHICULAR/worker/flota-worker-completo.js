@@ -95,7 +95,7 @@ const totalRutas = () => rutas.length;
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 15;
+const VERSION_API = 16;
 
 /**
  * Juegos de roles que usan las rutas.
@@ -1246,6 +1246,11 @@ ruta('POST', '/api/itinerario/copiar', async ({ db, sesion, cuerpo }) => {
   const dias = Math.round(
     (Date.parse(destino_desde) - Date.parse(desde)) / 86400000);
   let creados = 0, omitidos = 0;
+  // Ensayo (D39): cuenta lo que haría SIN escribir nada. Copiar un período
+  // crea decenas de programaciones de un golpe y no tenía vuelta atrás; ahora
+  // la pantalla enseña primero cuántas y entre qué fechas.
+  const ensayo = cuerpo.ensayo === true;
+  const nuevasFechas = [];
 
   for (const it of origen.results) {
     const nueva = new Date(Date.parse(it.fecha) + dias * 86400000)
@@ -1254,6 +1259,7 @@ ruta('POST', '/api/itinerario/copiar', async ({ db, sesion, cuerpo }) => {
       "SELECT id FROM itinerarios WHERE fecha = ? AND vehiculo_id = ? AND estado != 'cancelado'")
       .bind(nueva, it.vehiculo_id).first();
     if (choque) { omitidos++; continue; }
+    if (ensayo) { creados++; nuevasFechas.push(nueva); continue; }
     await db.prepare(`
       INSERT INTO itinerarios (fecha, vehiculo_id, conductor_id, municipio_id,
                                destino_id, destino_texto, tipo_jornada, observaciones,
@@ -1263,6 +1269,13 @@ ruta('POST', '/api/itinerario/copiar', async ({ db, sesion, cuerpo }) => {
             it.destino_texto, it.tipo_jornada, it.observaciones, sesion.id, ahora()).run();
     await recalcularDia(db, nueva, it.vehiculo_id);
     creados++;
+  }
+  if (ensayo) {
+    nuevasFechas.sort();
+    return { ensayo: true, creados, omitidos,
+             primera: nuevasFechas[0] || null,
+             ultima: nuevasFechas[nuevasFechas.length - 1] || null,
+             vehiculos: new Set(origen.results.map(x => x.vehiculo_id)).size };
   }
   await auditar(db, sesion, 'crear', 'itinerarios', null, null,
                 { copiados: creados, omitidos });
@@ -1469,6 +1482,82 @@ ruta('POST', '/api/itinerario/lote', async ({ db, sesion, cuerpo }) => {
                   errores: resultados.errores.length });
   return resultados;
 }, GESTION);
+
+/**
+ * Lo que se programó hace poco, para poder revisarlo y deshacerlo (D39).
+ *
+ * El itinerario se puede crear en bloque por tres caminos —copiar un período,
+ * la plantilla de Excel y el pincel— y ninguno tenía vuelta atrás: deshacer
+ * una copia de dos semanas era borrar cien celdas a mano. Esta consulta
+ * responde «qué se creó, cuándo y quién», que es lo primero que se pregunta
+ * cuando aparece programación que nadie esperaba.
+ *
+ * Se devuelve también si el día YA tiene viajes registrados: esas no se
+ * pueden quitar, y además significan que el vehículo sí salió.
+ */
+ruta('GET', '/api/itinerario/recientes', async ({ db, url }) => {
+  const horas = Math.min(Math.max(Number(url.searchParams.get('horas')) || 48, 1), 24 * 30);
+  const desde = new Date(Date.now() - horas * 3600e3).toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+  const r = await db.prepare(`
+    SELECT i.id, i.fecha, i.vehiculo_id, i.tipo_jornada, i.estado,
+           i.creado_en, i.creado_por,
+           v.placa, IFNULL(d.nombre, i.destino_texto) AS destino,
+           u.usuario AS creado_por_usuario,
+           p.nombres || ' ' || IFNULL(p.apellidos,'') AS creado_por_nombre,
+           (SELECT COUNT(*) FROM trayectos t
+             WHERE t.fecha_operacion = i.fecha AND t.vehiculo_id = i.vehiculo_id
+               AND t.estado != 'anulado') AS viajes
+      FROM itinerarios i
+      JOIN vehiculos v ON v.id = i.vehiculo_id
+      LEFT JOIN cat_destinos d ON d.id = i.destino_id
+      LEFT JOIN usuarios u ON u.id = i.creado_por
+      LEFT JOIN personas p ON p.id = u.persona_id
+     WHERE i.creado_en >= ?
+     ORDER BY i.creado_en DESC, i.fecha, v.placa
+     LIMIT 2000`).bind(desde).all();
+  return { desde, horas, itinerarios: r.results };
+}, GESTION);
+
+/**
+ * Quitar en bloque las programaciones que se señalen. Solo el administrador.
+ *
+ * Se piden los IDENTIFICADORES, no un rango ni una hora: agrupar por el
+ * momento de creación haría que dos operaciones distintas y seguidas se
+ * borraran juntas. Aquí se borra exactamente lo que el usuario vio y marcó.
+ *
+ * Un día con viajes registrados NO se toca, aunque venga en la lista: el
+ * vehículo salió, y quitar la programación descuadraría el día pagable.
+ */
+ruta('POST', '/api/itinerario/borrar-lote', async ({ db, sesion, cuerpo }) => {
+  const ids = Array.isArray(cuerpo.ids) ? cuerpo.ids.map(Number).filter(Boolean) : [];
+  if (!ids.length) throw malaPeticion('No se señaló ninguna programación');
+  if (ids.length > 600) throw malaPeticion('Demasiadas en un solo envío (máximo 600)');
+  const motivo = String(cuerpo.motivo || '').trim();
+  if (motivo.length < 5) throw malaPeticion('Escriba por qué se quitan: queda registrado');
+
+  const borradas = [], omitidas = [];
+  const dias = new Set();
+  for (const id of ids) {
+    const it = await db.prepare('SELECT * FROM itinerarios WHERE id = ?').bind(id).first();
+    if (!it) { omitidas.push({ id, motivo: 'ya no existe' }); continue; }
+    if (await viajesDelDia(db, it.fecha, it.vehiculo_id)) {
+      omitidas.push({ id, fecha: it.fecha, motivo: 'ese día ya tiene viajes registrados' });
+      continue;
+    }
+    await db.prepare('DELETE FROM itinerario_cambios WHERE itinerario_id = ?').bind(id).run();
+    await db.prepare('DELETE FROM itinerarios WHERE id = ?').bind(id).run();
+    borradas.push(id);
+    dias.add(`${it.fecha}|${it.vehiculo_id}`);
+  }
+  for (const clave of dias) {
+    const [f, v] = clave.split('|');
+    await recalcularDia(db, f, Number(v));
+  }
+  await auditar(db, sesion, 'eliminar', 'itinerarios', null,
+                { ids }, { motivo, borradas: borradas.length, omitidas: omitidas.length });
+  return { borradas: borradas.length, omitidas };
+}, ['principal']);
 
 // ══════════════════════════════════ BANCO DE PREDETERMINADOS ════════════════
 

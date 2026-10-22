@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D39 | Creación en bloque | Copiar un período **enseña antes cuántas crearía**; el pincel lo anuncia con una barra fija mientras está encendido; y lo creado hace poco se puede **revisar y deshacer** de un golpe |
 | D38 | Corregir un viaje | **Solo el administrador**, con motivo obligatorio e **historial visible en el propio viaje**. Las coordenadas y las fotografías NO se pueden corregir |
 | D37 | Dashboard por persona y por vehículo | Secciones comparativas de las dos cosas **y** dos selectores que enfocan **todo** el tablero en un conductor o un vehículo. El recorte lo hace el servidor, no la pantalla |
 | D36 | Consecutivos | Salen del **máximo**, no de `COUNT(*)`: un número borrado deja hueco y la serie sigue. Con reintento, para cuando dos conductores marcan en el mismo segundo |
@@ -812,6 +813,40 @@ conversión va por el propio navegador en los dos sentidos, así que cuadra est�
 corrige.
 
 Se prueba en `prueba_api.mjs` y en `prueba_viajes.mjs`.
+
+### 5.1.5 Crear programación en bloque: enseñar antes y poder deshacer (D39)
+
+El itinerario se puede crear **en bloque** por tres caminos, y ninguno tenía vuelta atrás:
+
+| Camino | Qué crea de un golpe | Rastro que deja en la auditoría |
+|---|---|---|
+| **Copiar período** | el período visible entero, desplazado | UNA fila: `crear · itinerarios`, sin identificador, con `{"copiados":N,"omitidos":M}` |
+| **Plantilla de Excel** | lo que traiga el archivo | UNA fila con `{"origen":"plantilla de Excel", ...}` |
+| **Pincel** | un día por cada toque | UNA fila **por cada** programación, con su identificador |
+
+Deshacer una copia de dos semanas era borrar cien celdas a mano. Eso cambia:
+
+**Copiar período enseña primero.** Se pregunta al servidor qué *haría* (`ensayo: true`, que no
+escribe nada) y lo que se confirma es ese número: *«se van a crear 47 programaciones, del X al Y,
+para 9 vehículos»*. El botón de confirmar pasa a rojo y dice *«Sí, crear 47»*. Además dejó de ser
+el único botón azul sólido de la barra — era el más fácil de tocar por accidente.
+
+**El pincel lo dice mientras dure.** Con el pincel encendido **cada toque sobre un día lo
+programa**, sin ventana de confirmación. El único aviso era un mensaje que se desvanece y un
+cambio de cursor, que en un teléfono no existe: se podía quedar encendido sin que nadie lo notara.
+Ahora hay una **barra fija abajo** con el nombre del predeterminado, la cuenta de lo que lleva
+hecho y un botón **Apagar**.
+
+**Y se puede deshacer.** El botón *«Creado hace poco»* lista lo programado en las últimas 24 h, 48
+h, 7 o 30 días, agrupado por momento y autor, diciendo cuántas, entre qué fechas y quién; las de
+más de diez llevan la nota *«creadas de un golpe»*. El administrador las quita todas con un motivo
+obligatorio.
+
+> **Dos cuidados en el borrado en bloque.** Se piden los **identificadores**, no un rango ni una
+> hora: agrupar por el momento de creación haría que dos operaciones distintas y seguidas se
+> borraran juntas. Y un día **con viajes registrados no se toca** aunque venga señalado — el
+> vehículo salió, y quitarle la programación descuadraría el día pagable; se informa cuáles se
+> dejaron y por qué.
 
 ### 5.4.11 Las fechas de las pruebas no se escriben a mano
 
