@@ -108,16 +108,28 @@ try {
   await coord.waitForTimeout(500);
   verificar('el historial arranca vacío',
     /no tiene días fuera de servicio/i.test(await coord.locator('.modal-caja').innerText()));
+  await coord.click('.modal-pie .btn.sec:has-text("Cerrar")');
+  await coord.waitForSelector('.modal-caja', { state: 'hidden' });
 
-  await coord.click('.modal-caja button:has-text("Registrar período")');
-  await coord.waitForSelector('#fs-desde');
+  // El período lo registra el ADMINISTRADOR. Desde D41 lo que pide
+  // coordinación no se aplica, y lo que se prueba de aquí en adelante es qué
+  // hace el período una vez existe: los días marcados en la matriz, el aviso
+  // al programar encima, lo que se ofrece con los días ya programados. El
+  // camino de coordinación —que quede esperando— se comprueba al final.
+  await admin.click('.nav button:has-text("Itinerario")');
+  await admin.waitForSelector('#itin-env');
+  await admin.waitForTimeout(900);
+  await admin.click(`.itin-td-veh:has-text("${objetivo.placa}") .fs-boton`);
+  await admin.waitForSelector('.modal-caja:has-text("Fuera de servicio")');
+  await admin.click('.modal-caja button:has-text("Registrar período")');
+  await admin.waitForSelector('#fs-desde');
 
   // El rango se escoge para que caiga sobre días YA PROGRAMADOS y sobre días
   // vacíos a la vez: los primeros ejercitan el ofrecimiento de cancelarlos, y
   // los segundos son donde se adjudicaría un traslado imposible. Empieza hoy
   // porque la matriz arranca en la semana en curso y un día anterior quedaría
   // fuera de la ventana visible.
-  const rango = await coord.evaluate(id => {
+  const rango = await admin.evaluate(id => {
     const enLaFila = f => document.querySelector(
       `.itin-celda[data-vehiculo-id="${id}"][data-fecha="${f}"]`);
     const dias = Array.from({ length: itinDias }, (_, i) => nDias(itinDesde, i));
@@ -128,27 +140,27 @@ try {
   verificar('el rango de prueba cubre días programados y días vacíos',
     rango.hayLosDos && rango.desde < rango.hasta, JSON.stringify(rango));
 
-  await coord.selectOption('#fs-causa', 'averia');
-  await coord.fill('#fs-desde', rango.desde);
-  await coord.fill('#fs-hasta', rango.hasta);
-  await coord.fill('#fs-desc', 'Caja de velocidades');
-  await coord.fill('#fs-taller', 'Taller Ocaña');
-  await coord.click('#fs-btn');
-  await coord.waitForTimeout(1200);
+  await admin.selectOption('#fs-causa', 'averia');
+  await admin.fill('#fs-desde', rango.desde);
+  await admin.fill('#fs-hasta', rango.hasta);
+  await admin.fill('#fs-desc', 'Caja de velocidades');
+  await admin.fill('#fs-taller', 'Taller Ocaña');
+  await admin.click('#fs-btn');
+  await admin.waitForTimeout(1200);
 
-  const textoModal = await coord.locator('.modal-caja').innerText();
+  const textoModal = await admin.locator('.modal-caja').innerText();
   verificar('ofrece qué hacer con los días ya programados',
     /Días ya programados/i.test(textoModal), textoModal.slice(0, 80));
   verificar('y no cancela nada por su cuenta: hay que decidirlo',
-    await coord.locator('.modal-caja button:has-text("Dejarlos como están")').count() === 1);
+    await admin.locator('.modal-caja button:has-text("Dejarlos como están")').count() === 1);
 
-  const paraCancelar = await coord.locator('.modal-caja button:has-text("Cancelar los")').count();
+  const paraCancelar = await admin.locator('.modal-caja button:has-text("Cancelar los")').count();
   if (paraCancelar) {
-    await coord.click('.modal-caja button:has-text("Cancelar los")');
-    await coord.waitForTimeout(1500);
+    await admin.click('.modal-caja button:has-text("Cancelar los")');
+    await admin.waitForTimeout(1500);
   } else {
-    await coord.click('.modal-caja button:has-text("Dejarlos como están")');
-    await coord.waitForTimeout(800);
+    await admin.click('.modal-caja button:has-text("Dejarlos como están")');
+    await admin.waitForTimeout(800);
   }
 
   // ── Se ve en la matriz ───────────────────────────────────────────────────
@@ -189,6 +201,7 @@ try {
   await cond.waitForTimeout(900);
 
   const suyo = await cond.evaluate(() => diaActual?.vehiculo_id || null);
+  const VEH_COND = suyo;
   verificar('el conductor tiene vehículo asignado hoy', !!suyo, String(suyo));
 
   const yaParado = await cond.evaluate(() => !!diaActual?.fuera_servicio);
@@ -255,6 +268,9 @@ try {
   verificar('se avisa de que sigue parado y cada día deja de ser pagable',
     /Sigue fuera de servicio/i.test(hist));
 
+  // ── Cerrar el período: coordinación lo pide, el administrador lo cierra ──
+  // Un período abierto deja de ser pagable cada día que pasa, así que cerrarlo
+  // mueve plata: por eso también pasa por aprobación (D41).
   await coord.click('.modal-caja tbody button:has-text("Editar")');
   await coord.waitForSelector('#fs-hasta');
   verificar('al editar un período abierto se pide el motivo del cierre',
@@ -263,8 +279,29 @@ try {
   await coord.fill('#fs-motivo', 'Se cambió la correa en la vía');
   await coord.click('#fs-btn');
   await coord.waitForTimeout(1200);
-  verificar('queda cerrado y ya no aparece como parado',
-    !/Sigue fuera de servicio/i.test(await coord.locator('.modal-caja').innerText()));
+  verificar('cerrarlo queda pedido, no hecho',
+    /aprobaci[óo]n/i.test(await coord.locator('#avisos').innerText()),
+    (await coord.locator('#avisos').innerText()).replace(/\n/g, ' ').slice(0, 90));
+
+  const abierto = await admin.evaluate(id =>
+    api('/api/fuera-servicio?vehiculo_id=' + id)
+      .then(l => l.some(x => !x.fecha_fin)), VEH_COND);
+  verificar('y el vehículo sigue parado mientras nadie apruebe', abierto === true);
+
+  await admin.evaluate(() => ir('solicitudes'));
+  await admin.waitForSelector('#main .card');
+  await admin.waitForTimeout(700);
+  verificar('el administrador ve en su bandeja que piden cerrarlo',
+    /fuera de servicio/i.test(await admin.locator('#main').innerText()),
+    (await admin.locator('#main').innerText()).replace(/\n/g, ' ').slice(0, 130));
+  admin.once('dialog', d => d.accept());
+  await admin.locator('#main button:has-text("Aprobar")').first().click();
+  await admin.waitForTimeout(1500);
+
+  const yaCerrado = await admin.evaluate(id =>
+    api('/api/fuera-servicio?vehiculo_id=' + id)
+      .then(l => l.every(x => !!x.fecha_fin)), VEH_COND);
+  verificar('aprobado, el período queda cerrado de verdad', yaCerrado === true);
 
   await ctxCond.close();
 } finally {

@@ -82,6 +82,14 @@ a{color:var(--azul)}
 }
 .nav button:hover{color:var(--text-soft)}
 .nav button.on{color:var(--azul);border-bottom-color:var(--azul)}
+/* Cuántas solicitudes esperan. Va en el propio botón del menú porque una
+   bandeja a la que hay que acordarse de entrar no la abre nadie. */
+.cuenta-nav{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:1.15rem;height:1.15rem;padding:0 .25rem;margin-left:.1rem;
+  border-radius:999px;background:var(--rojo);color:#fff;
+  font:700 .65rem 'Inter',sans-serif;line-height:1;
+}
 main{max-width:1240px;margin:0 auto;padding:1rem}
 .vista{display:none;animation:sube .22s ease}
 .vista.on{display:block}
@@ -255,6 +263,23 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
   text-transform:uppercase;letter-spacing:.04em;color:var(--rojo);
   background:var(--surface);border:1px solid rgba(194,46,36,.3);
   border-radius:999px;padding:.05rem .35rem;white-space:nowrap;
+}
+
+/* Día con solicitud esperando aprobación (D41). Rayado y sin el signo «+»:
+   tiene que leerse de un vistazo que ahí no se puede programar todavía, y
+   que no es un día libre ni uno ya adjudicado. */
+.itin-celda.esperando{
+  border-style:dashed;border-color:var(--ambar);background:var(--ambar-glow);
+  cursor:help;
+}
+.itin-ren.esperando{
+  border-style:dashed;border-color:var(--ambar);background:var(--ambar-glow);
+}
+.sol-marca{
+  display:inline-block;margin-top:.2rem;font:700 .56rem 'Inter',sans-serif;
+  text-transform:uppercase;letter-spacing:.04em;color:var(--ambar);
+  background:var(--surface);border:1px solid rgba(162,98,10,.35);
+  border-radius:999px;padding:.05rem .3rem;white-space:nowrap;
 }
 
 /* Fichas del banco de predeterminados */

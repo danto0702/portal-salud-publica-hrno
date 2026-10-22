@@ -454,9 +454,10 @@ ruta('POST', '/api/itinerario/lote', async ({ db, sesion, cuerpo }) => {
           await db.prepare(`
             INSERT INTO itinerario_cambios (itinerario_id, ts, usuario_id, campo,
                                             valor_antes, valor_despues, motivo)
-            VALUES (?,?,?,?,?,?, 'Carga desde plantilla de Excel')`)
+            VALUES (?,?,?,?,?,?, ?)`)
             .bind(op.id, ahora(), sesion.id, campo,
-                  antes[campo] != null ? String(antes[campo]) : null, String(val)).run();
+                  antes[campo] != null ? String(antes[campo]) : null, String(val),
+                  cuerpo.motivo || 'Carga desde plantilla de Excel').run();
         }
         await marcarUsoDestino(db, destinoId);
         resultados.actualizadas++;
@@ -487,7 +488,7 @@ ruta('POST', '/api/itinerario/lote', async ({ db, sesion, cuerpo }) => {
     await recalcularDia(db, f, Number(v));
   }
   await auditar(db, sesion, 'crear', 'itinerarios', null, null,
-                { origen: 'plantilla de Excel', ...resultados,
+                { origen: cuerpo.origen || 'plantilla de Excel', ...resultados,
                   errores: resultados.errores.length });
   return resultados;
 }, GESTION);

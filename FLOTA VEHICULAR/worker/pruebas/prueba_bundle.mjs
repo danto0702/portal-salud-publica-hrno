@@ -130,6 +130,7 @@ r = await api('POST', '/api/usuarios', {
   usuario: 'coordina', clave: 'Coordinacion2026', rol: 'coordinacion',
 }, tokenPrincipal);
 verificar('el principal crea un usuario de coordinación', r.estado === 200, r.datos);
+const idCoord = r.datos.id;
 
 r = await api('POST', '/api/usuarios', {
   usuario: 'jnavarro', clave: 'Conductor2026', rol: 'conductor', persona_id: personaConductor,
@@ -145,6 +146,26 @@ const tCoord = (await api('POST', '/api/auth/login',
 const tCond = (await api('POST', '/api/auth/login',
   { usuario: 'jnavarro', clave: 'Conductor2026' })).datos.token;
 verificar('ingresan coordinación y conductor', !!tCoord && !!tCond);
+
+/**
+ * Pide algo como coordinación y lo aprueba en el acto (D41).
+ *
+ * Desde D41 lo que pide coordinación NO se aplica: queda esperando al
+ * administrador y la respuesta es 202. Las verificaciones de aquí abajo
+ * comprueban QUÉ hace la operación, no quién la autoriza, así que se aprueba
+ * sin más y vuelven a ver el mismo resultado de siempre. El camino de la
+ * aprobación —que se intercepte, que no se aplique, que venza, que se
+ * rechace— tiene su propia sección al final.
+ */
+async function coord(metodo, ruta, cuerpo) {
+  const r = await api(metodo, ruta, cuerpo, tCoord);
+  if (r.estado !== 202 || !r.datos.pendiente) return r;          // 400, 403, 404…
+  const a = await api('POST', `/api/solicitudes/${r.datos.solicitud}/aprobar`,
+                      {}, tokenPrincipal);
+  if (a.estado !== 200) return a;
+  return { estado: 200, datos: a.datos.resultado === undefined ? { ok: true }
+                                                               : a.datos.resultado };
+}
 
 r = await api('POST', '/api/usuarios', { usuario: 'colado', clave: 'Clave123456', rol: 'principal' },
               tCoord);
@@ -270,28 +291,28 @@ verificar('también se puede asignar al crear el vehículo',
   r.datos.find(v => v.id === veh2));
 
 console.log('\n── Itinerario y destinos vivos ───────────────────────────────');
-r = await api('POST', '/api/itinerario', {
+r = await coord('POST', '/api/itinerario', {
   fecha: hoy, vehiculo_id: vehiculo, conductor_id: personaConductor,
   municipio_id: 1, destino_nombre: 'hoyo pilón', tipo_jornada: 'ebs',
-}, tCoord);
+});
 verificar('coordinación adjudica un desplazamiento', r.estado === 200 && r.datos.id, r.datos);
 const itinerario = r.datos.id;
 verificar('reutiliza el destino ya existente del catálogo', r.datos.destino_id === 8, r.datos);
 
-r = await api('POST', '/api/itinerario', {
+r = await coord('POST', '/api/itinerario', {
   fecha: hoy, vehiculo_id: vehiculo, municipio_id: 1, destino_nombre: 'OTRA VEREDA',
-}, tCoord);
+});
 verificar('detecta choque: dos programaciones el mismo día', r.estado === 400, r.datos);
 
-r = await api('POST', '/api/itinerario', {
+r = await coord('POST', '/api/itinerario', {
   fecha: fx(38), vehiculo_id: vehiculo, municipio_id: 3,
   destino_nombre: 'VEREDA NUEVA SIN CATÁLOGO',
-}, tCoord);
+});
 verificar('crea un destino nuevo sobre la marcha', r.estado === 200 && r.datos.destino_id > 17, r.datos);
 
-r = await api('PUT', `/api/itinerario/${itinerario}`, {
+r = await coord('PUT', `/api/itinerario/${itinerario}`, {
   tipo_jornada: 'vacunacion', motivo: 'Se reprogramó por jornada PAI',
-}, tCoord);
+});
 verificar('coordinación modifica el itinerario', r.estado === 200, r.datos);
 
 r = await api('GET', `/api/itinerario/${itinerario}/cambios`, null, tCoord);
@@ -305,10 +326,10 @@ r = await api('PUT', `/api/itinerario/${itinerario}`, { tipo_jornada: 'ebs' }, t
 verificar('el conductor NO modifica el itinerario', r.estado === 403, r.datos);
 
 console.log('\n── Predeterminados ───────────────────────────────────────────');
-r = await api('POST', '/api/predeterminados', {
+r = await coord('POST', '/api/predeterminados', {
   nombre: 'EBS Santa Inés', tipo_jornada: 'ebs', municipio_id: 3,
   destino_nombre: 'SANTA INÉS', observaciones: 'Ruta habitual',
-}, tCoord);
+});
 verificar('coordinación crea un predeterminado', r.estado === 200 && r.datos.id, r.datos);
 const pred = r.datos.id;
 
@@ -316,9 +337,9 @@ r = await api('GET', '/api/predeterminados', null, tCond);
 verificar('el conductor puede leerlos', r.estado === 200 && r.datos.length === 1, r.datos);
 verificar('trae el destino resuelto', r.datos[0].destino === 'SANTA INÉS', r.datos[0]);
 
-r = await api('POST', '/api/itinerario', {
+r = await coord('POST', '/api/itinerario', {
   fecha: fx(10), vehiculo_id: vehiculo, predeterminado_id: pred,
-}, tCoord);
+});
 verificar('adjudicar con un predeterminado', r.estado === 200, r.datos);
 const itPred = r.datos.id;
 
@@ -338,9 +359,9 @@ r = await api('GET', '/api/predeterminados', null, tCoord);
 verificar('desactivado deja de aparecer', r.datos.length === 0, r.datos);
 
 console.log('\n── Mover y duplicar ──────────────────────────────────────────');
-r = await api('POST', '/api/itinerario/mover', {
+r = await coord('POST', '/api/itinerario/mover', {
   id: itPred, fecha: fx(11), vehiculo_id: vehiculo,
-}, tCoord);
+});
 verificar('mueve a un día libre', r.estado === 200 && !r.datos.intercambio, r.datos);
 
 r = await api('GET', `/api/itinerario?desde=${fx(10)}&hasta=${fx(11)}`, null, tCoord);
@@ -351,9 +372,9 @@ r = await api('GET', `/api/itinerario/${itPred}/cambios`, null, tCoord);
 verificar('el movimiento queda en el historial',
   r.datos.some(c => c.campo === 'fecha' && c.valor_despues === fx(11)), r.datos);
 
-r = await api('POST', '/api/itinerario/mover', {
+r = await coord('POST', '/api/itinerario/mover', {
   id: itPred, fecha: fx(12), vehiculo_id: vehiculo, duplicar: true,
-}, tCoord);
+});
 verificar('duplica en otro día', r.estado === 200 && r.datos.duplicado, r.datos);
 const itDup = r.datos.id;
 
@@ -362,15 +383,15 @@ verificar('ahora hay dos, con el mismo destino',
   r.datos.length === 2 && r.datos[0].destino === r.datos[1].destino,
   r.datos.map(x => `${x.fecha}:${x.destino}`));
 
-r = await api('POST', '/api/itinerario/mover', {
+r = await coord('POST', '/api/itinerario/mover', {
   id: itPred, fecha: fx(12), vehiculo_id: vehiculo, duplicar: true,
-}, tCoord);
+});
 verificar('no duplica sobre una celda ocupada', r.estado === 400, r.datos);
 
 // Intercambio: las dos existentes cambian de lugar
-r = await api('POST', '/api/itinerario/mover', {
+r = await coord('POST', '/api/itinerario/mover', {
   id: itPred, fecha: fx(12), vehiculo_id: vehiculo,
-}, tCoord);
+});
 verificar('mover sobre celda ocupada intercambia', r.estado === 200 && r.datos.intercambio, r.datos);
 
 r = await api('GET', `/api/itinerario?desde=${fx(11)}&hasta=${fx(12)}`, null, tCoord);
@@ -380,10 +401,10 @@ verificar('cada una quedó en el lugar de la otra',
 verificar('ninguna se perdió en el intercambio', r.datos.length === 2, r.datos.length);
 
 console.log('\n── Borrado definitivo ────────────────────────────────────────');
-r = await api('DELETE', `/api/itinerario/${itDup}?definitivo=1`, null, tCoord);
+r = await coord('DELETE', `/api/itinerario/${itDup}?definitivo=1`, null);
 verificar('coordinación NO borra definitivamente', r.estado === 403, r.datos);
 
-r = await api('DELETE', `/api/itinerario/${itDup}`, { motivo: 'prueba' }, tCoord);
+r = await coord('DELETE', `/api/itinerario/${itDup}`, { motivo: 'prueba' });
 verificar('coordinación sí puede cancelar', r.estado === 200 && r.datos.borrado === false, r.datos);
 
 r = await api('DELETE', `/api/itinerario/${itPred}?definitivo=1`, null, tokenPrincipal);
@@ -393,14 +414,14 @@ r = await api('GET', `/api/itinerario?desde=${fx(11)}&hasta=${fx(12)}`, null, tC
 verificar('el borrado desaparece de verdad', r.datos.length === 1, r.datos.map(x => x.id));
 
 console.log('\n── Carga por lote (plantilla de Excel) ───────────────────────');
-r = await api('POST', '/api/itinerario/lote', {
+r = await coord('POST', '/api/itinerario/lote', {
   operaciones: [
     { accion: 'crear', fecha: fx(47), vehiculo_id: vehiculo, municipio_id: 1,
       destino_nombre: 'LA LAGUNA', tipo_jornada: 'ebs' },
     { accion: 'crear', fecha: fx(48), vehiculo_id: vehiculo, tipo_jornada: 'disponible' },
     { accion: 'crear', fecha: fx(49), vehiculo_id: 999999, tipo_jornada: 'ebs' },
   ],
-}, tCoord);
+});
 verificar('el lote crea lo válido', r.estado === 200 && r.datos.creadas === 2, r.datos);
 verificar('y reporta la fila mala sin tumbar el resto',
   r.datos.errores.length === 1, r.datos.errores);
@@ -409,22 +430,22 @@ r = await api('GET', `/api/itinerario?desde=${fx(47)}&hasta=${fx(49)}`, null, tC
 verificar('quedaron las dos en el itinerario', r.datos.length === 2, r.datos.length);
 const idLote = r.datos.find(x => x.fecha === fx(47)).id;
 
-r = await api('POST', '/api/itinerario/lote', {
+r = await coord('POST', '/api/itinerario/lote', {
   operaciones: [{ accion: 'actualizar', id: idLote, tipo_jornada: 'vacunacion',
                   municipio_id: 1, destino_nombre: 'HONDURAS' }],
-}, tCoord);
+});
 verificar('el lote actualiza', r.estado === 200 && r.datos.actualizadas === 1, r.datos);
 
 r = await api('GET', `/api/itinerario/${idLote}/cambios`, null, tCoord);
 verificar('la actualización por lote deja historial',
   r.datos.some(c => c.motivo && c.motivo.includes('Excel')), r.datos);
 
-r = await api('POST', '/api/itinerario/lote', {
+r = await coord('POST', '/api/itinerario/lote', {
   operaciones: [{ accion: 'borrar', id: idLote }],
-}, tCoord);
+});
 verificar('el lote borra', r.estado === 200 && r.datos.borradas === 1, r.datos);
 
-r = await api('POST', '/api/itinerario/lote', { operaciones: [] }, tCoord);
+r = await coord('POST', '/api/itinerario/lote', { operaciones: [] });
 verificar('un lote vacío se rechaza', r.estado === 400, r.datos);
 
 r = await api('POST', '/api/itinerario/lote', {
@@ -621,17 +642,17 @@ r = await api('DELETE', `/api/itinerario/${itinerario}?definitivo=1`, null, toke
 verificar('no deja borrar un día con viajes registrados', r.estado === 400, r.datos);
 verificar('y lo explica nombrando los viajes', /viaje/i.test(r.datos.error || ''), r.datos.error);
 
-r = await api('DELETE', `/api/itinerario/${itinerario}`, { motivo: 'x' }, tCoord);
+r = await coord('DELETE', `/api/itinerario/${itinerario}`, { motivo: 'x' });
 verificar('tampoco deja cancelarlo', r.estado === 400, r.datos);
 
-r = await api('POST', '/api/itinerario/mover', {
+r = await coord('POST', '/api/itinerario/mover', {
   id: itinerario, fecha: fx(27), vehiculo_id: vehiculo,
-}, tCoord);
+});
 verificar('tampoco deja moverlo', r.estado === 400, r.datos);
 
-r = await api('POST', '/api/itinerario/lote', {
+r = await coord('POST', '/api/itinerario/lote', {
   operaciones: [{ accion: 'borrar', id: itinerario }],
-}, tCoord);
+});
 verificar('ni borrarlo desde la plantilla de Excel',
   r.estado === 200 && r.datos.borradas === 0 && r.datos.errores.length === 1, r.datos);
 
@@ -661,10 +682,10 @@ verificar('el día ejecutado es pagable', dia && dia.dia_pagable === 1, dia);
 verificar('calcula los kilómetros del día', dia && dia.km_dia === 50, dia && dia.km_dia);
 
 // Día DISPONIBLE: se paga igual aunque no haya desplazamiento (D11)
-await api('POST', '/api/itinerario', {
+await coord('POST', '/api/itinerario', {
   fecha: fx(0), vehiculo_id: vehiculo, conductor_id: personaConductor,
   municipio_id: 1, tipo_jornada: 'disponible',
-}, tCoord);
+});
 r = await api('GET', `/api/dias?desde=${fx(0)}&hasta=${fx(0)}`, null, tCoord);
 const diaDisp = r.datos[0];
 verificar('un día DISPONIBLE sin desplazamiento es pagable',
@@ -673,10 +694,10 @@ verificar('y queda marcado como disponible, no como operativo',
   diaDisp && diaDisp.estado_dia === 'disponible', diaDisp && diaDisp.estado_dia);
 
 // Día programado con desplazamiento pero NO ejecutado: no se paga solo
-await api('POST', '/api/itinerario', {
+await coord('POST', '/api/itinerario', {
   fecha: fx(1), vehiculo_id: vehiculo, municipio_id: 1,
   destino_nombre: 'LA LAGUNA', tipo_jornada: 'ebs',
-}, tCoord);
+});
 r = await api('GET', `/api/dias?desde=${fx(1)}&hasta=${fx(1)}`, null, tCoord);
 verificar('un día programado y NO ejecutado no es pagable',
   r.datos[0] && r.datos[0].dia_pagable === 0, r.datos[0]);
@@ -873,18 +894,18 @@ const vehFS = r.datos.id;
 
 // Un día DISPONIBLE se paga sin que el conductor marque nada: es justo el que
 // quedaría cobrando aunque el vehículo estuviera en el taller.
-await api('POST', '/api/itinerario', {
+await coord('POST', '/api/itinerario', {
   fecha: fx(17), vehiculo_id: vehFS, tipo_jornada: 'disponible', municipio_id: 1,
-}, tCoord);
+});
 r = await api('GET', `/api/dias?desde=${fx(17)}&hasta=${fx(17)}`, null, tCoord);
 verificar('antes de registrar la avería, el día DISPONIBLE se paga',
   r.datos[0] && r.datos[0].dia_pagable === 1, r.datos[0]);
 
-r = await api('POST', '/api/fuera-servicio', {
+r = await coord('POST', '/api/fuera-servicio', {
   vehiculo_id: vehFS, causa: 'averia',
   fecha_inicio: fx(15), fecha_fin: fx(19),
   descripcion: 'Caja de velocidades', taller: 'Taller Ocaña',
-}, tCoord);
+});
 verificar('coordinación registra el período fuera de servicio', r.estado === 200, r.datos);
 const fsId = r.datos.id;
 verificar('y avisa de los días que ya estaban programados',
@@ -901,39 +922,39 @@ verificar('los cinco días del rango quedan registrados', r.datos.length === 5, 
 verificar('ninguno es pagable', r.datos.every(d => d.dia_pagable === 0), r.datos);
 
 // El mantenimiento preventivo se distingue de la avería en el estado del día.
-r = await api('POST', '/api/fuera-servicio', {
+r = await coord('POST', '/api/fuera-servicio', {
   vehiculo_id: vehFS, causa: 'mantenimiento',
   fecha_inicio: fx(27), fecha_fin: fx(28),
-}, tCoord);
+});
 verificar('un mantenimiento preventivo también se registra', r.estado === 200, r.datos);
 r = await api('GET', `/api/dias?desde=${fx(27)}&hasta=${fx(27)}`, null, tCoord);
 verificar('y el día se distingue como mantenimiento',
   r.datos[0] && r.datos[0].estado_dia === 'mantenimiento', r.datos[0]);
 
 // Solapes: dos períodos del mismo vehículo contarían el día dos veces.
-r = await api('POST', '/api/fuera-servicio', {
+r = await coord('POST', '/api/fuera-servicio', {
   vehiculo_id: vehFS, causa: 'accidente',
   fecha_inicio: fx(18), fecha_fin: fx(22),
-}, tCoord);
+});
 verificar('rechaza un período que se solapa con otro', r.estado === 400, r.datos);
 verificar('y dice con cuál choca',
   (r.datos.error || '').includes(fx(15)), r.datos);
 
-r = await api('POST', '/api/fuera-servicio', {
+r = await coord('POST', '/api/fuera-servicio', {
   vehiculo_id: vehFS, causa: 'averia', fecha_inicio: fx(42), fecha_fin: fx(38),
-}, tCoord);
+});
 verificar('rechaza un fin anterior al inicio', r.estado === 400, r.datos);
 
-r = await api('POST', '/api/fuera-servicio', {
+r = await coord('POST', '/api/fuera-servicio', {
   vehiculo_id: vehFS, causa: 'inventada', fecha_inicio: fx(42),
-}, tCoord);
+});
 verificar('rechaza una causa que no existe', r.estado === 400, r.datos);
 
 // Mover las fechas tiene que liberar los días que dejan de estar cubiertos.
-r = await api('PUT', `/api/fuera-servicio/${fsId}`, {
+r = await coord('PUT', `/api/fuera-servicio/${fsId}`, {
   fecha_inicio: fx(15), fecha_fin: fx(16),
   motivo_cierre: 'Salió del taller antes de lo previsto',
-}, tCoord);
+});
 verificar('se acorta el período', r.estado === 200 && r.datos.cerrado === true, r.datos);
 r = await api('GET', `/api/dias?desde=${fx(17)}&hasta=${fx(17)}`, null, tCoord);
 verificar('el día que se libera vuelve a ser pagable',
@@ -945,9 +966,9 @@ verificar('y vuelve a contar como disponible',
 r = await api('GET', `/api/dias?desde=${hoy}&hasta=${hoy}`, null, tCoord);
 const diaTrabajado = r.datos.find(d => d.vehiculo_id === vehiculo && d.ejecutado === 1);
 verificar('hay un día realmente ejecutado con el que contrastar', !!diaTrabajado, r.datos);
-r = await api('POST', '/api/fuera-servicio', {
+r = await coord('POST', '/api/fuera-servicio', {
   vehiculo_id: vehiculo, causa: 'averia', fecha_inicio: hoy, fecha_fin: hoy,
-}, tCoord);
+});
 verificar('deja registrar aunque ese día haya viajes', r.estado === 200, r.datos);
 const fsChoque = r.datos.id;
 r = await api('GET', `/api/dias?desde=${hoy}&hasta=${hoy}`, null, tCoord);
@@ -989,9 +1010,9 @@ verificar('la fotografía se pide aparte', r.estado === 200 && !!r.datos.datos, 
 
 r = await api('PUT', `/api/fuera-servicio/${fsCond}`, { fecha_fin: hoy }, tCondFS);
 verificar('el conductor NO puede cerrar el período', r.estado === 403, r.datos);
-r = await api('PUT', `/api/fuera-servicio/${fsCond}`, {
+r = await coord('PUT', `/api/fuera-servicio/${fsCond}`, {
   fecha_fin: hoy, motivo_cierre: 'Arreglado en la vía',
-}, tCoord);
+});
 verificar('coordinación sí lo cierra', r.estado === 200, r.datos);
 
 r = await api('DELETE', `/api/fuera-servicio/${fsCond}`, null, tCoord);
@@ -1007,9 +1028,9 @@ verificar('el resumen cuenta los días parados por vehículo',
 verificar('y separa los de mantenimiento',
   resFS && resFS.dias_mantenimiento === 2, resFS);
 
-r = await api('POST', '/api/fuera-servicio', {
+r = await coord('POST', '/api/fuera-servicio', {
   vehiculo_id: vehFS, causa: 'documentos', fecha_inicio: fx(38),
-}, tCoord);
+});
 verificar('un período sin fecha de fin se acepta', r.estado === 200, r.datos);
 r = await api('GET', '/api/fuera-servicio', null, tCoord);
 verificar('y sale en la lista de los que siguen parados',
@@ -1109,10 +1130,10 @@ console.log('\n── Anular y borrar viajes (solo el administrador) ───�
 
 // Un viaje propio para esta sección, con su día programado, para poder ver
 // cómo se mueve el día pagable al quitarlo.
-await api('POST', '/api/itinerario', {
+await coord('POST', '/api/itinerario', {
   fecha: fx(32), vehiculo_id: vehiculo, conductor_id: personaConductor,
   municipio_id: 1, destino_nombre: 'LA PLAYA', tipo_jornada: 'ebs',
-}, tCoord);
+});
 r = await api('POST', '/api/sync', {
   marcas: [
     { local_id: 'b1', hito: 'salida', vehiculo_id: vehiculo, conductor_id: personaConductor,
@@ -1215,12 +1236,12 @@ verificar('copiar un período ya no existe en la API', r.estado === 404, r.estad
 
 // Una carga en bloque, como la de la plantilla de Excel, para tener qué revisar.
 const vCopia = (await api('GET', '/api/vehiculos', null, tCoord)).datos[0].id;
-r = await api('POST', '/api/itinerario/lote', {
+r = await coord('POST', '/api/itinerario/lote', {
   operaciones: [70, 71, 72].map(n => ({
     accion: 'crear', fecha: fx(n), vehiculo_id: vCopia, municipio_id: 1,
     destino_nombre: 'CARGA EN BLOQUE', tipo_jornada: 'ebs',
   })),
-}, tCoord);
+});
 verificar('una carga en bloque crea varias de un golpe', r.datos.creadas === 3, r.datos);
 
 // Lo creado hace poco sale en la revisión, con quién y cuándo.
@@ -1266,10 +1287,10 @@ verificar('y sigue ahí', r.datos.some(x => x.id === conViajes.id), r.datos.leng
 console.log('\n── Corregir un viaje (solo el administrador) ─────────────────');
 
 // Un viaje propio, con su día programado, para ver cómo se mueve el pago.
-await api('POST', '/api/itinerario', {
+await coord('POST', '/api/itinerario', {
   fecha: fx(55), vehiculo_id: vehiculo, conductor_id: personaConductor,
   municipio_id: 1, destino_nombre: 'EL TARRA', tipo_jornada: 'ebs',
-}, tCoord);
+});
 r = await api('POST', '/api/sync', { marcas: [{
   local_id: 'ed1', hito: 'salida', vehiculo_id: vehiculo, conductor_id: personaConductor,
   fecha_operacion: fx(55), ts_dispositivo: `${fx(55)}T06:00:00Z`,
@@ -1392,10 +1413,10 @@ const trayectosDe = () => db.prepare(
   .results.map(x => x.consecutivo);
 
 async function marcarSalida(fecha, dia) {
-  await api('POST', '/api/itinerario', {
+  await coord('POST', '/api/itinerario', {
     fecha, vehiculo_id: vehiculo, conductor_id: personaConductor,
     municipio_id: 1, destino_nombre: 'LA PLAYA', tipo_jornada: 'ebs',
-  }, tCoord).catch(() => {});
+  }).catch(() => {});
   return api('POST', '/api/sync', { marcas: [{
     local_id: 'c' + dia, hito: 'salida', vehiculo_id: vehiculo,
     conductor_id: personaConductor, fecha_operacion: fecha,
@@ -1455,6 +1476,202 @@ verificar('el itinerario histórico sobrevive al destino desactivado',
 
 r = await api('PUT', '/api/usuarios/1', { activo: 0 }, tokenPrincipal);
 verificar('no deja al sistema sin usuario principal', r.estado === 400, r.datos);
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// D41 · Lo que pide la coordinación espera al administrador
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── Solicitudes de aprobación ─────────────────────────────────');
+
+const fAp = fx(80);
+r = await api('POST', '/api/itinerario', {
+  fecha: fAp, vehiculo_id: vehiculo, municipio_id: 1, destino_nombre: 'EL TARRA',
+  tipo_jornada: 'ebs',
+}, tCoord);
+verificar('la programación de coordinación no se aplica: queda pedida',
+  r.estado === 202 && r.datos.pendiente === true && r.datos.solicitud > 0, r.datos);
+verificar('y se le dice en castellano qué fue lo que pidió',
+  /Programar .* el / .test(r.datos.resumen), r.datos.resumen);
+const solPendiente = r.datos.solicitud;
+
+r = await api('GET', `/api/itinerario?desde=${fAp}&hasta=${fAp}`, null, tokenPrincipal);
+verificar('ese día sigue SIN programación mientras no se apruebe',
+  r.datos.length === 0, r.datos);
+
+r = await api('GET', '/api/solicitudes', null, tokenPrincipal);
+verificar('el administrador la ve en su bandeja',
+  r.estado === 200 && r.datos.some(x => x.id === solPendiente), r.datos.length);
+verificar('con el nombre de quien la pidió',
+  (r.datos.find(x => x.id === solPendiente) || {}).solicitante === 'coordina');
+
+r = await api('GET', '/api/solicitudes/conteo', null, tokenPrincipal);
+verificar('y el contador del menú las cuenta', r.datos.pendientes >= 1, r.datos);
+
+r = await api('GET', `/api/solicitudes/dias?desde=${fAp}&hasta=${fAp}`, null, tCoord);
+verificar('el día sale marcado como pendiente en la matriz',
+  r.datos.length === 1 && r.datos[0].vehiculo_id === vehiculo, r.datos);
+
+// Un segundo toque sobre el mismo día no apila una solicitud contradictoria.
+r = await api('POST', '/api/itinerario', {
+  fecha: fAp, vehiculo_id: vehiculo, tipo_jornada: 'jornada',
+}, tCoord);
+verificar('un día que ya tiene solicitud no admite otra',
+  r.estado === 400 && /esperando aprobación/i.test(r.datos.error), r.datos);
+
+r = await api('POST', `/api/solicitudes/${solPendiente}/aprobar`, {}, tCoord);
+verificar('la coordinación NO puede aprobarse a sí misma', r.estado === 403, r.datos);
+
+r = await api('POST', `/api/solicitudes/${solPendiente}/rechazar`, { motivo: 'no' },
+              tokenPrincipal);
+verificar('rechazar sin explicar no se permite', r.estado === 400, r.datos);
+
+r = await api('POST', `/api/solicitudes/${solPendiente}/aprobar`, {}, tokenPrincipal);
+verificar('el administrador la aprueba y SE APLICA',
+  r.estado === 200 && r.datos.aplicada === true, r.datos);
+
+r = await api('GET', `/api/itinerario?desde=${fAp}&hasta=${fAp}`, null, tokenPrincipal);
+verificar('ahora sí existe la programación', r.datos.length === 1, r.datos);
+verificar('y queda firmada por quien la pidió, no por quien la aprobó',
+  r.datos[0].creado_por === idCoord, { creado_por: r.datos[0].creado_por, idCoord });
+
+r = await api('POST', `/api/solicitudes/${solPendiente}/aprobar`, {}, tokenPrincipal);
+verificar('no se puede aprobar dos veces la misma', r.estado === 400, r.datos);
+
+r = await api('GET', `/api/solicitudes/dias?desde=${fAp}&hasta=${fAp}`, null, tCoord);
+verificar('y el día deja de estar marcado como pendiente', r.datos.length === 0, r.datos);
+
+// ── Rechazo ────────────────────────────────────────────────────────────────
+const fRech = fx(81);
+r = await api('POST', '/api/itinerario', {
+  fecha: fRech, vehiculo_id: vehiculo, tipo_jornada: 'ebs',
+}, tCoord);
+const solRech = r.datos.solicitud;
+r = await api('POST', `/api/solicitudes/${solRech}/rechazar`,
+              { motivo: 'Ese vehículo está asignado a otra cosa ese día' }, tokenPrincipal);
+verificar('rechazar con motivo sí', r.estado === 200, r.datos);
+r = await api('GET', `/api/itinerario?desde=${fRech}&hasta=${fRech}`, null, tokenPrincipal);
+verificar('lo rechazado no se aplicó', r.datos.length === 0, r.datos);
+r = await api('GET', '/api/solicitudes?estado=rechazada', null, tCoord);
+verificar('quien la pidió ve por qué se la rechazaron',
+  /asignado a otra cosa/.test((r.datos.find(x => x.id === solRech) || {}).motivo || ''), r.datos[0]);
+
+// ── Retirar lo que uno mismo pidió ─────────────────────────────────────────
+const fRet = fx(82);
+r = await api('POST', '/api/itinerario', {
+  fecha: fRet, vehiculo_id: vehiculo, tipo_jornada: 'ebs',
+}, tCoord);
+const solRet = r.datos.solicitud;
+r = await api('DELETE', `/api/solicitudes/${solRet}`, null, tCoord);
+verificar('la coordinación puede retirar lo suyo antes de que lo contesten',
+  r.estado === 200, r.datos);
+r = await api('POST', '/api/itinerario', {
+  fecha: fRet, vehiculo_id: vehiculo, tipo_jornada: 'jornada',
+}, tCoord);
+verificar('y al retirarla el día vuelve a quedar libre para pedir',
+  r.estado === 202 && r.datos.pendiente, r.datos);
+await api('DELETE', `/api/solicitudes/${r.datos.solicitud}`, null, tCoord);
+
+// ── Lo que ya no se puede aplicar ──────────────────────────────────────────
+const fFall = fx(83);
+r = await api('POST', '/api/itinerario',
+              { fecha: fFall, vehiculo_id: vehiculo, tipo_jornada: 'ebs' }, tokenPrincipal);
+const itFall = r.datos.id;
+r = await api('DELETE', `/api/itinerario/${itFall}`, { motivo: 'se cancela' }, tCoord);
+const solFall = r.datos.solicitud;
+await api('DELETE', `/api/itinerario/${itFall}?definitivo=1`, null, tokenPrincipal);
+r = await api('POST', `/api/solicitudes/${solFall}/aprobar`, {}, tokenPrincipal);
+verificar('aprobar algo que ya no existe falla y lo dice',
+  r.estado === 400 && /no se pudo aplicar/i.test(r.datos.error), r.datos);
+r = await api('GET', '/api/solicitudes?estado=fallida', null, tokenPrincipal);
+verificar('y queda registrada como fallida, no como aprobada',
+  r.datos.some(x => x.id === solFall), r.datos.length);
+
+// ── Se vence sola ──────────────────────────────────────────────────────────
+const fVence = fx(84);
+r = await api('POST', '/api/itinerario',
+              { fecha: fVence, vehiculo_id: vehiculo, tipo_jornada: 'ebs' }, tCoord);
+const solVence = r.datos.solicitud;
+verificar('la solicitud nace con la fecha en que deja de servir',
+  r.datos.vence_el === fVence, r.datos);
+// Se adelanta el reloj a mano: el día de la operación ya pasó.
+db.prepare("UPDATE solicitudes SET vence_el = '2000-01-01' WHERE id = ?")
+  .bind(solVence).run();
+r = await api('GET', '/api/solicitudes?estado=pendiente', null, tokenPrincipal);
+verificar('al pasar su día deja de estar pendiente',
+  !r.datos.some(x => x.id === solVence), r.datos.length);
+r = await api('GET', '/api/solicitudes?estado=vencida', null, tokenPrincipal);
+verificar('y queda como vencida sin respuesta, no borrada',
+  r.datos.some(x => x.id === solVence), r.datos.length);
+r = await api('POST', `/api/solicitudes/${solVence}/aprobar`, {}, tokenPrincipal);
+verificar('una vencida ya no se puede aprobar', r.estado === 400, r.datos);
+
+// ── A quién NO se le pide permiso ──────────────────────────────────────────
+r = await api('POST', '/api/itinerario',
+              { fecha: fx(85), vehiculo_id: vehiculo, tipo_jornada: 'ebs' }, tokenPrincipal);
+verificar('el administrador no se pide permiso a sí mismo',
+  r.estado === 200 && r.datos.id > 0, r.datos);
+r = await api('POST', '/api/fuera-servicio', {
+  vehiculo_id: vehiculo, causa: 'averia', fecha_inicio: hoy,
+  descripcion: 'Se varó en la vía',
+}, tCondFS);
+verificar('el conductor reporta su avería de una: es un hecho, no un permiso',
+  r.estado === 200, r.datos);
+if (r.datos.id) await api('DELETE', `/api/fuera-servicio/${r.datos.id}`, null, tokenPrincipal);
+
+// ── La bandeja de cada quien ───────────────────────────────────────────────
+r = await api('GET', '/api/solicitudes?estado=todas', null, tSinP);
+verificar('una coordinación distinta no ve lo que pidió la otra',
+  r.estado === 200 && r.datos.length === 0, r.datos.length);
+r = await api('GET', '/api/solicitudes?estado=todas', null, tCondFS);
+verificar('y el conductor no entra a la bandeja', r.estado === 403, r.estado);
+
+// ── Las rutas de coordinación están todas cubiertas ────────────────────────
+// Esta es la comprobación que impide el olvido: cualquier ruta nueva que
+// escriba algo y que coordinación pueda llamar tiene que estar en la lista de
+// aprobación, o constar aquí como excepción pensada.
+const { REQUIERE_APROBACION } = await import('../src/lib.js');
+
+// Existencia: se le pregunta al Worker que está corriendo, no al registro de
+// rutas del código fuente — así vale igual para el bundle, que registra las
+// suyas en su propia copia del router.
+const inexistentes = [];
+for (const entrada of REQUIERE_APROBACION) {
+  const [m, patron] = entrada.split(' ');
+  const q = await api(m, patron.replace(/:(\w+)/g, '99999999'), {}, tokenPrincipal);
+  if (q.datos && q.datos.error === 'Ruta no encontrada') inexistentes.push(entrada);
+}
+verificar('cada ruta de la lista de aprobación existe de verdad',
+  inexistentes.length === 0, inexistentes);
+
+// Cobertura: ninguna ruta que escriba y que coordinación pueda llamar se queda
+// fuera de la lista sin que alguien lo haya decidido. Es la comprobación que
+// evita el olvido silencioso cuando se agregue la ruta número doce.
+const { rutasRegistradas } = await import('../src/router.js');
+if (rutasRegistradas && rutasRegistradas().length) {       // no aplica al bundle
+  // Rutas de escritura que coordinación puede llamar y que a propósito NO
+  // piden permiso. Cada una con su razón.
+  const EXENTAS = [
+    'POST /api/auth/logout',          // su propia sesión
+    'POST /api/auth/cambiar-clave',   // su propia clave
+    'DELETE /api/solicitudes/:id',    // retirar lo que uno mismo pidió
+    // Marcas de campo: registran un HECHO que ya ocurrió, no una decisión
+    // sobre lo que se va a pagar. Son del conductor; que coordinación pueda
+    // llamarlas viene de antes y se deja como está.
+    'POST /api/trayectos/salida',
+    'POST /api/trayectos/:id/llegada',
+    'POST /api/trayectos/:id/foto',
+    'POST /api/sync',
+    'POST /api/checklists',
+    'POST /api/eventos',              // crear la novedad es el hecho; CAMBIARLA sí pide permiso
+  ];
+  const sueltas = rutasRegistradas()
+    .filter(x => ['POST', 'PUT', 'DELETE'].includes(x.metodo))
+    .filter(x => x.roles && x.roles.includes('coordinacion'))
+    .map(x => `${x.metodo} ${x.patron}`)
+    .filter(e => !REQUIERE_APROBACION.includes(e) && !EXENTAS.includes(e));
+  verificar('ninguna ruta de escritura de coordinación se queda sin aprobación',
+    sueltas.length === 0, sueltas);
+}
 
 console.log('\n═══════════════════════════════════════════════════════════════');
 console.log(`  ${pruebas - fallos} de ${pruebas} verificaciones pasaron`);

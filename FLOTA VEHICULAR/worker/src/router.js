@@ -16,6 +16,10 @@ const rutas = [];
 export const ruta = (metodo, patron, manejador, roles) =>
   rutas.push({
     metodo,
+    // El patrón se conserva tal cual: es la llave con la que se consulta si la
+    // ruta necesita aprobación (lib.js, REQUIERE_APROBACION). Reconstruirlo
+    // desde los segmentos funcionaría igual hoy y se desincronizaría mañana.
+    patron,
     segmentos: patron.split('/').filter(Boolean),
     manejador,
     roles: roles || null,
@@ -38,3 +42,8 @@ export function resolver(metodo, ruta_) {
 }
 
 export const totalRutas = () => rutas.length;
+
+/** El registro entero, para que las pruebas puedan recorrerlo. Lo usa la
+ *  comprobación de que ninguna ruta de escritura de coordinación se queda sin
+ *  pasar por aprobación (D41). */
+export const rutasRegistradas = () => rutas;

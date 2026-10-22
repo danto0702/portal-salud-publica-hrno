@@ -79,8 +79,13 @@ pag.on('pageerror', e => errores.push(e.message));
 
 try {
   await pag.goto(`${BASE}/index.html`, { waitUntil: 'networkidle' });
-  await pag.fill('#in-usuario', 'coordina');
-  await pag.fill('#in-clave', 'Coordina2026');
+  // Se entra como ADMINISTRADOR a propósito. Lo que se prueba aquí son los
+  // mecanismos de la pantalla —la matriz en el celular, mover sin arrastrar,
+  // el pincel—, y desde D41 lo que hace coordinación no se aplica: queda
+  // esperando aprobación, y ninguna celda cambiaría. El camino de coordinación
+  // tiene su propia sección al final.
+  await pag.fill('#in-usuario', 'danilo');
+  await pag.fill('#in-clave', 'Demo2026Clave');
   await pag.click('#in-btn');
   await pag.waitForSelector('#app:not([hidden])');
   await pag.click('.nav button:has-text("Itinerario")');
@@ -333,6 +338,105 @@ try {
   await pag.waitForTimeout(1800);
   verificar('pintar arrastrando con el ratón sigue funcionando',
     await pag.locator('.itin-celda.vacia').count() < antesVacias);
+
+
+  // ── Lo que hace coordinación espera al administrador (D41) ──────────────
+  // La misma pantalla, el mismo gesto, otro desenlace: la celda no se ocupa,
+  // se marca como pedida, y el administrador la ve en su bandeja.
+  console.log('\n══ Coordinación programa y queda esperando ══');
+
+  const ctxC = await nav.newContext(TEL);
+  const pagC = await ctxC.newPage();
+  const erroresC = [];
+  pagC.on('pageerror', e => erroresC.push(e.message));
+  await pagC.goto(`${BASE}/index.html`, { waitUntil: 'networkidle' });
+  await pagC.fill('#in-usuario', 'coordina');
+  await pagC.fill('#in-clave', 'Coordina2026');
+  await pagC.click('#in-btn');
+  await pagC.waitForSelector('#app:not([hidden])');
+  await pagC.click('.nav button:has-text("Itinerario")');
+  await pagC.waitForSelector('#itin-env, #itin-dia');
+  await pagC.waitForTimeout(700);
+
+  const libreC = await pagC.evaluate(() => {
+    const c = document.querySelector('.itin-celda.vacia');
+    return c ? { veh: c.dataset.vehiculoId, fec: c.dataset.fecha } : null;
+  });
+  verificar('coordinación tiene una casilla libre donde probar', !!libreC);
+
+  await pagC.locator(
+    `.itin-celda.vacia[data-vehiculo-id="${libreC.veh}"][data-fecha="${libreC.fec}"]`).click();
+  await pagC.waitForSelector('.modal-caja');
+  await pagC.selectOption('#it-tipo', 'ebs');
+  await pagC.fill('#it-dest', 'Pedido sin aprobar');
+  await pagC.click('#it-btn');
+  await pagC.waitForSelector('.modal-caja', { state: 'hidden' });
+  await pagC.waitForTimeout(1200);
+
+  verificar('se le dice que se envió a aprobación, no que se guardó',
+    /aprobaci[óo]n/i.test(await pagC.locator('#avisos').innerText()),
+    (await pagC.locator('#avisos').innerText()).replace(/\n/g, ' ').slice(0, 90));
+
+  const celdaC = pagC.locator(
+    `.itin-celda[data-vehiculo-id="${libreC.veh}"][data-fecha="${libreC.fec}"]`);
+  verificar('la casilla queda marcada como esperando, no programada',
+    (await celdaC.getAttribute('class')).includes('esperando'),
+    await celdaC.getAttribute('class'));
+  verificar('y lo dice con todas sus letras',
+    /esperando aprobaci[óo]n/i.test(await celdaC.innerText()));
+
+  // Volver a tocarla no apila una segunda petición sobre el mismo día.
+  await celdaC.click();
+  await pagC.waitForTimeout(400);
+  verificar('tocar otra vez no abre la ventana de adjudicar',
+    await pagC.locator('.modal-caja:visible').count() === 0);
+
+  verificar('el menú de coordinación lleva su contador de pendientes',
+    await pagC.locator('.nav button[data-v="solicitudes"] .cuenta-nav').count() === 1);
+
+  await pagC.click('.nav button:has-text("Solicitudes")');
+  await pagC.waitForSelector('#main .card');
+  await pagC.waitForTimeout(600);
+  const bandejaC = await pagC.locator('#main').innerText();
+  verificar('en su bandeja ve lo que pidió, y que no está hecho',
+    /Pedido sin aprobar|Programar/i.test(bandejaC) && /esperando/i.test(bandejaC),
+    bandejaC.replace(/\n/g, ' ').slice(0, 140));
+  verificar('y puede retirarlo, no aprobarlo',
+    await pagC.locator('#main button:has-text("Retirar")').count() >= 1
+    && await pagC.locator('#main button:has-text("Aprobar")').count() === 0);
+
+  // ── El administrador lo resuelve ────────────────────────────────────────
+  console.log('\n══ El administrador lo aprueba desde su bandeja ══');
+
+  await pag.setViewportSize({ width: 414, height: 896 });
+  await pag.evaluate(() => { contarSolicitudes(); ir('solicitudes'); });
+  await pag.waitForSelector('#main .card');
+  await pag.waitForTimeout(700);
+  verificar('al administrador le aparece el número rojo en el menú',
+    await pag.locator('.nav button[data-v="solicitudes"] .cuenta-nav').count() === 1);
+  verificar('su bandeja dice quién lo pidió',
+    /coordina/i.test(await pag.locator('#main').innerText()));
+
+  pag.once('dialog', d => d.accept());
+  await pag.locator('#main button:has-text("Aprobar")').first().click();
+  await pag.waitForTimeout(1500);
+  verificar('tras aprobar ya no queda nada esperando',
+    /No hay nada esperando/i.test(await pag.locator('#main').innerText()),
+    (await pag.locator('#main').innerText()).replace(/\n/g, ' ').slice(0, 120));
+
+  await pagC.evaluate(() => verItinerario());
+  await pagC.waitForTimeout(1200);
+  const celdaFin = pagC.locator(
+    `.itin-celda[data-vehiculo-id="${libreC.veh}"][data-fecha="${libreC.fec}"]`);
+  verificar('y ahora sí la programación está puesta de verdad',
+    /pedido sin aprobar/i.test(await celdaFin.innerText()),
+    (await celdaFin.innerText()).replace(/\n/g, ' '));
+  verificar('la casilla deja de estar marcada como esperando',
+    !(await celdaFin.getAttribute('class')).includes('esperando'));
+
+  verificar('ninguna excepción en la consola de coordinación',
+    erroresC.length === 0, erroresC[0]);
+  await ctxC.close();
 
   verificar('ninguna excepción en la consola', errores.length === 0, errores[0]);
 } finally {

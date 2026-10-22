@@ -12,12 +12,14 @@
  */
 
 import { resolver, totalRutas } from './router.js';
-import { cors, json, ErrorApi, sesionActual, ahora, hashClave, VERSION_API } from './lib.js';
+import { cors, json, ErrorApi, sesionActual, ahora, hashClave, VERSION_API,
+         necesitaAprobacion, registrarSolicitud } from './lib.js';
 
 // El sólo hecho de importarlos registra sus rutas en el router.
 import './rutas_admin.js';
 import './rutas_operacion.js';
 import './rutas_fuera_servicio.js';
+import './rutas_solicitudes.js';
 
 export default {
   async fetch(request, env) {
@@ -69,6 +71,19 @@ export default {
           try { cuerpo = JSON.parse(texto); }
           catch { throw new ErrorApi(400, 'El cuerpo de la petición no es JSON válido'); }
         }
+      }
+
+      // Lo que pide la coordinación NO se aplica: se guarda y espera al
+      // administrador (D41). Se intercepta aquí, en el único sitio por el que
+      // pasan todas las rutas, y no dentro de cada manejador: una ruta nueva
+      // que se olvidara de pedir permiso sería una puerta abierta, y el olvido
+      // no se vería hasta que alguien lo usara.
+      if (necesitaAprobacion(sesion, request.method, encontrada.patron)) {
+        const pendiente = await registrarSolicitud(env.DB, sesion, {
+          metodo: request.method, patron: encontrada.patron,
+          ruta: url.pathname + url.search, params: encontrada.params, cuerpo, url,
+        });
+        return json(pendiente, 202, cabecerasCors);
       }
 
       const resultado = await encontrada.manejador({

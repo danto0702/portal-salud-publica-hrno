@@ -17,7 +17,7 @@
  * peticiones e ignora en silencio lo que no entiende — un campo que no se
  * guarda y ningún mensaje de error. Por eso se comprueba y se avisa.
  */
-const VERSION_API_REQUERIDA = 17;
+const VERSION_API_REQUERIDA = 18;
 
 const esLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 const API = localStorage.getItem('flota_api') ||
@@ -149,7 +149,25 @@ async function api(ruta, opciones = {}) {
   // que evita que quedarse sin señal le borre la sesión al conductor.
   if (res.status === 401 && sesion) { salir(true); throw new Error('Su sesión expiró'); }
   if (!res.ok) throw new Error(datos.error || `Error ${res.status}`);
+  // 202: el servidor NO aplicó el cambio, lo dejó esperando al administrador
+  // (D41). Se avisa aquí, en el único sitio por el que pasan todas las
+  // peticiones, para que ninguna pantalla pueda decir «guardado» por descuido.
+  if (res.status === 202 && datos.pendiente) avisarPendiente(datos);
   return datos;
+}
+
+/**
+ * Lo que ve la coordinación cuando su cambio queda esperando.
+ *
+ * Tiene que quedar claro que NO se guardó: si creyera que sí, volvería a
+ * programar el mismo día mañana, o daría por hecha una ruta que nadie
+ * autorizó y el vehículo no saldría.
+ */
+function avisarPendiente(d) {
+  aviso(`${d.resumen}. Queda esperando al administrador`
+        + (d.cuantas > 1 ? ` (${d.cuantas} días)` : '') + '.',
+        'info', 'Enviado a aprobación');
+  contarSolicitudes();
 }
 
 // ── Cola sin señal ───────────────────────────────────────────────────────────
@@ -377,6 +395,7 @@ const ICONOS = {
   usuarios:   ico('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
   ajustes:    ico('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6 1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.6.76 1 1.4 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
   auditoria:  ico('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15h6M9 11h3"/>'),
+  solicitudes: ico('<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
 };
 const VISTAS = {
   hoy:        { et: 'Mi día',      fn: () => verHoy() },
@@ -389,11 +408,12 @@ const VISTAS = {
   personas:   { et: 'Personas',    fn: () => verPersonas() },
   usuarios:   { et: 'Usuarios',    fn: () => verUsuarios() },
   ajustes:    { et: 'Ajustes',     fn: () => verAjustes() },
+  solicitudes: { et: 'Solicitudes', fn: () => verSolicitudes() },
 };
 const MENU = {
   conductor:    ['hoy', 'miItinerario', 'eventos'],
-  coordinacion: ['itinerario', 'dashboard', 'trayectos', 'eventos', 'hoy'],
-  principal:    ['itinerario', 'dashboard', 'trayectos', 'eventos', 'vehiculos', 'personas', 'usuarios', 'ajustes'],
+  coordinacion: ['itinerario', 'solicitudes', 'dashboard', 'trayectos', 'eventos', 'hoy'],
+  principal:    ['solicitudes', 'itinerario', 'dashboard', 'trayectos', 'eventos', 'vehiculos', 'personas', 'usuarios', 'ajustes'],
 };
 
 /**
@@ -423,6 +443,7 @@ async function iniciar() {
     `<button data-v="${v}" onclick="ir('${v}')">${ICONOS[v] || ''}${VISTAS[v].et}</button>`).join('');
 
   cola.contar();
+  contarSolicitudes();
   comprobarVersion();
   cargarBanner();
 
@@ -1465,6 +1486,7 @@ async function guardarEvento() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 let itinDesde = null, itinDatos = [], predeterminados = [];
+let itinPendientes = new Map();   // fecha|vehiculo → solicitud esperando (D41)
 /** vehiculo_id -> { dias, con_salida, primera, ultima } de TODA la operación. */
 let totalesItin = new Map();
 /** vehiculo_id -> { dias, dias_mantenimiento } fuera de servicio (D33). */
@@ -1493,8 +1515,8 @@ async function verItinerario() {
 
   $('#main').innerHTML = '<div class="cargando">Cargando itinerario...</div>';
   try {
-    let resumen, periodosFS, resumenFS;
-    [itinDatos, predeterminados, resumen, periodosFS, resumenFS] = await Promise.all([
+    let resumen, periodosFS, resumenFS, pendientes;
+    [itinDatos, predeterminados, resumen, periodosFS, resumenFS, pendientes] = await Promise.all([
       api(`/api/itinerario?desde=${itinDesde}&hasta=${hasta}`),
       api('/api/predeterminados'),
       // Los totales NO salen del período visible: se piden aparte, de toda la
@@ -1503,7 +1525,13 @@ async function verItinerario() {
       api('/api/itinerario/resumen').catch(() => null),
       api(`/api/fuera-servicio?desde=${itinDesde}&hasta=${hasta}`).catch(() => []),
       api('/api/fuera-servicio/resumen').catch(() => null),
+      // Los días que ya tienen una solicitud esperando (D41). Sin esto la
+      // coordinación programa, no ve nada aparecer y vuelve a programar: la
+      // pantalla le estaría mintiendo. Contra un Worker viejo, sin marcas.
+      api(`/api/solicitudes/dias?desde=${itinDesde}&hasta=${hasta}`).catch(() => []),
     ]);
+    itinPendientes = new Map((pendientes || [])
+      .map(x => [`${x.fecha}|${x.vehiculo_id}`, x]));
     totalesItin = new Map((resumen?.vehiculos || []).map(v => [v.vehiculo_id, v]));
     totalesFSItin = new Map((resumenFS?.vehiculos || []).map(v => [v.vehiculo_id, v]));
     indexarFS(periodosFS, Array.from({ length: itinDias }, (_, i) => nDias(itinDesde, i)));
@@ -1519,7 +1547,21 @@ async function verItinerario() {
   const celda = (v, f) => {
     const it = porClave[f + '|' + v.id];
     const fs = fsDe(f, v.id);
+    const sol = itinPendientes.get(`${f}|${v.id}`);
     const datos = `data-vehiculo-id="${v.id}" data-fecha="${f}"${it ? ` data-itin-id="${it.id}"` : ''}`;
+    // Un día con solicitud esperando no se toca: ni el pincel ni el modal.
+    // Pedir dos cosas distintas sobre la misma celda le deja al administrador
+    // dos peticiones que se contradicen, y la segunda falla al aplicarse
+    // cuando ya nadie está mirando.
+    const marcaSol = sol
+      ? `<span class="sol-marca" title="${esc(sol.resumen)} — pedido por ${
+           esc(sol.solicitante || '')}">esperando aprobación</span>`
+      : '';
+    if (sol) {
+      return `<td style="padding:.2rem"><div class="itin-celda esperando${it ? ' ' + it.tipo_jornada : ' vacia'}" ${datos}
+        onclick="avisoSolicitado(${sol.solicitud_id})">${
+          it ? `<span class="dest">${esc(it.destino || '')}</span>` : ''}${marcaSol}</div></td>`;
+    }
     // Un día en que el vehículo está parado se ve, programado o no: sin esto,
     // una casilla vacía de un vehículo en el taller invita a adjudicarle un
     // traslado que no puede hacer.
@@ -1848,6 +1890,7 @@ async function itinPointerUp(ev) {
       metodo: 'POST', cuerpo: { id, fecha, vehiculo_id: Number(vehiculoId), duplicar },
     });
     if (r.sin_cambios) return;
+    if (r.pendiente) return verItinerario();   // se pidió, no se movió (D41)
     ultimoMovimiento = duplicar
       ? { tipo: 'duplicado', id: r.id }
       : { tipo: 'movido', id, fecha: origen.fecha, vehiculo_id: origen.vehiculo_id };
@@ -1890,9 +1933,17 @@ function activarPincel(id) {
                : 'Pincel apagado', pincel ? 'ok' : 'info');
 }
 
+/** Al tocar una celda que ya tiene solicitud: se dice qué se pidió y dónde
+ *  está, en vez de dejar que se pida otra cosa encima. */
+function avisoSolicitado(id) {
+  const s = itinPendientes.size
+    ? [...itinPendientes.values()].find(x => x.solicitud_id === id) : null;
+  aviso((s ? s.resumen + '. ' : '') + 'Ya está esperando aprobación; véala en Solicitudes.',
+        'info', 'Día pedido');
+}
+
 let pintando = new Set();       // celdas ya tocadas en el trazo actual
-let tareasPintura = [];         // guardados en vuelo
-let pintadasEnTrazo = 0;
+let tareasPintura = [];         // operaciones del trazo en curso
 
 /**
  * Programa una celda con el pincel activo.
@@ -1905,30 +1956,16 @@ function pintarCelda(vehiculoId, fecha, idExistente) {
   if (!pincel) return;
   const clave = `${fecha}|${vehiculoId}`;
   if (pintando.has(clave)) return;                    // ya se pintó en este trazo
+  if (itinPendientes.has(clave)) return;              // ya tiene solicitud esperando
   pintando.add(clave);
-  tareasPintura.push(guardarPintura(vehiculoId, fecha, idExistente));
-}
-
-async function guardarPintura(vehiculoId, fecha, idExistente) {
-  try {
-    if (idExistente) {
-      await api('/api/itinerario/' + idExistente, {
-        metodo: 'PUT',
-        cuerpo: { tipo_jornada: pincel.tipo_jornada, municipio_id: pincel.municipio_id,
-                  destino_id: pincel.destino_id, observaciones: pincel.observaciones,
-                  motivo: `Pintado con "${pincel.nombre}"` },
-      });
-    } else {
-      await api('/api/itinerario', {
-        metodo: 'POST',
-        cuerpo: { fecha, vehiculo_id: Number(vehiculoId), predeterminado_id: pincel.id,
-                  conductor_id: vehiculos.find(v => v.id == vehiculoId)?.conductor_id || null },
-      });
-    }
-    pintadasEnTrazo++;
-  } catch (e) {
-    aviso(e.message, 'mal', 'No se pudo pintar');
-  }
+  tareasPintura.push(idExistente
+    ? { accion: 'actualizar', id: Number(idExistente), fecha, vehiculo_id: Number(vehiculoId),
+        tipo_jornada: pincel.tipo_jornada, municipio_id: pincel.municipio_id,
+        destino_id: pincel.destino_id, observaciones: pincel.observaciones }
+    : { accion: 'crear', fecha, vehiculo_id: Number(vehiculoId),
+        tipo_jornada: pincel.tipo_jornada, municipio_id: pincel.municipio_id,
+        destino_id: pincel.destino_id, observaciones: pincel.observaciones,
+        conductor_id: vehiculos.find(v => v.id == vehiculoId)?.conductor_id || null });
 }
 
 function pincelMove(ev) {
@@ -1944,16 +1981,48 @@ function pincelMove(ev) {
   pintarCelda(vehiculoId, fecha, itinId ? Number(itinId) : null);
 }
 
+/**
+ * Cierra el trazo: UNA petición con todo lo que se pintó.
+ *
+ * Antes salía una petición por celda. Arrastrar sobre veinte días eran veinte
+ * peticiones, veinte líneas de auditoría y —desde D41— veinte solicitudes de
+ * aprobación para una sola decisión. Un trazo es UN acto, y así se registra,
+ * se aprueba y se deshace: entero.
+ */
 async function pincelFin() {
   if (!pincel || !tareasPintura.length) return;
-  const tareas = tareasPintura;
+  const operaciones = tareasPintura;
   tareasPintura = [];
   pintando.clear();
-  await Promise.all(tareas);                 // sin esto se redibuja antes de tiempo
-  if (!pintadasEnTrazo) return;
-  aviso(`${pintadasEnTrazo} día(s) programado(s)`, 'ok', 'Listo');
-  pintadasEnSesion += pintadasEnTrazo;
-  pintadasEnTrazo = 0;
+
+  let r;
+  try {
+    r = await api('/api/itinerario/lote', {
+      metodo: 'POST',
+      cuerpo: { operaciones, motivo: `Pintado con "${pincel.nombre}"`,
+                origen: `pincel «${pincel.nombre}»` },
+    });
+  } catch (e) {
+    aviso(e.message, 'mal', 'No se pudo pintar');
+    await verItinerario();
+    return;
+  }
+
+  if (r.pendiente) {                 // quedó esperando aprobación: ya se avisó
+    pintadasEnSesion += operaciones.length;
+  } else {
+    const hechas = (r.creadas || 0) + (r.actualizadas || 0);
+    if (r.errores?.length) {
+      aviso(`${r.errores.length} día(s) no se pudieron programar: ${
+        r.errores.slice(0, 2).map(x => `${x.fecha} — ${x.motivo}`).join('; ')}`,
+        'mal', 'Quedaron días sin pintar');
+    }
+    if (!hechas && !r.errores?.length) return;
+    if (hechas) {
+      aviso(`${hechas} día(s) programado(s)`, 'ok', 'Listo');
+      pintadasEnSesion += hechas;
+    }
+  }
   await verItinerario();
   marcarPintando(!!pincel);          // refresca el contador de la barra
 }
@@ -2013,6 +2082,16 @@ function vistaPorDia(dias, activos, porClave) {
   const renglon = ({ v, it }) => {
     const conductor = v.conductor_actual?.trim() || 'sin conductor';
     const fs = fsDe(f, v.id);
+    const sol = itinPendientes.get(`${f}|${v.id}`);
+    // Igual que en la matriz: un día pedido no se vuelve a pedir (D41).
+    if (sol) {
+      return `<div class="itin-ren esperando" data-vehiculo-id="${v.id}" data-fecha="${f}"
+        onclick="avisoSolicitado(${sol.solicitud_id})">
+        <span class="pl">${esc(v.placa)}</span>
+        <span class="de"><b>${esc(sol.resumen)}</b><br>
+          <span class="sub">pedido por ${esc(sol.solicitante || '—')}</span></span>
+        <span class="etq ambar">esperando</span></div>`;
+    }
     if (!it) {
       return `<div class="itin-ren libre${fs ? ' fs' : ''}" data-vehiculo-id="${v.id}" data-fecha="${f}"
         onclick="tocarRenItin(null,${v.id},'${f}')">
@@ -2285,9 +2364,12 @@ async function guardarItinerario(id, vehiculoId, fecha) {
       // Queda al alcance del botón Deshacer, igual que un arrastre.
       ultimoMovimiento = { tipo: 'movido', id, fecha, vehiculo_id: Number(vehiculoId) };
     }
-    if (id) await api('/api/itinerario/' + id, { metodo: 'PUT', cuerpo });
-    else await api('/api/itinerario', { metodo: 'POST', cuerpo });
+    const g = id ? await api('/api/itinerario/' + id, { metodo: 'PUT', cuerpo })
+                 : await api('/api/itinerario', { metodo: 'POST', cuerpo });
     cerrarModal();
+    // Si quedó esperando aprobación, api() ya lo dijo: decir además
+    // «adjudicado» sería decirle a coordinación que su ruta está puesta.
+    if (g.pendiente) return verItinerario();
     const fuera = mueve && (fDestino < itinDesde || fDestino > nDias(itinDesde, itinDias - 1));
     aviso(!id ? 'Desplazamiento adjudicado'
           : intercambio ? 'Actualizada e intercambiada con la que ocupaba ese día'
@@ -2330,11 +2412,13 @@ async function confirmarBorrado(id) {
   const btn = $('#bo-btn'); btn.disabled = true; btn.textContent = 'Quitando...';
   const definitivo = $('#bo-definitivo')?.checked;
   try {
-    await api(`/api/itinerario/${id}${definitivo ? '?definitivo=1' : ''}`, {
+    const q = await api(`/api/itinerario/${id}${definitivo ? '?definitivo=1' : ''}`, {
       metodo: 'DELETE', cuerpo: { motivo: $('#bo-motivo').value.trim() || null },
     });
     cerrarModal();
-    aviso(definitivo ? 'Programación borrada' : 'Programación cancelada', 'ok', 'Listo');
+    if (!q.pendiente) {
+      aviso(definitivo ? 'Programación borrada' : 'Programación cancelada', 'ok', 'Listo');
+    }
     verItinerario();
   } catch (e) {
     aviso(e.message, 'mal', 'No se pudo quitar');
@@ -2382,7 +2466,7 @@ async function crearPredeterminado(tipo, destino, municipioId) {
   if (!nombre) return aviso('Póngale un nombre', 'mal');
   const btn = $('#gp-btn'); btn.disabled = true; btn.textContent = 'Guardando...';
   try {
-    await api('/api/predeterminados', {
+    const g = await api('/api/predeterminados', {
       metodo: 'POST',
       cuerpo: {
         nombre, tipo_jornada: tipo,
@@ -2392,7 +2476,7 @@ async function crearPredeterminado(tipo, destino, municipioId) {
       },
     });
     cerrarModal();
-    aviso('Guardado en el banco', 'ok', 'Listo');
+    if (!g.pendiente) aviso('Guardado en el banco', 'ok', 'Listo');
     predeterminados = await api('/api/predeterminados');
   } catch (e) {
     aviso(e.message, 'mal', 'No se pudo guardar');
@@ -4063,6 +4147,7 @@ async function guardarPeriodoFS(vehiculoId, id) {
     const r = id
       ? await api('/api/fuera-servicio/' + id, { metodo: 'PUT', cuerpo })
       : await api('/api/fuera-servicio', { metodo: 'POST', cuerpo });
+    if (r.pendiente) { cerrarModal(); return verItinerario(); }
     aviso(id ? 'Período actualizado' : 'Días registrados', 'ok', 'Listo');
 
     // Lo que hay que decidir a continuación: los días que ya estaban
@@ -4651,6 +4736,166 @@ async function verAuditoria() {
         <td style="font-size:.76rem;max-width:320px">${resumir(x)}</td>
       </tr>`; }).join('')}
     </tbody></table></div>`);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SOLICITUDES DE APROBACIÓN (D41)
+//
+// La coordinación propone y el administrador dispone. Lo que la coordinación
+// pide NO está en la base: está aquí, esperando. Esta pantalla es la única
+// forma de que llegue a aplicarse, así que tiene que poder resolverse de
+// corrido y desde el teléfono: cada línea dice en castellano qué se pide,
+// quién lo pide y hasta cuándo sirve, y lleva sus dos botones al lado.
+// ═══════════════════════════════════════════════════════════════════════════
+
+let solEstado = 'pendiente';
+let solicitudesCargadas = [];
+
+const ESTADO_SOL = {
+  pendiente: { et: 'Esperando',  etq: 'ambar' },
+  aprobada:  { et: 'Aprobada',   etq: 'verde' },
+  rechazada: { et: 'Rechazada',  etq: 'rojo'  },
+  vencida:   { et: 'Vencida sin respuesta', etq: 'gris' },
+  fallida:   { et: 'No se pudo aplicar',    etq: 'rojo' },
+  retirada:  { et: 'Retirada',   etq: 'gris' },
+};
+
+/**
+ * El número rojo del menú.
+ *
+ * Sin él la bandeja es una pantalla a la que hay que acordarse de entrar, y
+ * nadie entra: la programación se quedaría esperando sin que nadie lo sepa,
+ * que es exactamente el problema que esto viene a resolver al revés.
+ */
+async function contarSolicitudes() {
+  if (!sesion || sesion.rol === 'conductor') return;
+  let n = 0;
+  try { n = (await api('/api/solicitudes/conteo')).pendientes || 0; }
+  catch { return; }                      // sin señal o Worker viejo: sin número
+  const btn = $('#nav button[data-v="solicitudes"]');
+  if (!btn) return;
+  btn.querySelector('.cuenta-nav')?.remove();
+  if (n) btn.insertAdjacentHTML('beforeend', `<span class="cuenta-nav">${n}</span>`);
+}
+
+async function verSolicitudes() {
+  $('#main').innerHTML = '<div class="cargando">Cargando solicitudes...</div>';
+  try {
+    solicitudesCargadas = await api('/api/solicitudes?estado=' + solEstado);
+  } catch (e) {
+    return $('#main').innerHTML = `<div class="card"><div class="nota avi">${esc(e.message)}</div></div>`;
+  }
+  pintarSolicitudes();
+  contarSolicitudes();
+}
+
+function filtroSol(e) { solEstado = e; verSolicitudes(); }
+
+function pintarSolicitudes() {
+  const admin = sesion.rol === 'principal';
+  const filtros = ['pendiente', 'aprobada', 'rechazada', 'vencida', 'fallida', 'todas']
+    .map(e => `<button class="btn sm ${e === solEstado ? '' : 'sec'}"
+       onclick="filtroSol('${e}')">${e === 'todas' ? 'Todas' : ESTADO_SOL[e].et}</button>`).join('');
+
+  const explica = admin
+    ? `Aquí espera todo lo que la coordinación quiere cambiar. <b>Nada de esto
+       está aplicado</b>: hasta que usted lo apruebe, la programación sigue
+       como estaba.`
+    : `Esto es lo que usted pidió. Mientras diga <b>«${ESTADO_SOL.pendiente.et}»</b>
+       el cambio <b>no está hecho</b>; puede retirarlo si se equivocó.`;
+
+  const filas = solicitudesCargadas.map(s => {
+    const est = ESTADO_SOL[s.estado] || { et: s.estado, etq: 'gris' };
+    const quien = (s.solicitante_nombre || '').trim() || s.solicitante || '—';
+    const cuando = s.afecta_desde
+      ? (s.afecta_desde === s.afecta_hasta ? s.afecta_desde
+         : `${s.afecta_desde} a ${s.afecta_hasta}`)
+      : '—';
+    const acciones = s.estado !== 'pendiente' ? ''
+      : admin
+        ? `<button class="btn sm" onclick="aprobarSolicitud(${s.id})">Aprobar</button>
+           <button class="btn sm rojo" onclick="modalRechazar(${s.id})">Rechazar</button>`
+        : `<button class="btn sm sec" onclick="retirarSolicitud(${s.id})">Retirar</button>`;
+    return `<tr${s.estado === 'pendiente' ? ' style="background:var(--ambar-glow)"' : ''}>
+      <td style="white-space:nowrap">${fechaHora(s.ts)}</td>
+      <td>${esc(quien)}</td>
+      <td>${esc(s.resumen)}${s.cuantas > 1
+            ? ` <span class="etq ambar">${s.cuantas} días</span>` : ''}</td>
+      <td style="white-space:nowrap">${esc(cuando)}</td>
+      <td><span class="etq ${est.etq}">${est.et}</span>${
+        s.motivo ? `<br><span style="font-size:.7rem;color:var(--muted)">«${esc(s.motivo)}»</span>` : ''}${
+        s.resuelto_por_usuario ? `<br><span style="font-size:.68rem;color:var(--muted)">por ${esc(s.resuelto_por_usuario)}</span>` : ''}</td>
+      <td style="white-space:nowrap">${acciones}</td>
+    </tr>`;
+  }).join('');
+
+  $('#main').innerHTML = `
+    <div class="card">
+      <div class="card-tit">Solicitudes de cambio</div>
+      <p style="font-size:.8rem;color:var(--muted);margin:.2rem 0 .8rem">${explica}</p>
+      <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.8rem">${filtros}</div>
+      ${solicitudesCargadas.length ? `<div class="tabla-env"><table>
+        <thead><tr><th>Pedida</th><th>Quién</th><th>Qué pide</th>
+          <th>Para cuándo</th><th>Estado</th><th></th></tr></thead>
+        <tbody>${filas}</tbody></table></div>`
+      : `<div class="nota">${solEstado === 'pendiente'
+            ? 'No hay nada esperando aprobación.'
+            : 'No hay solicitudes en ese estado.'}</div>`}
+    </div>`;
+}
+
+/**
+ * Aprobar ejecuta de verdad lo pedido, y puede fallar: entre la petición y el
+ * visto bueno el día pudo quedarse con viajes registrados. El error se enseña
+ * entero, porque dice exactamente qué lo impidió.
+ */
+async function aprobarSolicitud(id) {
+  const s = solicitudesCargadas.find(x => x.id === id);
+  if (!confirm(`¿Aprobar y aplicar?\n\n${s ? s.resumen : ''}`)) return;
+  try {
+    await api(`/api/solicitudes/${id}/aprobar`, { metodo: 'POST', cuerpo: {} });
+    aviso('Aprobada y aplicada', 'ok');
+  } catch (e) {
+    aviso(e.message, 'mal', 'No se pudo aplicar');
+  }
+  verSolicitudes();
+}
+
+function modalRechazar(id) {
+  const s = solicitudesCargadas.find(x => x.id === id);
+  abrirModal('Rechazar la solicitud', `
+    <p style="font-size:.85rem;margin:0 0 .8rem"><b>${esc(s ? s.resumen : '')}</b></p>
+    <div class="nota avi" style="margin-bottom:.8rem">
+      El motivo lo lee quien la pidió. Un «no» sin razón se vuelve a pedir
+      mañana igual.
+    </div>
+    <div class="campo"><label class="lb">Por qué no se aprueba <span class="req">*</span></label>
+      <textarea class="inp" id="rech-motivo" rows="3"
+        placeholder="Ese vehículo ya está asignado a la jornada de vacunación"></textarea></div>`,
+    `<button class="btn sec" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn rojo" onclick="rechazarSolicitud(${id})">Rechazar</button>`);
+}
+
+async function rechazarSolicitud(id) {
+  const motivo = ($('#rech-motivo').value || '').trim();
+  if (motivo.length < 5) return aviso('Escriba el motivo', 'mal');
+  try {
+    await api(`/api/solicitudes/${id}/rechazar`, { metodo: 'POST', cuerpo: { motivo } });
+    cerrarModal();
+    aviso('Rechazada', 'ok');
+  } catch (e) { aviso(e.message, 'mal', 'No se pudo rechazar'); }
+  verSolicitudes();
+}
+
+async function retirarSolicitud(id) {
+  const s = solicitudesCargadas.find(x => x.id === id);
+  if (!confirm(`¿Retirar su solicitud?\n\n${s ? s.resumen : ''}`)) return;
+  try {
+    await api(`/api/solicitudes/${id}`, { metodo: 'DELETE' });
+    aviso('Retirada', 'ok');
+  } catch (e) { aviso(e.message, 'mal', 'No se pudo retirar'); }
+  verSolicitudes();
 }
 
 // ── Arranque ─────────────────────────────────────────────────────────────────
@@ -5295,6 +5540,7 @@ async function aplicarPrevia() {
       },
     });
     cerrarModal();
+    if (r.pendiente) return verItinerario();   // quedó esperando aprobación (D41)
     const partes = [];
     if (r.creadas) partes.push(`${r.creadas} creada(s)`);
     if (r.actualizadas) partes.push(`${r.actualizadas} cambiada(s)`);

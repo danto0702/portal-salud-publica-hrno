@@ -21,11 +21,8 @@
 import { ruta } from './router.js';
 import {
   ahora, hoyISO, malaPeticion, prohibido, noEncontrado,
-  auditar, recalcularDia, asegurarEsquema, TODOS, GESTION,
+  auditar, recalcularDia, asegurarEsquema, TODOS, GESTION, CAUSAS,
 } from './lib.js';
-
-const CAUSAS = ['averia', 'mantenimiento', 'accidente', 'documentos',
-                'retenido', 'sin_conductor', 'otro'];
 
 /** Tope de días de un período. Un rango disparatado recalcularía media base. */
 const MAX_DIAS = 400;

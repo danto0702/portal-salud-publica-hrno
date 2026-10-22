@@ -33,7 +33,7 @@
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 17;
+const VERSION_API = 18;
 
 /**
  * Juegos de roles que usan las rutas.
@@ -45,6 +45,12 @@ const VERSION_API = 17;
  */
 const TODOS = ['principal', 'coordinacion', 'conductor'];
 const GESTION = ['principal', 'coordinacion'];
+
+/** Causas válidas de un período fuera de servicio. Vive aquí por lo mismo que
+ *  TODOS y GESTION, y porque la comprueban dos sitios: la ruta que lo registra
+ *  y la revisión previa de una solicitud de coordinación (D41). */
+const CAUSAS = ['averia', 'mantenimiento', 'accidente', 'documentos',
+                'retenido', 'sin_conductor', 'otro'];
 
 const ahora = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 /**
@@ -234,6 +240,49 @@ async function asegurarEsquema(db) {
     )`).run();
   await db.prepare(
     'CREATE INDEX IF NOT EXISTS idx_traycam ON trayecto_cambios(trayecto_id, ts)').run();
+
+  // Solicitudes de aprobación (D41). Lo que pide la coordinación queda aquí
+  // GUARDADO PERO SIN APLICAR hasta que el administrador lo apruebe: por eso se
+  // almacena la petición entera —método, ruta, parámetros y cuerpo— y no un
+  // resumen. Al aprobar se vuelve a ejecutar la MISMA ruta con la MISMA sesión
+  // de quien la pidió, de modo que las validaciones, el historial y la
+  // auditoría salen idénticos a los de un cambio hecho directamente.
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS solicitudes (
+      id             INTEGER PRIMARY KEY,
+      ts             TEXT NOT NULL,
+      solicitante_id INTEGER NOT NULL REFERENCES usuarios(id),
+      metodo         TEXT NOT NULL,
+      patron         TEXT NOT NULL,
+      ruta           TEXT NOT NULL,
+      params         TEXT,
+      cuerpo         TEXT,
+      resumen        TEXT NOT NULL,
+      afecta_desde   TEXT,
+      afecta_hasta   TEXT,
+      cuantas        INTEGER NOT NULL DEFAULT 1,
+      vence_el       TEXT,
+      estado         TEXT NOT NULL DEFAULT 'pendiente',
+      resuelto_en    TEXT,
+      resuelto_por   INTEGER REFERENCES usuarios(id),
+      motivo         TEXT,
+      resultado      TEXT
+    )`).run();
+  await db.prepare(
+    'CREATE INDEX IF NOT EXISTS idx_sol_estado ON solicitudes(estado, ts)').run();
+
+  // Los días que toca cada solicitud, uno por fila. Existe para dos cosas que
+  // no se pueden sacar del cuerpo guardado sin volver a interpretarlo: pintar
+  // la celda «pendiente» en la matriz, y rechazar de entrada una segunda
+  // solicitud sobre un día que ya tiene una esperando.
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS solicitud_dias (
+      solicitud_id INTEGER NOT NULL REFERENCES solicitudes(id) ON DELETE CASCADE,
+      fecha        TEXT NOT NULL,
+      vehiculo_id  INTEGER NOT NULL
+    )`).run();
+  await db.prepare(
+    'CREATE INDEX IF NOT EXISTS idx_soldia ON solicitud_dias(fecha, vehiculo_id)').run();
 
   // Columnas de anulación de viajes (D35). SQLite no tiene
   // ADD COLUMN IF NOT EXISTS: se intenta y se ignora el error de «ya existe»,
@@ -452,12 +501,291 @@ async function resolverDestino(db, nombre, municipioId, tipo, usuarioId) {
   return nuevo.meta.last_row_id;
 }
 
+
+// ──────────────────────────────── solicitudes de aprobación (D41) ───────────
+
+/**
+ * Lo que la coordinación NO puede aplicar por su cuenta.
+ *
+ * El 21 de octubre una cuenta de coordinación recién creada programó dos
+ * semanas de operación en cuatro toques, siete minutos después de su primer
+ * ingreso. Nadie lo autorizó y nadie se enteró hasta que la programación ya
+ * estaba ahí. El itinerario es el soporte de lo que se paga: quien lo escribe
+ * decide la plata.
+ *
+ * La lista se comprueba contra las rutas registradas en las pruebas, para que
+ * una ruta nueva de coordinación no se cuele sin pasar por aquí ni por una
+ * decisión explícita de dejarla fuera.
+ */
+const REQUIERE_APROBACION = [
+  'POST /api/itinerario',
+  'PUT /api/itinerario/:id',
+  'DELETE /api/itinerario/:id',
+  'POST /api/itinerario/mover',
+  'POST /api/itinerario/lote',
+  'POST /api/predeterminados',
+  'PUT /api/predeterminados/:id',
+  'PUT /api/eventos/:id',
+  'POST /api/fuera-servicio',
+  'PUT /api/fuera-servicio/:id',
+  'POST /api/catalogos/destinos',
+];
+
+/**
+ * Solo la coordinación pide permiso.
+ *
+ * El administrador aplica directo —si tuviera que aprobarse a sí mismo nadie
+ * podría desatascar nada—, y el conductor tampoco pasa por aquí: lo único que
+ * puede hacer de esta lista es reportar su propio vehículo averiado, y eso es
+ * un hecho que ya ocurrió, no una decisión que se autorice.
+ */
+const necesitaAprobacion = (sesion, metodo, patron) =>
+  !!sesion && sesion.rol === 'coordinacion'
+  && REQUIERE_APROBACION.includes(`${metodo} ${patron}`);
+
+const TEXTO_JORNADA = {
+  ebs: 'Ruta EBS', jornada: 'Jornada', vacunacion: 'Vacunación',
+  disponible: 'Disponible en base', traslado_ciudad: 'Fuera del área',
+  administrativo: 'Administrativo',
+};
+
+const placaDe = async (db, id) => {
+  if (!id) return 'vehículo sin identificar';
+  const v = await db.prepare('SELECT placa FROM vehiculos WHERE id = ?').bind(id).first();
+  return v ? v.placa : `vehículo #${id}`;
+};
+
+/**
+ * Traduce la petición a una frase que se pueda aprobar sin abrir nada más, y
+ * saca los días que toca.
+ *
+ * De paso hace la revisión BARATA de la petición —que no venga vacía, que lo
+ * que dice tocar exista— y la rechaza en el momento. No es la validación
+ * completa, que sigue viviendo en cada ruta y corre al aprobar: es lo justo
+ * para que la bandeja del administrador no se llene de peticiones imposibles
+ * que nadie puede aprobar y que fallarían una semana después, cuando ya nadie
+ * se acuerde de qué se pedía.
+ *
+ * El administrador decide desde el teléfono y en un minuto. «PUT
+ * /api/itinerario/482» no es una decisión que nadie pueda tomar; «Cambiar la
+ * programación de OCV-123 del martes 4 de noviembre» sí.
+ */
+async function describirSolicitud(db, metodo, patron, params, cuerpo, url) {
+  const clave = `${metodo} ${patron}`;
+  const dias = [];
+  let resumen = clave;
+  let desde = null, hasta = null, cuantas = 1;
+
+  if (clave === 'POST /api/itinerario') {
+    if (!cuerpo.fecha || !cuerpo.vehiculo_id) {
+      throw malaPeticion('Fecha y vehículo son obligatorios');
+    }
+    const placa = await placaDe(db, cuerpo.vehiculo_id);
+    let jornada = cuerpo.tipo_jornada;
+    if (!jornada && cuerpo.predeterminado_id) {
+      const pre = await db.prepare('SELECT tipo_jornada FROM itinerario_predeterminados WHERE id = ?')
+        .bind(cuerpo.predeterminado_id).first();
+      jornada = pre && pre.tipo_jornada;
+    }
+    resumen = `Programar ${placa} el ${cuerpo.fecha}`
+      + (jornada ? ` — ${TEXTO_JORNADA[jornada] || jornada}` : '');
+    if (cuerpo.fecha && cuerpo.vehiculo_id) {
+      dias.push({ fecha: cuerpo.fecha, vehiculo_id: Number(cuerpo.vehiculo_id) });
+    }
+
+  } else if (clave === 'PUT /api/itinerario/:id' || clave === 'DELETE /api/itinerario/:id') {
+    const it = await db.prepare('SELECT * FROM itinerarios WHERE id = ?')
+      .bind(params.id).first();
+    if (!it) throw noEncontrado('Programación no encontrada');
+    const placa = await placaDe(db, it.vehiculo_id);
+    const definitivo = url && url.searchParams.get('definitivo') === '1';
+    // Pedir algo que, al aprobarse, se ejecutaría con los permisos de quien lo
+    // pidió —y fallaría— sería una solicitud que nadie puede aprobar nunca.
+    // Se corta aquí y se contesta lo mismo que antes de D41: 403.
+    if (definitivo) throw prohibido('Solo el administrador puede borrar definitivamente');
+    resumen = metodo === 'PUT'
+      ? `Cambiar la programación de ${placa} del ${it.fecha}`
+      : `${definitivo ? 'Borrar' : 'Cancelar'} la programación de ${placa} del ${it.fecha}`;
+    dias.push({ fecha: it.fecha, vehiculo_id: it.vehiculo_id });
+
+  } else if (clave === 'POST /api/itinerario/mover') {
+    if (!cuerpo.id || !cuerpo.fecha || !cuerpo.vehiculo_id) {
+      throw malaPeticion('Se requieren id, fecha y vehiculo_id de destino');
+    }
+    const it = await db.prepare('SELECT * FROM itinerarios WHERE id = ?')
+      .bind(cuerpo.id).first();
+    if (!it) throw noEncontrado('Programación no encontrada');
+    const placaO = await placaDe(db, it.vehiculo_id);
+    const placaD = await placaDe(db, cuerpo.vehiculo_id);
+    const mismo = placaO === placaD;
+    resumen = `${cuerpo.duplicar ? 'Duplicar' : 'Mover'} la programación de ${placaO} `
+      + `del ${it.fecha} ${mismo ? `al ${cuerpo.fecha}` : `a ${placaD} el ${cuerpo.fecha}`}`;
+    dias.push({ fecha: it.fecha, vehiculo_id: it.vehiculo_id });
+    if (cuerpo.fecha && cuerpo.vehiculo_id) {
+      dias.push({ fecha: cuerpo.fecha, vehiculo_id: Number(cuerpo.vehiculo_id) });
+    }
+
+  } else if (clave === 'POST /api/itinerario/lote') {
+    const ops = Array.isArray(cuerpo.operaciones) ? cuerpo.operaciones : [];
+    if (!ops.length) throw malaPeticion('No hay operaciones que aplicar');
+    if (ops.length > 600) throw malaPeticion('Demasiadas operaciones en un solo envío');
+    const cuenta = { crear: 0, actualizar: 0, borrar: 0 };
+    for (const op of ops) {
+      cuenta[op.accion] = (cuenta[op.accion] || 0) + 1;
+      let f = op.fecha, v = op.vehiculo_id;
+      if (!f || !v) {                       // actualizar y borrar solo traen el id
+        const it = await db.prepare('SELECT fecha, vehiculo_id FROM itinerarios WHERE id = ?')
+          .bind(op.id).first();
+        if (!it) continue;
+        f = it.fecha; v = it.vehiculo_id;
+      }
+      dias.push({ fecha: f, vehiculo_id: Number(v) });
+    }
+    const partes = [];
+    if (cuenta.crear) partes.push(`${cuenta.crear} nueva(s)`);
+    if (cuenta.actualizar) partes.push(`${cuenta.actualizar} cambiada(s)`);
+    if (cuenta.borrar) partes.push(`${cuenta.borrar} quitada(s)`);
+    const placas = [...new Set(await Promise.all(
+      [...new Set(dias.map(d => d.vehiculo_id))].slice(0, 4).map(v => placaDe(db, v))))];
+    resumen = `${ops.length} cambio(s) de programación de un golpe`
+      + (partes.length ? `: ${partes.join(', ')}` : '')
+      + (placas.length ? ` — ${placas.join(', ')}` : '');
+    cuantas = ops.length;
+
+  } else if (patron === '/api/predeterminados' || patron === '/api/predeterminados/:id') {
+    const nombre = cuerpo.nombre
+      || (await db.prepare('SELECT nombre FROM itinerario_predeterminados WHERE id = ?')
+            .bind(params.id).first() || {}).nombre
+      || `#${params.id}`;
+    resumen = `${metodo === 'POST' ? 'Crear' : 'Cambiar'} el predeterminado «${nombre}»`;
+
+  } else if (clave === 'PUT /api/eventos/:id') {
+    const e = await db.prepare(`
+      SELECT e.*, v.placa FROM eventos e
+      LEFT JOIN vehiculos v ON v.id = e.vehiculo_id WHERE e.id = ?`).bind(params.id).first();
+    if (!e) throw noEncontrado('Novedad no encontrada');
+    resumen = `Cambiar la novedad #${params.id} de ${e.placa || 'un vehículo'}`
+      + (e.fecha ? ` del ${e.fecha}` : '');
+    if (e.fecha && e.vehiculo_id) dias.push({ fecha: e.fecha, vehiculo_id: e.vehiculo_id });
+
+  } else if (patron === '/api/fuera-servicio' || patron === '/api/fuera-servicio/:id') {
+    const antes = metodo === 'PUT'
+      ? await db.prepare('SELECT * FROM fuera_servicio WHERE id = ?').bind(params.id).first()
+      : null;
+    if (metodo === 'PUT' && !antes) throw noEncontrado('Período no encontrado');
+    if (cuerpo.causa && !CAUSAS.includes(cuerpo.causa)) throw malaPeticion('Causa no válida');
+    const vehiculoId = cuerpo.vehiculo_id || (antes && antes.vehiculo_id);
+    const inicio = cuerpo.fecha_inicio || (antes && antes.fecha_inicio);
+    const fin = cuerpo.fecha_fin !== undefined ? cuerpo.fecha_fin : (antes && antes.fecha_fin);
+    const placa = await placaDe(db, vehiculoId);
+    resumen = `${metodo === 'POST' ? 'Registrar' : 'Cambiar el período'} fuera de servicio `
+      + `de ${placa}, desde el ${inicio}` + (fin ? ` hasta el ${fin}` : ' (sigue parado)');
+    desde = inicio || null;
+    hasta = fin || null;
+
+  } else if (clave === 'POST /api/catalogos/destinos') {
+    if (!cuerpo.nombre) throw malaPeticion('El nombre del destino es obligatorio');
+    resumen = `Crear el destino «${cuerpo.nombre}»`;
+  }
+
+  // Los días los fija la operación; el rango solo se deduce de ellos cuando la
+  // propia ruta no lo trajo (fuera de servicio sí lo trae, y es un intervalo).
+  if (dias.length) {
+    const fechas = dias.map(d => d.fecha).filter(Boolean).sort();
+    desde = fechas[0] || null;
+    hasta = fechas[fechas.length - 1] || null;
+    if (cuantas === 1) cuantas = new Set(dias.map(d => `${d.fecha}|${d.vehiculo_id}`)).size;
+  }
+  return { resumen, dias, desde, hasta, cuantas };
+}
+
+/**
+ * Guarda la petición sin aplicarla y la deja esperando al administrador.
+ *
+ * Devuelve lo que verá quien la pidió. El `pendiente: true` es la señal que la
+ * aplicación usa para decir «se envió a aprobación» en vez de «guardado»: sin
+ * él la coordinación creería que su cambio quedó hecho.
+ */
+async function registrarSolicitud(db, sesion, { metodo, patron, ruta, params, cuerpo, url }) {
+  await asegurarEsquema(db);
+  const d = await describirSolicitud(db, metodo, patron, params || {}, cuerpo || {}, url);
+
+  // Un día con solicitud pendiente no admite otra. Sin esto, el pincel o un
+  // segundo toque dejan al administrador dos peticiones contradictorias sobre
+  // la misma celda y la segunda falla al aplicarse, cuando ya no hay nadie
+  // mirando.
+  if (d.dias.length) {
+    const choques = [];
+    for (const x of d.dias) {
+      const y = await db.prepare(`
+        SELECT s.id FROM solicitud_dias sd JOIN solicitudes s ON s.id = sd.solicitud_id
+         WHERE sd.fecha = ? AND sd.vehiculo_id = ? AND s.estado = 'pendiente'
+         LIMIT 1`).bind(x.fecha, x.vehiculo_id).first();
+      if (y) choques.push(`${x.fecha} (${await placaDe(db, x.vehiculo_id)})`);
+    }
+    if (choques.length) {
+      throw malaPeticion(
+        'Ya hay una solicitud esperando aprobación para ' +
+        choques.slice(0, 3).join(', ') +
+        (choques.length > 3 ? ` y ${choques.length - 3} día(s) más` : '') +
+        '. Espere la respuesta del administrador o pídale que la resuelva.');
+    }
+  }
+
+  // Una solicitud para una fecha que ya pasó no se puede aplicar, pero la que
+  // se pide HOY vive al menos hoy: si naciera vencida, cancelar la
+  // programación de ayer sería imposible de pedir.
+  const hoy = hoyISO();
+  const vence = d.hasta && d.hasta > hoy ? d.hasta : hoy;
+
+  const r = await db.prepare(`
+    INSERT INTO solicitudes (ts, solicitante_id, metodo, patron, ruta, params, cuerpo,
+                             resumen, afecta_desde, afecta_hasta, cuantas, vence_el, estado)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'pendiente')`)
+    .bind(ahora(), sesion.id, metodo, patron, ruta,
+          JSON.stringify(params || {}), JSON.stringify(cuerpo || {}),
+          d.resumen, d.desde, d.hasta, d.cuantas, vence).run();
+  const id = r.meta.last_row_id;
+
+  for (const x of d.dias) {
+    if (!x.fecha || !x.vehiculo_id) continue;
+    await db.prepare(
+      'INSERT INTO solicitud_dias (solicitud_id, fecha, vehiculo_id) VALUES (?,?,?)')
+      .bind(id, x.fecha, x.vehiculo_id).run();
+  }
+
+  await auditar(db, sesion, 'solicitar', 'solicitudes', id, null,
+                { resumen: d.resumen, ruta, cuantas: d.cuantas });
+  return {
+    pendiente: true, solicitud: id, resumen: d.resumen,
+    cuantas: d.cuantas, vence_el: vence,
+  };
+}
+
+/**
+ * Vence sola la solicitud cuyo día ya pasó.
+ *
+ * No hay tarea programada en el Worker, así que se hace al leer la bandeja:
+ * es la única pantalla donde el estado importa, y el coste es un UPDATE que
+ * casi siempre no toca nada. Lo vencido NO se borra — queda el rastro de que
+ * se pidió y no se contestó, que es justo lo que hay que poder demostrar.
+ */
+async function vencerSolicitudes(db) {
+  await asegurarEsquema(db);
+  await db.prepare(`
+    UPDATE solicitudes SET estado = 'vencida', resuelto_en = ?
+     WHERE estado = 'pendiente' AND vence_el IS NOT NULL AND vence_el < ?`)
+    .bind(ahora(), hoyISO()).run();
+}
+
 export {
-  VERSION_API, TODOS, GESTION,
+  VERSION_API, TODOS, GESTION, CAUSAS,
   ahora, hoyISO, cors, json, ErrorApi,
   malaPeticion, noAutorizado, prohibido, noEncontrado,
   hashClave, verificarClave,
   sesionActual, exigirRol, auditar,
   recalcularDia, marcarUsoDestino, resolverDestino, siguienteConsecutivo,
   conConsecutivo, asegurarEsquema, fueraDeServicio,
+  REQUIERE_APROBACION, necesitaAprobacion, registrarSolicitud,
+  describirSolicitud, vencerSolicitudes, TEXTO_JORNADA,
 };

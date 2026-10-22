@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D41 | La coordinación propone, el administrador dispone | Lo que pide coordinación **no se aplica**: se guarda entera y espera. Al aprobar se vuelve a ejecutar la misma ruta con la sesión de **quien la pidió**. Lo que no se contesta a tiempo **se vence solo** |
 | D40 | La auditoría dice **qué** pasó | El registro guardaba el detalle y la pantalla solo mostraba «crear itinerarios». Ahora hay columna **Detalle**, y una línea **sin número de ficha** se señala como operación **en bloque** |
 | D39 | Creación en bloque | **Copiar período se retiró.** El pincel se anuncia con una barra fija mientras está encendido, y lo creado hace poco se puede **revisar y deshacer** de un golpe |
 | D38 | Corregir un viaje | **Solo el administrador**, con motivo obligatorio e **historial visible en el propio viaje**. Las coordenadas y las fotografías NO se pueden corregir |
@@ -849,6 +850,67 @@ obligatorio.
 > borraran juntas. Y un día **con viajes registrados no se toca** aunque venga señalado — el
 > vehículo salió, y quitarle la programación descuadraría el día pagable; se informa cuáles se
 > dejaron y por qué.
+
+### 5.1.7 La coordinación propone, el administrador dispone (D41)
+
+El 21 de octubre una cuenta de coordinación recién creada programó dos semanas de operación en
+cuatro toques, **siete minutos después de su primer ingreso**. Nadie lo autorizó y nadie se enteró
+hasta que la programación ya estaba puesta. El itinerario es el soporte de lo que se paga: quien
+lo escribe decide la plata.
+
+**Lo que pide la coordinación ya no se aplica.** Se guarda entera —método, ruta, parámetros y
+cuerpo— en `solicitudes`, y espera. Hasta que el administrador la apruebe, la base no cambia.
+
+| | |
+|---|---|
+| **Qué pide permiso** | itinerario (crear, cambiar, borrar, mover, cargar en bloque), predeterminados, editar una novedad, fuera de servicio, crear destinos |
+| **Qué no** | las marcas de campo —salida, llegada, fotografía, checklist, sincronización, **crear** una novedad—: registran un hecho que ya ocurrió, no una decisión sobre lo que se va a pagar |
+| **Quién no pide permiso** | el **administrador** (si tuviera que aprobarse a sí mismo nadie podría desatascar nada) y el **conductor** (lo único que puede hacer de esa lista es reportar su propio vehículo averiado) |
+
+**Se intercepta en un solo sitio.** En `index.js`, antes de llamar al manejador, en el punto por el
+que pasan todas las rutas. No dentro de cada una: una ruta nueva que se olvidara de pedir permiso
+sería una puerta abierta, y el olvido no se vería hasta que alguien lo usara. Para que no haya
+olvido, una prueba recorre el registro de rutas y falla si alguna que **escriba** y que
+coordinación pueda llamar no está ni en la lista de aprobación ni en la de exenciones razonadas.
+
+**Al aprobar se vuelve a ejecutar la MISMA ruta, con la sesión de quien la pidió.** No hay un
+segundo camino que escriba lo mismo de otra manera: las validaciones, el historial de cambios y la
+auditoría salen idénticos a los de un cambio directo. Y la firma queda donde corresponde —el
+cambio es de la coordinación, la autorización es del administrador, y las dos cosas constan por
+separado—. Que se ejecute con **sus** permisos y no con los del administrador es además lo que
+impide que una solicitud sirva para colarse: pedir un borrado definitivo se rechaza al pedirlo,
+porque al aprobarse fallaría de todos modos.
+
+**Aprobar puede fallar, y es normal.** Entre la petición y el visto bueno el mundo siguió andando:
+el día pudo quedarse con viajes registrados, o la programación pudo desaparecer. En ese caso la
+solicitud queda `fallida` con el motivo exacto —no aprobada, no pendiente, no perdida— y nadie
+cree que se aplicó algo que no se aplicó.
+
+**Se vence sola.** Una solicitud para el 25 que sigue sin respuesta el 26 ya no se puede aplicar.
+Pasa a `vencida` al leer la bandeja —no hay tarea programada en el Worker, y es un `UPDATE` que
+casi siempre no toca nada—. **No se borra:** queda el rastro de que se pidió y no se contestó, que
+es justo lo que hay que poder demostrar. La que se pide HOY vive al menos hoy, porque si naciera
+vencida, pedir que se cancele la programación de ayer sería imposible.
+
+**La pantalla no puede mentir.** Tres cosas lo sostienen:
+
+- El día pedido sale **rayado en ámbar** en la matriz y en la vista por día, con la etiqueta
+  *esperando aprobación* y quién lo pidió. Sin esto la coordinación programa, no ve nada aparecer
+  y vuelve a programar.
+- Un día que ya tiene solicitud **no admite otra**. Dos peticiones que se contradicen sobre la
+  misma celda le dejan al administrador una decisión imposible, y la segunda falla al aplicarse
+  cuando ya nadie está mirando. Quien se equivocó al pedir puede **retirar** lo suyo.
+- El aviso lo pone `api()`, en el único sitio por el que pasan todas las peticiones, para que
+  ninguna pantalla pueda decir «guardado» por descuido.
+
+**El pincel pasó a enviar el trazo entero.** Antes salía una petición por celda: arrastrar sobre
+veinte días eran veinte peticiones, veinte líneas de auditoría y —con esto— veinte solicitudes de
+aprobación para **una sola decisión**. Un trazo es un acto, y así se registra, se aprueba y se
+deshace: entero, en un solo `POST /api/itinerario/lote`.
+
+> **Lo que esto cuesta.** Si el administrador no mira la bandeja, no hay programación. El número
+> rojo en el menú está para eso, y por eso lo vencido queda registrado en vez de desaparecer: la
+> demora también deja rastro.
 
 ### 5.1.6 La auditoría dice qué pasó, no solo que pasó (D40)
 

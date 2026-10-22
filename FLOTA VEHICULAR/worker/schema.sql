@@ -577,3 +577,49 @@ CREATE TABLE parametros (
   actualizado_por INTEGER,
   actualizado_en  TEXT
 );
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- SOLICITUDES DE APROBACIÓN (D41)
+--
+-- Lo que pide la coordinación NO se aplica: se guarda aquí entero —método,
+-- ruta, parámetros y cuerpo— y espera al administrador. Al aprobar se vuelve
+-- a ejecutar la MISMA ruta con la sesión de quien la pidió, de modo que las
+-- validaciones, el historial y la auditoría salen idénticos a los de un
+-- cambio hecho directamente. Por eso se almacena la petición y no un resumen.
+--
+-- Estados: pendiente · aprobada · rechazada · vencida · fallida · retirada.
+-- Nada se borra nunca: una solicitud que nadie contestó a tiempo queda como
+-- `vencida`, que es justo lo que hay que poder demostrar.
+-- ═══════════════════════════════════════════════════════════════════════════
+CREATE TABLE solicitudes (
+  id             INTEGER PRIMARY KEY,
+  ts             TEXT NOT NULL,
+  solicitante_id INTEGER NOT NULL REFERENCES usuarios(id),
+  metodo         TEXT NOT NULL,
+  patron         TEXT NOT NULL,         -- '/api/itinerario/:id'
+  ruta           TEXT NOT NULL,         -- la pedida, con su cadena de consulta
+  params         TEXT,                  -- JSON
+  cuerpo         TEXT,                  -- JSON
+  resumen        TEXT NOT NULL,         -- en castellano, para poder decidir
+  afecta_desde   TEXT,
+  afecta_hasta   TEXT,
+  cuantas        INTEGER NOT NULL DEFAULT 1,
+  vence_el       TEXT,                  -- el último día en que todavía sirve
+  estado         TEXT NOT NULL DEFAULT 'pendiente',
+  resuelto_en    TEXT,
+  resuelto_por   INTEGER REFERENCES usuarios(id),
+  motivo         TEXT,                  -- del administrador, al rechazar
+  resultado      TEXT                   -- JSON de lo que devolvió al aplicarse
+);
+CREATE INDEX idx_sol_estado ON solicitudes(estado, ts);
+
+-- Los días que toca cada solicitud. Existe para dos cosas que no se pueden
+-- sacar del cuerpo guardado sin volver a interpretarlo: marcar la celda
+-- «esperando» en la matriz, y rechazar de entrada una segunda solicitud sobre
+-- un día que ya tiene una esperando.
+CREATE TABLE solicitud_dias (
+  solicitud_id INTEGER NOT NULL REFERENCES solicitudes(id) ON DELETE CASCADE,
+  fecha        TEXT NOT NULL,
+  vehiculo_id  INTEGER NOT NULL
+);
+CREATE INDEX idx_soldia ON solicitud_dias(fecha, vehiculo_id);
