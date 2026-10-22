@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D40 | La auditoría dice **qué** pasó | El registro guardaba el detalle y la pantalla solo mostraba «crear itinerarios». Ahora hay columna **Detalle**, y una línea **sin número de ficha** se señala como operación **en bloque** |
 | D39 | Creación en bloque | **Copiar período se retiró.** El pincel se anuncia con una barra fija mientras está encendido, y lo creado hace poco se puede **revisar y deshacer** de un golpe |
 | D38 | Corregir un viaje | **Solo el administrador**, con motivo obligatorio e **historial visible en el propio viaje**. Las coordenadas y las fotografías NO se pueden corregir |
 | D37 | Dashboard por persona y por vehículo | Secciones comparativas de las dos cosas **y** dos selectores que enfocan **todo** el tablero en un conductor o un vehículo. El recorte lo hace el servidor, no la pantalla |
@@ -848,6 +849,23 @@ obligatorio.
 > borraran juntas. Y un día **con viajes registrados no se toca** aunque venga señalado — el
 > vehículo salió, y quitarle la programación descuadraría el día pagable; se informa cuáles se
 > dejaron y por qué.
+
+### 5.1.6 La auditoría dice qué pasó, no solo que pasó (D40)
+
+La tabla de auditoría guardaba `valor_despues` desde el principio y la pantalla **nunca lo
+mostraba**. Las tres columnas eran *Cuándo*, *Quién* y *Qué*, y *Qué* decía `crear itinerarios`
+tanto para una programación hecha a mano como para ochenta hechas de un golpe. Con eso delante no
+se podía contestar la única pregunta que importa cuando aparece programación que nadie pidió:
+**¿quién, y de cuántas a la vez?**
+
+Hay una cuarta columna, **Detalle**, que traduce el JSON a lenguaje corriente: *«3 creadas de un
+golpe · plantilla de Excel»*, *««odómetro mal leído»»*, *«cambió km_final, lugar_llegada»*.
+
+Y la señal que de verdad distingue los dos casos: **una línea sin número de ficha es una operación
+en bloque.** Cada ruta que crea o borra de una en una audita con el identificador de lo que tocó;
+las que trabajan en bloque auditan una sola fila sin identificador, porque no hay *una* ficha que
+nombrar. Esa diferencia ya estaba en los datos y no se veía. Ahora esas filas van resaltadas en
+ámbar, con la etiqueta *en bloque*, y la pantalla lo explica arriba en una línea.
 
 ### 5.4.11 Las fechas de las pruebas no se escriben a mano
 

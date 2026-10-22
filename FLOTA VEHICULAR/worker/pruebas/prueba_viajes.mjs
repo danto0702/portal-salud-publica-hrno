@@ -388,6 +388,28 @@ try {
   await pag.click('.modal-pie .btn:has-text("Cerrar")');
   await pag.waitForSelector('.modal-caja', { state: 'hidden' });
 
+  // ── La auditoría distingue lo hecho en bloque ──────────────────────────
+  // Sin esto no se podía saber de dónde salió programación que nadie esperaba:
+  // el detalle se guardaba y nunca se mostraba.
+  console.log('\n══ La auditoría muestra el detalle ══');
+  await pag.evaluate(() => api('/api/itinerario/lote', { metodo: 'POST', cuerpo: {
+    operaciones: [1, 2, 3].map(i => ({
+      accion: 'crear', fecha: nDias(hoy(), 200 + i),
+      vehiculo_id: vehiculos[0].id, tipo_jornada: 'ebs',
+    })),
+  } }));
+  await pag.evaluate(() => verAuditoria());
+  await pag.waitForSelector('.modal-caja');
+  await pag.waitForTimeout(700);
+  const aud = await pag.locator('.modal-caja').innerText();
+  verificar('explica qué significa una línea sin número', /en bloque/i.test(aud));
+  verificar('y la creación en bloque dice cuántas fueron',
+    /3 creadas de un golpe/i.test(aud), aud.split('\n').slice(0, 12).join(' | '));
+  verificar('la fila en bloque va señalada',
+    await pag.locator('.modal-caja .etq.ambar:has-text("en bloque")').count() >= 1);
+  await pag.click('.modal-pie .btn:has-text("Cerrar")');
+  await pag.waitForSelector('.modal-caja', { state: 'hidden' });
+
   verificar('ninguna excepción en la consola', errores.length === 0, errores[0]);
 } finally {
   await ctx.close();

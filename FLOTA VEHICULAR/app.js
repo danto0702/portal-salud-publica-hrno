@@ -4595,14 +4595,61 @@ async function guardarParametro(clave) {
   } catch (e) { aviso(e.message, 'mal', 'No se pudo guardar'); }
 }
 
+/**
+ * Auditoría.
+ *
+ * El detalle de cada línea se guardaba y no se mostraba, y es justo lo que
+ * distingue una creación de otra: una línea «crear itinerarios» SIN número
+ * es una creación EN BLOQUE —la plantilla de Excel—, y el detalle dice
+ * cuántas fueron. Con número es una sola, hecha a mano. Sin esa columna hubo
+ * que sacar la base para entender de dónde salió programación que nadie
+ * esperaba.
+ */
 async function verAuditoria() {
   const a = await api('/api/auditoria?limite=200');
-  abrirModal('Auditoría', `<div class="tabla-env" style="border:0"><table>
-    <thead><tr><th>Cuándo</th><th>Quién</th><th>Qué</th></tr></thead>
-    <tbody>${a.map(x => `
-      <tr><td style="white-space:nowrap">${fechaHora(x.ts)}</td>
-        <td>${esc(x.nombre?.trim() || x.usuario || '—')}<br><span style="font-size:.68rem;color:var(--muted)">${esc(x.rol || '')}</span></td>
-        <td>${esc(x.accion)} <b>${esc(x.entidad)}</b>${x.entidad_id ? ' #' + x.entidad_id : ''}</td></tr>`).join('')}
+
+  // El detalle viene como JSON; se enseña en lenguaje corriente lo que importa.
+  const resumir = (x) => {
+    let d = null;
+    try { d = JSON.parse(x.valor_despues || 'null'); } catch { /* texto suelto */ }
+    if (!d || typeof d !== 'object') return esc(x.valor_despues || '');
+    const partes = [];
+    if (d.copiados != null) partes.push(`<b>${d.copiados} creadas de un golpe</b>`);
+    if (d.creadas != null) partes.push(`<b>${d.creadas} creadas de un golpe</b>`);
+    if (d.origen) partes.push(esc(d.origen));
+    if (d.actualizadas) partes.push(`${d.actualizadas} actualizadas`);
+    if (d.borradas != null) partes.push(`${d.borradas} quitadas`);
+    if (d.omitidos != null) partes.push(`${d.omitidos} omitidas`);
+    if (d.motivo) partes.push(`«${esc(String(d.motivo).slice(0, 80))}»`);
+    if (d.campos?.length) partes.push('cambió ' + esc(d.campos.join(', ')));
+    if (d.hito) partes.push(esc(d.hito));
+    if (d.consecutivo) partes.push(esc(d.consecutivo));
+    if (!partes.length) {
+      const claves = Object.keys(d).slice(0, 4);
+      if (claves.length) partes.push(esc(claves.join(', ')));
+    }
+    return partes.join(' · ');
+  };
+
+  abrirModal('Auditoría', `
+    <p style="font-size:.78rem;color:var(--muted);margin:0 0 .7rem">
+      Una línea <b>sin número</b> es una operación <b>en bloque</b>: creó o quitó
+      varias cosas de una vez. Con número es una sola.
+    </p>
+    <div class="tabla-env" style="border:0"><table>
+    <thead><tr><th>Cuándo</th><th>Quién</th><th>Qué</th><th>Detalle</th></tr></thead>
+    <tbody>${a.map(x => {
+      const bloque = !x.entidad_id && ['crear', 'eliminar'].includes(x.accion);
+      return `
+      <tr${bloque ? ' style="background:var(--ambar-glow)"' : ''}>
+        <td style="white-space:nowrap">${fechaHora(x.ts)}</td>
+        <td>${esc(x.nombre?.trim() || x.usuario || '—')}<br>
+          <span style="font-size:.68rem;color:var(--muted)">${esc(x.rol || '')}</span></td>
+        <td style="white-space:nowrap">${esc(x.accion)} <b>${esc(x.entidad)}</b>${
+          x.entidad_id ? ' #' + x.entidad_id
+            : bloque ? ' <span class="etq ambar">en bloque</span>' : ''}</td>
+        <td style="font-size:.76rem;max-width:320px">${resumir(x)}</td>
+      </tr>`; }).join('')}
     </tbody></table></div>`);
 }
 
