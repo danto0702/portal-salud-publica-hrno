@@ -188,6 +188,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
   <div class="tabs">
     <button class="tab active" onclick="switchTab('usuarios')">Usuarios</button>
     <button class="tab" onclick="switchTab('modulos')">Módulos públicos</button>
+    <button class="tab" onclick="switchTab('claves')">Contraseñas de módulos</button>
     <button class="tab" onclick="switchTab('log')">Registro de actividad</button>
   </div>
 
@@ -236,6 +237,32 @@ tr:hover td{background:rgba(255,255,255,.02);}
   </div>
 
   <!-- ─────────────────────────────────────────── -->
+  <!-- TAB: CONTRASEÑAS DE MÓDULOS                 -->
+  <!-- ─────────────────────────────────────────── -->
+  <div class="tab-panel" id="tab-claves">
+    <div class="card">
+      <div class="card-title">Contraseñas de módulos con acceso administrador</div>
+      <p style="font-size:.78rem;color:var(--muted);margin-bottom:16px">
+        Lista de módulos que tienen contraseña de administrador propia. Como superadmin puedes ver, cambiar o borrar cada contraseña.<br>
+        <b>Al borrar</b> la contraseña, el módulo queda abierto (sin protección). <b>Al restablecer</b>, se genera una nueva que debes comunicar al responsable.
+      </p>
+      <div id="claves-loader" style="color:var(--muted);font-size:.8rem">Cargando módulos...</div>
+      <div class="tbl-wrap" id="claves-wrap" style="display:none">
+        <table>
+          <thead>
+            <tr>
+              <th>Módulo</th>
+              <th>Estado contraseña</th>
+              <th>Nueva contraseña</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyClaves"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- TAB: LOG                                    -->
   <!-- ─────────────────────────────────────────── -->
   <div class="tab-panel" id="tab-log">
@@ -442,11 +469,101 @@ document.body.style.visibility = 'hidden';
 // ════════════════════════════════════════════════════════
 function switchTab(id) {
   document.querySelectorAll('.tab').forEach((t,i) => {
-    const panels = ['usuarios','modulos','log'];
+    const panels = ['usuarios','modulos','claves','log'];
     t.classList.toggle('active', panels[i] === id);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + id).classList.add('active');
+  if (id === 'claves') cargarClaves();
+}
+
+// ════════════════════════════════════════════════════════
+// CONTRASEÑAS DE MÓDULOS
+// ════════════════════════════════════════════════════════
+let clavesCache = [];
+
+async function cargarClaves() {
+  document.getElementById('claves-loader').style.display = '';
+  document.getElementById('claves-wrap').style.display = 'none';
+
+  // Módulos con admin propio
+  const { data: mods, error: e1 } = await portalSb
+    .from('portal_modulos')
+    .select('id,nombre')
+    .eq('tiene_admin_propio', true)
+    .order('nombre');
+  if (e1) { document.getElementById('claves-loader').textContent = 'Error: ' + e1.message; return; }
+
+  // Configuraciones de contraseñas (todas las filas de portal_config para estos módulos)
+  const modIds = (mods||[]).map(m => m.id);
+  const { data: cfgs } = await portalSb
+    .from('portal_config')
+    .select('clave,modulo_id,valor,updated_at')
+    .in('modulo_id', modIds.length ? modIds : ['__none__']);
+
+  clavesCache = (mods||[]).map(m => {
+    const cfg = (cfgs||[]).find(c => c.modulo_id === m.id);
+    return { ...m, valor: cfg?.valor || null, clave: cfg?.clave || null, updated_at: cfg?.updated_at || null };
+  });
+
+  renderClaves();
+  document.getElementById('claves-loader').style.display = 'none';
+  document.getElementById('claves-wrap').style.display = '';
+}
+
+function renderClaves() {
+  const tbody = document.getElementById('tbodyClaves');
+  if (!clavesCache.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty"><div class="empty-msg">No hay módulos con contraseña propia registrados</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = clavesCache.map((m, i) => `
+    <tr>
+      <td><b>${m.nombre}</b><br><span style="font-size:.72rem;color:var(--muted)">${m.id}</span></td>
+      <td>
+        ${m.valor
+          ? `<span style="color:var(--green);font-weight:600">● Establecida</span><br><span style="font-size:.72rem;color:var(--muted)">${m.updated_at ? new Date(m.updated_at).toLocaleString('es-CO') : ''}</span>`
+          : `<span style="color:var(--yellow);font-weight:600">○ Sin contraseña</span><br><span style="font-size:.72rem;color:var(--muted)">Módulo abierto</span>`}
+      </td>
+      <td>
+        <input id="clave_new_${i}" type="text" placeholder="Nueva contraseña…"
+          style="width:160px;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+                 border-radius:6px;padding:5px 8px;font-size:.78rem">
+      </td>
+      <td style="white-space:nowrap;display:flex;gap:6px;align-items:center;padding-top:10px">
+        <button class="btn-primary" onclick="guardarClave(${i})" style="font-size:.72rem;padding:4px 10px">Guardar</button>
+        ${m.valor ? `<button class="btn-sm" onclick="borrarClave(${i})" style="font-size:.72rem;padding:4px 10px;color:var(--primary);border-color:var(--primary)">Borrar</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+async function guardarClave(i) {
+  const m = clavesCache[i];
+  const pass = document.getElementById('clave_new_' + i).value.trim();
+  if (!pass) { showErr('Escribe la nueva contraseña antes de guardar.'); return; }
+  // Usar la clave existente o construir una nueva: <modulo_id_sin_punto>.admin_pass
+  const clave = m.clave || (m.id.replace('.','_') + '.admin_pass');
+  const { error } = await portalSb.from('portal_config').upsert({
+    clave,
+    modulo_id: m.id,
+    descripcion: 'Contraseña admin ' + m.nombre,
+    valor: pass,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'clave' });
+  if (error) { showErr('Error al guardar: ' + error.message); return; }
+  showOk('Contraseña de "' + m.nombre + '" guardada.');
+  cargarClaves();
+}
+
+async function borrarClave(i) {
+  const m = clavesCache[i];
+  if (!confirm('¿Borrar la contraseña de "' + m.nombre + '"? El módulo quedará sin protección.')) return;
+  const { error } = await portalSb.from('portal_config')
+    .update({ valor: null, updated_at: new Date().toISOString() })
+    .eq('modulo_id', m.id);
+  if (error) { showErr('Error al borrar: ' + error.message); return; }
+  showOk('Contraseña de "' + m.nombre + '" eliminada. El módulo quedó abierto.');
+  cargarClaves();
 }
 
 // ════════════════════════════════════════════════════════
