@@ -1207,27 +1207,21 @@ verificar('un viaje que no existe responde 404', r.estado === 404, r.estado);
 
 console.log('\n── Revisar y deshacer lo programado en bloque ────────────────');
 
-// Copiar un período: primero el ensayo, que no debe escribir nada.
-const vCopia = (await api('GET', '/api/vehiculos', null, tCoord)).datos[0].id;
-for (const n of [60, 61, 62]) {
-  await api('POST', '/api/itinerario', {
-    fecha: fx(n), vehiculo_id: vCopia, municipio_id: 1,
-    destino_nombre: 'ORIGEN COPIA', tipo_jornada: 'ebs',
-  }, tCoord);
-}
-r = await api('POST', '/api/itinerario/copiar', {
-  desde: fx(60), hasta: fx(62), destino_desde: fx(70), ensayo: true,
-}, tCoord);
-verificar('el ensayo dice cuántas crearía', r.estado === 200 && r.datos.creados === 3, r.datos);
-verificar('y entre qué fechas',
-  r.datos.primera === fx(70) && r.datos.ultima === fx(72), r.datos);
-r = await api('GET', `/api/itinerario?desde=${fx(70)}&hasta=${fx(72)}`, null, tCoord);
-verificar('el ensayo NO escribió nada', r.datos.length === 0, r.datos.length);
-
+// Copiar un período se retiró: ni la pantalla ni la API deben ofrecerlo.
 r = await api('POST', '/api/itinerario/copiar', {
   desde: fx(60), hasta: fx(62), destino_desde: fx(70),
 }, tCoord);
-verificar('la copia de verdad sí escribe', r.datos.creados === 3, r.datos);
+verificar('copiar un período ya no existe en la API', r.estado === 404, r.estado);
+
+// Una carga en bloque, como la de la plantilla de Excel, para tener qué revisar.
+const vCopia = (await api('GET', '/api/vehiculos', null, tCoord)).datos[0].id;
+r = await api('POST', '/api/itinerario/lote', {
+  operaciones: [70, 71, 72].map(n => ({
+    accion: 'crear', fecha: fx(n), vehiculo_id: vCopia, municipio_id: 1,
+    destino_nombre: 'CARGA EN BLOQUE', tipo_jornada: 'ebs',
+  })),
+}, tCoord);
+verificar('una carga en bloque crea varias de un golpe', r.datos.creadas === 3, r.datos);
 
 // Lo creado hace poco sale en la revisión, con quién y cuándo.
 r = await api('GET', '/api/itinerario/recientes?horas=24', null, tCoord);
@@ -1240,7 +1234,7 @@ verificar('y dice si el día ya tiene viajes', copiadas.every(x => x.viajes === 
 // Quitarlo en bloque: solo el administrador, con motivo.
 const idsCopia = copiadas.map(x => x.id);
 r = await api('POST', '/api/itinerario/borrar-lote',
-  { ids: idsCopia, motivo: 'Se copió por error' }, tCoord);
+  { ids: idsCopia, motivo: 'Se cargó por error' }, tCoord);
 verificar('coordinación NO quita en bloque', r.estado === 403, r.datos);
 r = await api('POST', '/api/itinerario/borrar-lote', { ids: idsCopia, motivo: 'ups' },
               tokenPrincipal);
@@ -1250,8 +1244,8 @@ r = await api('POST', '/api/itinerario/borrar-lote', { ids: [], motivo: 'Nada se
 verificar('no hace nada si no se señaló ninguna', r.estado === 400, r.datos);
 
 r = await api('POST', '/api/itinerario/borrar-lote',
-  { ids: idsCopia, motivo: 'Se copió el período por error' }, tokenPrincipal);
-verificar('el administrador deshace la copia de un golpe',
+  { ids: idsCopia, motivo: 'Se cargó en bloque por error' }, tokenPrincipal);
+verificar('el administrador deshace la carga de un golpe',
   r.estado === 200 && r.datos.borradas === 3, r.datos);
 r = await api('GET', `/api/itinerario?desde=${fx(70)}&hasta=${fx(72)}`, null, tCoord);
 verificar('y los días quedan limpios', r.datos.length === 0, r.datos.length);

@@ -17,7 +17,7 @@
  * peticiones e ignora en silencio lo que no entiende — un campo que no se
  * guarda y ningún mensaje de error. Por eso se comprueba y se avisa.
  */
-const VERSION_API_REQUERIDA = 16;
+const VERSION_API_REQUERIDA = 17;
 
 const esLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 const API = localStorage.getItem('flota_api') ||
@@ -1591,7 +1591,6 @@ async function verItinerario() {
           onchange="cargarPlantilla(this)">
         <button class="btn sec sm" onclick="modalRecientes()"
           title="Qué se programó hace poco, quién lo hizo y cómo deshacerlo">Creado hace poco</button>
-        <button class="btn sec sm" onclick="modalCopiarSemana()">Copiar período</button>
       </div>
     </div>
 
@@ -2451,10 +2450,10 @@ async function verCambios(id) {
 
 // ── Revisar y deshacer lo programado hace poco (D39) ────────────────────────
 //
-// El itinerario se puede crear en bloque por tres caminos —copiar un período,
-// la plantilla de Excel y el pincel— y ninguno tenía vuelta atrás: deshacer
-// una copia de dos semanas era borrar cien celdas a mano. Esta pantalla
-// responde «qué se creó, cuándo y quién» y permite quitarlo de una vez.
+// El itinerario se puede crear en bloque desde la plantilla de Excel y con el
+// pincel, y no había vuelta atrás: deshacer una carga de dos semanas era
+// borrar cien celdas a mano. Esta pantalla responde «qué se creó, cuándo y
+// quién» y permite quitarlo de una vez.
 
 let recientesCargadas = [];
 let recientesHoras = 48;
@@ -2574,80 +2573,6 @@ async function quitarRecientes(clave) {
   } catch (e) {
     aviso(e.message, 'mal', 'No se pudo quitar');
     btn.disabled = false; btn.textContent = 'Quitar';
-  }
-}
-
-/**
- * Copiar un período (D39).
- *
- * Crea decenas de programaciones de un golpe y antes no enseñaba cuántas ni
- * hasta dónde: se escogía una fecha y se tocaba «Copiar». Ahora hay dos
- * pasos — primero se pregunta al servidor qué HARÍA, sin escribir nada, y lo
- * que se confirma es ese número.
- */
-function modalCopiarSemana() {
-  const hasta = nDias(itinDesde, itinDias - 1);
-  abrirModal('Copiar programación', `
-    <p style="font-size:.88rem;color:var(--text-soft);margin:0 0 1rem">
-      Copia la programación del <b>${itinDesde}</b> al <b>${hasta}</b> hacia adelante.
-      Los días que ya tengan programación se dejan como están.
-    </p>
-    <div class="campo"><label class="lb">Copiar a partir del</label>
-      <input class="inp" type="date" id="cp-desde" value="${nDias(itinDesde, itinDias)}"></div>
-    <div id="cp-previa"></div>`,
-    `<button class="btn sec" onclick="cerrarModal()">Cancelar</button>
-     <button class="btn" id="cp-btn"
-       onclick="ensayarCopia('${itinDesde}','${hasta}')">Ver qué se va a copiar</button>`);
-}
-
-/** Primer paso: se pregunta qué haría, sin escribir nada. */
-async function ensayarCopia(desde, hasta) {
-  const destino = $('#cp-desde').value;
-  if (!destino) return aviso('Indique desde qué día copiar', 'mal', 'Falta la fecha');
-  const btn = $('#cp-btn'); btn.disabled = true; btn.textContent = 'Revisando...';
-  try {
-    const r = await api('/api/itinerario/copiar', {
-      metodo: 'POST', cuerpo: { desde, hasta, destino_desde: destino, ensayo: true },
-    });
-    $('#cp-previa').innerHTML = r.creados ? `
-      <div class="nota avi" style="margin-top:.4rem">
-        Se van a crear <b>${num(r.creados)} programación(es)</b> nuevas,
-        del <b>${esc(r.primera)}</b> al <b>${esc(r.ultima)}</b>, para
-        ${r.vehiculos} vehículo(s).
-        ${r.omitidos ? `<br>${r.omitidos} se omiten porque esos días ya tienen programación.` : ''}
-        <br><br>Si no era esto, toque <b>Cancelar</b>.
-      </div>` : `
-      <div class="nota" style="margin-top:.4rem">
-        No hay nada que copiar: todos esos días ya tienen programación.
-      </div>`;
-    btn.disabled = false;
-    if (r.creados) {
-      btn.textContent = `Sí, crear ${r.creados}`;
-      btn.classList.add('rojo');
-      btn.setAttribute('onclick', `copiarSemana('${desde}','${hasta}')`);
-    } else {
-      btn.textContent = 'Ver qué se va a copiar';
-    }
-  } catch (e) {
-    aviso(e.message, 'mal', 'No se pudo revisar');
-    btn.disabled = false; btn.textContent = 'Ver qué se va a copiar';
-  }
-}
-
-async function copiarSemana(desde, hasta) {
-  const btn = $('#cp-btn'); btn.disabled = true; btn.textContent = 'Copiando...';
-  try {
-    const r = await api('/api/itinerario/copiar', {
-      metodo: 'POST',
-      cuerpo: { desde, hasta, destino_desde: $('#cp-desde').value },
-    });
-    cerrarModal();
-    aviso(`${r.creados} copiada(s)${r.omitidos ? `, ${r.omitidos} omitida(s) por tener programación` : ''}. ` +
-      'Si no era lo que quería, use «Creado hace poco» para deshacerlo.', 'ok', 'Listo');
-    verItinerario();
-  } catch (e) {
-    aviso(e.message, 'mal', 'No se pudo copiar');
-    btn.disabled = false; btn.textContent = 'Copiar';
   }
 }
 

@@ -95,7 +95,7 @@ const totalRutas = () => rutas.length;
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 16;
+const VERSION_API = 17;
 
 /**
  * Juegos de roles que usan las rutas.
@@ -1233,55 +1233,6 @@ ruta('DELETE', '/api/itinerario/:id', async ({ db, sesion, params, cuerpo, url }
   return { ok: true, borrado: false };
 }, GESTION);
 
-/** Copia la programación de un rango a otro, para no reprogramar desde cero. */
-ruta('POST', '/api/itinerario/copiar', async ({ db, sesion, cuerpo }) => {
-  const { desde, hasta, destino_desde } = cuerpo;
-  if (!desde || !hasta || !destino_desde) {
-    throw malaPeticion('Se requieren desde, hasta y destino_desde');
-  }
-  const origen = await db.prepare(
-    "SELECT * FROM itinerarios WHERE fecha BETWEEN ? AND ? AND estado != 'cancelado'")
-    .bind(desde, hasta).all();
-
-  const dias = Math.round(
-    (Date.parse(destino_desde) - Date.parse(desde)) / 86400000);
-  let creados = 0, omitidos = 0;
-  // Ensayo (D39): cuenta lo que haría SIN escribir nada. Copiar un período
-  // crea decenas de programaciones de un golpe y no tenía vuelta atrás; ahora
-  // la pantalla enseña primero cuántas y entre qué fechas.
-  const ensayo = cuerpo.ensayo === true;
-  const nuevasFechas = [];
-
-  for (const it of origen.results) {
-    const nueva = new Date(Date.parse(it.fecha) + dias * 86400000)
-      .toISOString().slice(0, 10);
-    const choque = await db.prepare(
-      "SELECT id FROM itinerarios WHERE fecha = ? AND vehiculo_id = ? AND estado != 'cancelado'")
-      .bind(nueva, it.vehiculo_id).first();
-    if (choque) { omitidos++; continue; }
-    if (ensayo) { creados++; nuevasFechas.push(nueva); continue; }
-    await db.prepare(`
-      INSERT INTO itinerarios (fecha, vehiculo_id, conductor_id, municipio_id,
-                               destino_id, destino_texto, tipo_jornada, observaciones,
-                               estado, creado_por, creado_en)
-      VALUES (?,?,?,?,?,?,?,?,'programado',?,?)`)
-      .bind(nueva, it.vehiculo_id, it.conductor_id, it.municipio_id, it.destino_id,
-            it.destino_texto, it.tipo_jornada, it.observaciones, sesion.id, ahora()).run();
-    await recalcularDia(db, nueva, it.vehiculo_id);
-    creados++;
-  }
-  if (ensayo) {
-    nuevasFechas.sort();
-    return { ensayo: true, creados, omitidos,
-             primera: nuevasFechas[0] || null,
-             ultima: nuevasFechas[nuevasFechas.length - 1] || null,
-             vehiculos: new Set(origen.results.map(x => x.vehiculo_id)).size };
-  }
-  await auditar(db, sesion, 'crear', 'itinerarios', null, null,
-                { copiados: creados, omitidos });
-  return { creados, omitidos };
-}, GESTION);
-
 /**
  * Mover o duplicar una programación arrastrándola en la matriz.
  *
@@ -1486,11 +1437,11 @@ ruta('POST', '/api/itinerario/lote', async ({ db, sesion, cuerpo }) => {
 /**
  * Lo que se programó hace poco, para poder revisarlo y deshacerlo (D39).
  *
- * El itinerario se puede crear en bloque por tres caminos —copiar un período,
- * la plantilla de Excel y el pincel— y ninguno tenía vuelta atrás: deshacer
- * una copia de dos semanas era borrar cien celdas a mano. Esta consulta
- * responde «qué se creó, cuándo y quién», que es lo primero que se pregunta
- * cuando aparece programación que nadie esperaba.
+ * El itinerario se puede crear en bloque desde la plantilla de Excel y con el
+ * pincel, y no había vuelta atrás: deshacer una carga de dos semanas era
+ * borrar cien celdas a mano. Esta consulta responde «qué se creó, cuándo y
+ * quién», que es lo primero que se pregunta cuando aparece programación que
+ * nadie esperaba.
  *
  * Se devuelve también si el día YA tiene viajes registrados: esas no se
  * pueden quitar, y además significan que el vehículo sí salió.

@@ -85,7 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
-| D39 | Creación en bloque | Copiar un período **enseña antes cuántas crearía**; el pincel lo anuncia con una barra fija mientras está encendido; y lo creado hace poco se puede **revisar y deshacer** de un golpe |
+| D39 | Creación en bloque | **Copiar período se retiró.** El pincel se anuncia con una barra fija mientras está encendido, y lo creado hace poco se puede **revisar y deshacer** de un golpe |
 | D38 | Corregir un viaje | **Solo el administrador**, con motivo obligatorio e **historial visible en el propio viaje**. Las coordenadas y las fotografías NO se pueden corregir |
 | D37 | Dashboard por persona y por vehículo | Secciones comparativas de las dos cosas **y** dos selectores que enfocan **todo** el tablero en un conductor o un vehículo. El recorte lo hace el servidor, no la pantalla |
 | D36 | Consecutivos | Salen del **máximo**, no de `COUNT(*)`: un número borrado deja hueco y la serie sigue. Con reintento, para cuando dos conductores marcan en el mismo segundo |
@@ -271,7 +271,6 @@ pero con lo que el Excel no da:
   qué decía antes y por qué. Es el requisito explícito del rol de coordinación.
 - **Semáforo programado vs ejecutado**: la celda cambia de color cuando el conductor cerró el
   trayecto de ese día. Un vistazo muestra qué se cumplió y qué no.
-- **Copiar semana anterior**, para no reprogramar desde cero cada lunes.
 - **Detección de choques**: un vehículo con dos destinos el mismo día, o un conductor asignado a
   dos vehículos, se marca en rojo al guardar.
 - **Importar y exportar Excel**, para la transición desde el archivo actual y para quien prefiera
@@ -816,20 +815,22 @@ Se prueba en `prueba_api.mjs` y en `prueba_viajes.mjs`.
 
 ### 5.1.5 Crear programación en bloque: enseñar antes y poder deshacer (D39)
 
-El itinerario se puede crear **en bloque** por tres caminos, y ninguno tenía vuelta atrás:
+El itinerario se podía crear **en bloque** por tres caminos, y ninguno tenía vuelta atrás:
 
 | Camino | Qué crea de un golpe | Rastro que deja en la auditoría |
 |---|---|---|
-| **Copiar período** | el período visible entero, desplazado | UNA fila: `crear · itinerarios`, sin identificador, con `{"copiados":N,"omitidos":M}` |
+| ~~**Copiar período**~~ | el período visible entero, desplazado | UNA fila: `crear · itinerarios`, sin identificador, con `{"copiados":N,"omitidos":M}` |
 | **Plantilla de Excel** | lo que traiga el archivo | UNA fila con `{"origen":"plantilla de Excel", ...}` |
 | **Pincel** | un día por cada toque | UNA fila **por cada** programación, con su identificador |
 
-Deshacer una copia de dos semanas era borrar cien celdas a mano. Eso cambia:
+Deshacer una carga de dos semanas era borrar cien celdas a mano. Eso cambia:
 
-**Copiar período enseña primero.** Se pregunta al servidor qué *haría* (`ensayo: true`, que no
-escribe nada) y lo que se confirma es ese número: *«se van a crear 47 programaciones, del X al Y,
-para 9 vehículos»*. El botón de confirmar pasa a rojo y dice *«Sí, crear 47»*. Además dejó de ser
-el único botón azul sólido de la barra — era el más fácil de tocar por accidente.
+**Copiar período se retiró** — el botón y la ruta `POST /api/itinerario/copiar`. Proponía por
+omisión empezar exactamente dos semanas adelante y era el único botón azul sólido de la barra: dos
+toques y estaban creadas decenas de programaciones. Se quitó también del servidor y no solo de la
+pantalla, por lo que enseñó esta misma aplicación dos veces: una ruta viva que nadie llama sigue
+siendo una ruta viva (§5.4.10, y el consecutivo de D36). Si vuelve a hacer falta, está en el
+historial de git.
 
 **El pincel lo dice mientras dure.** Con el pincel encendido **cada toque sobre un día lo
 programa**, sin ventana de confirmación. El único aviso era un mensaje que se desvanece y un

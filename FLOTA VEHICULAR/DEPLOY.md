@@ -249,7 +249,6 @@ ni firmar la planilla.
 | GET | `/api/itinerario` | los tres *(el conductor solo el suyo)* |
 | POST/PUT/DELETE | `/api/itinerario` | principal, coordinación |
 | GET | `/api/itinerario/:id/cambios` | los tres |
-| POST | `/api/itinerario/copiar` | principal, coordinación |
 | GET | `/api/mi-dia` | los tres |
 | POST | `/api/trayectos/salida` | los tres |
 | POST | `/api/trayectos/:id/llegada` | los tres |
