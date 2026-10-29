@@ -265,6 +265,18 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
   border-radius:999px;padding:.05rem .35rem;white-space:nowrap;
 }
 
+/* Cada firmante del informe, en una línea: casilla, quién es, y el rótulo
+   con el que firma. */
+.firmante-fila{
+  display:flex;align-items:center;gap:.6rem;padding:.45rem .2rem;
+  border-bottom:1px solid var(--border);
+}
+.firmante-fila:last-child{border-bottom:0}
+.firmante-fila.incompleto{background:var(--ambar-glow)}
+.firmante-fila .nom{flex:1;font-size:.82rem;line-height:1.3}
+.firmante-fila .nom .sub{display:block;font-size:.7rem;color:var(--muted)}
+.inp.sm{padding:.3rem .45rem;font-size:.76rem}
+
 /* Día con solicitud esperando aprobación (D41). Rayado y sin el signo «+»:
    tiene que leerse de un vistazo que ahí no se puede programar todavía, y
    que no es un día libre ni uno ya adjudicado. */

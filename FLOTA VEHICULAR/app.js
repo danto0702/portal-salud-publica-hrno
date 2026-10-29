@@ -17,7 +17,7 @@
  * peticiones e ignora en silencio lo que no entiende — un campo que no se
  * guarda y ningún mensaje de error. Por eso se comprueba y se avisa.
  */
-const VERSION_API_REQUERIDA = 18;
+const VERSION_API_REQUERIDA = 19;
 
 const esLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 const API = localStorage.getItem('flota_api') ||
@@ -3263,7 +3263,12 @@ function pintarTrayectos() {
     <div class="card filtros-tray">
       ${barraPeriodo('tr', trayDesde, trayHasta, 'atajoTray',
         `<button class="btn sec sm" onclick="exportarTrayectos()"
-           title="Lo que se está viendo, con todas las columnas">Descargar</button>`)}
+           title="Lo que se está viendo, con todas las columnas">Descargar</button>`
+        + (sesion.rol === 'principal' ? `
+        <button class="btn sec sm" onclick="modalInforme()"
+          title="Documento firmado, con número y cifras de todo el período">Informe</button>
+        <button class="btn sec sm" onclick="verInformesEmitidos()"
+          title="Volver a descargar un informe ya emitido">Emitidos</button>` : ''))}
       <div class="fila">
         <div><label class="lb">Vehículo</label>
           <select class="inp" onchange="filtrarTrayectos('vehiculo',this.value)">
@@ -4896,6 +4901,438 @@ async function retirarSolicitud(id) {
     aviso('Retirada', 'ok');
   } catch (e) { aviso(e.message, 'mal', 'No se pudo retirar'); }
   verSolicitudes();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INFORME ESTADÍSTICO FIRMADO (D42)
+//
+// Un informe que alguien firma no es una descarga: es un documento. Se EMITE
+// en el servidor —con su consecutivo y sus cifras congeladas— y aquí solo se
+// dibuja. Volver a descargarlo imprime el mismo papel que se firmó, aunque
+// después se haya anulado un viaje.
+//
+// Las cifras NO se calculan en esta pantalla. La lista de Viajes solo tiene lo
+// que alcanzó a descargar —hay un tope— y los días pagables ni siquiera están
+// aquí: viven en dias_operacion. Un informe armado con lo que hay en pantalla
+// diría menos de lo que hubo, y con una firma debajo.
+// ═══════════════════════════════════════════════════════════════════════════
+
+let firmantesDisponibles = [];
+
+async function modalInforme() {
+  try {
+    firmantesDisponibles = await api('/api/informes/firmantes');
+  } catch (e) {
+    return aviso(e.message, 'mal', 'No se pudo preparar el informe');
+  }
+  if (!firmantesDisponibles.length) {
+    return aviso('No hay ningún administrador activo que pueda firmar', 'mal');
+  }
+
+  const f = trayFiltro;
+  const vehiculo = f.vehiculo
+    ? (vehiculos.find(v => v.id == f.vehiculo)?.placa || `#${f.vehiculo}`) : null;
+  const conductor = f.conductor
+    ? (trayectosCargados.find(t => t.conductor_id == f.conductor)?.conductor || `#${f.conductor}`)
+    : null;
+
+  abrirModal('Informe estadístico firmado', `
+    <p style="font-size:.82rem;color:var(--muted);margin:0 0 .9rem">
+      Se emite con un número consecutivo y <b>queda guardado</b>: se puede
+      volver a descargar igual, aunque después cambien los datos. Las cifras
+      las calcula el servidor sobre <b>todo</b> el período, no sobre lo que
+      alcanzó a cargar esta pantalla.
+    </p>
+
+    <div class="campo"><label class="lb">Título del documento</label>
+      <input class="inp" id="inf-titulo"
+        value="INFORME ESTADÍSTICO DE OPERACIÓN — MISIÓN MÉDICA"></div>
+
+    <div class="fila">
+      <div><label class="lb">Desde</label>
+        <input class="inp" type="date" id="inf-desde" value="${trayDesde}"></div>
+      <div><label class="lb">Hasta</label>
+        <input class="inp" type="date" id="inf-hasta" value="${trayHasta}"></div>
+    </div>
+
+    ${vehiculo || conductor ? `<div class="nota avi" style="margin:.7rem 0">
+      El informe saldrá <b>solo de ${esc([vehiculo && `el vehículo ${vehiculo}`,
+        conductor && `el conductor ${conductor}`].filter(Boolean).join(' y '))}</b>,
+      que es el filtro que tiene puesto en la pantalla. Quítelo si lo quiere de
+      toda la flota.</div>` : ''}
+
+    <label class="lb" style="margin-top:.9rem">Quiénes firman <span class="req">*</span></label>
+    <p style="font-size:.74rem;color:var(--muted);margin:.1rem 0 .5rem">
+      El documento sale con el espacio para firmar a mano, y debajo el nombre,
+      el cargo y la cédula de cada uno, tomados de su ficha.
+    </p>
+    <div id="inf-firmantes">
+      ${firmantesDisponibles.map((u, i) => {
+        // Lo que va impreso bajo la raya sale de la ficha de la persona. Si
+        // está vacía, el papel saldría con el nombre de usuario y nada más
+        // debajo — que no es una firma. Se avisa aquí, antes de emitir, y no
+        // se descubre con el PDF ya impreso.
+        const falta = [!u.cargo && 'el cargo', !u.numero_doc && 'la cédula'].filter(Boolean);
+        return `
+        <label class="firmante-fila${falta.length ? ' incompleto' : ''}">
+          <input type="checkbox" data-id="${u.id}" ${i === 0 ? 'checked' : ''}>
+          <span class="nom"><b>${esc(u.nombre)}</b>
+            <span class="sub">${falta.length
+              ? `<span style="color:var(--ambar)">Le falta ${esc(falta.join(' y '))}
+                 en su ficha de Personas; el informe saldrá sin ese dato</span>`
+              : esc(u.cargo) + ' · ' + esc(u.tipo_doc || 'CC') + ' ' + esc(u.numero_doc)}</span></span>
+          <input class="inp sm" data-rotulo="${u.id}" placeholder="Elaboró, Revisó, Aprobó..."
+            style="max-width:170px">
+        </label>`; }).join('')}
+    </div>
+
+    <label class="marca-check" style="margin-top:.9rem">
+      <input type="checkbox" id="inf-anexo" checked>
+      Incluir el anexo con el detalle viaje por viaje</label>
+
+    <div class="campo" style="margin-top:.8rem">
+      <label class="lb">Observaciones (opcional)</label>
+      <textarea class="inp" id="inf-obs" rows="2"
+        placeholder="Lo que deba constar en el documento"></textarea></div>`,
+    `<button class="btn sec" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn" id="inf-btn" onclick="emitirInforme()">Emitir y descargar</button>`);
+}
+
+async function emitirInforme() {
+  const marcados = [...document.querySelectorAll('#inf-firmantes input[type=checkbox]')]
+    .filter(c => c.checked)
+    .map(c => ({
+      usuario_id: Number(c.dataset.id),
+      rotulo: $(`#inf-firmantes [data-rotulo="${c.dataset.id}"]`)?.value.trim() || null,
+    }));
+  if (!marcados.length) return aviso('Escoja quién firma', 'mal', 'Falta el firmante');
+
+  const btn = $('#inf-btn'); btn.disabled = true; btn.textContent = 'Emitiendo...';
+  try {
+    const inf = await api('/api/informes', {
+      metodo: 'POST',
+      cuerpo: {
+        titulo: $('#inf-titulo').value.trim(),
+        desde: $('#inf-desde').value,
+        hasta: $('#inf-hasta').value,
+        conductor_id: trayFiltro.conductor || null,
+        vehiculo_id: trayFiltro.vehiculo || null,
+        firmantes: marcados,
+        con_anexo: $('#inf-anexo').checked,
+        observaciones: $('#inf-obs').value.trim(),
+      },
+    });
+    cerrarModal();
+    pdfInforme(inf);
+    aviso(`Informe ${inf.consecutivo} emitido y descargado`, 'ok', 'Listo');
+  } catch (e) {
+    aviso(e.message, 'mal', 'No se pudo emitir');
+    btn.disabled = false; btn.textContent = 'Emitir y descargar';
+  }
+}
+
+/** Los informes ya emitidos, para volver a descargar el que se firmó. */
+async function verInformesEmitidos() {
+  let lista;
+  try { lista = await api('/api/informes'); }
+  catch (e) { return aviso(e.message, 'mal'); }
+
+  abrirModal('Informes emitidos', lista.length ? `
+    <div class="tabla-env" style="border:0"><table>
+    <thead><tr><th>Número</th><th>Emitido</th><th>Período</th><th>Firman</th><th></th></tr></thead>
+    <tbody>${lista.map(x => `<tr>
+      <td style="white-space:nowrap"><b>${esc(x.consecutivo)}</b>${
+        x.con_anexo ? '<br><span class="etq gris">con anexo</span>' : ''}</td>
+      <td style="white-space:nowrap">${fechaHora(x.ts)}<br>
+        <span style="font-size:.68rem;color:var(--muted)">${esc(x.emitido_por_usuario || '')}</span></td>
+      <td style="white-space:nowrap">${esc(x.desde)}<br>al ${esc(x.hasta)}</td>
+      <td style="font-size:.74rem">${x.firmantes.map(f => esc(f.nombre)).join('<br>')}</td>
+      <td><button class="btn sm sec" onclick="descargarInforme(${x.id})">Descargar</button></td>
+    </tr>`).join('')}</tbody></table></div>`
+    : '<div class="nota">Todavía no se ha emitido ningún informe.</div>');
+}
+
+async function descargarInforme(id) {
+  try {
+    pdfInforme(await api('/api/informes/' + id));
+    aviso('Descargado', 'ok');
+  } catch (e) { aviso(e.message, 'mal', 'No se pudo descargar'); }
+}
+
+// ── El documento ────────────────────────────────────────────────────────────
+
+/**
+ * Dibuja el informe en A4 vertical, paginado.
+ *
+ * Vertical y no apaisado como el itinerario: esto se archiva, se fotocopia y
+ * se radica, y en la carpeta todo lo demás es vertical.
+ *
+ * El pie —número de informe y «página N de M»— va en TODAS las hojas. Una hoja
+ * suelta de un informe firmado tiene que poder identificarse sola; si no, no
+ * sirve como soporte.
+ */
+function pdfInforme(inf) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const A = 210, ALTO = 297, M = 14;          // ancho, alto y margen, en mm
+  const ANCHO = A - M * 2;
+  let y = 0;
+
+  const n0 = (v) => Number(v || 0).toLocaleString('es-CO');
+  const n1 = (v) => Number(v || 0).toLocaleString(
+    'es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+  const pie = () => {
+    const p = doc.internal.getNumberOfPages();
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(120);
+    doc.text(`${inf.consecutivo} · ESE Hospital Regional Noroccidental`, M, ALTO - 8);
+    doc.text(`Página ${p}`, A - M, ALTO - 8, { align: 'right' });
+    doc.setTextColor(0);
+  };
+
+  /** Salta de hoja cuando lo que viene no cabe. */
+  const sitio = (alto) => {
+    if (y + alto <= ALTO - 16) return;
+    pie();
+    doc.addPage();
+    y = M;
+  };
+
+  const titulo = (texto) => {
+    sitio(14);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
+    doc.text(texto.toUpperCase(), M, y + 4);
+    doc.setDrawColor(30, 90, 168); doc.setLineWidth(0.5);
+    doc.line(M, y + 6, M + ANCHO, y + 6);
+    doc.setDrawColor(0);
+    y += 11;
+  };
+
+  /**
+   * Una tabla. `cols` es [rótulo, ancho en mm, cómo sacar el valor, alineación].
+   * Repite el encabezado en cada hoja: una tabla que sigue en la página
+   * siguiente sin rótulos es ilegible, y este papel se lee impreso.
+   */
+  const tabla = (cols, filas, altoFila = 6) => {
+    const cabecera = () => {
+      doc.setFillColor(238, 242, 246);
+      doc.rect(M, y, ANCHO, 6.5, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(6.6);
+      let x = M;
+      cols.forEach(([rot, w, , ali]) => {
+        doc.text(rot, ali === 'r' ? x + w - 1.5 : x + 1.5, y + 4.4,
+                 { align: ali === 'r' ? 'right' : 'left' });
+        x += w;
+      });
+      y += 6.5;
+    };
+    sitio(6.5 + altoFila * 2);
+    cabecera();
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8);
+    filas.forEach((fila, i) => {
+      if (y + altoFila > ALTO - 16) { pie(); doc.addPage(); y = M; cabecera();
+                                      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8); }
+      if (i % 2) { doc.setFillColor(249, 250, 252); doc.rect(M, y, ANCHO, altoFila, 'F'); }
+      let x = M;
+      cols.forEach(([, w, saca, ali]) => {
+        const v = String(saca(fila) ?? '');
+        const texto = doc.splitTextToSize(v, w - 3)[0] || '';
+        doc.text(texto, ali === 'r' ? x + w - 1.5 : x + 1.5, y + altoFila - 2,
+                 { align: ali === 'r' ? 'right' : 'left' });
+        x += w;
+      });
+      y += altoFila;
+    });
+    doc.setDrawColor(215, 221, 228); doc.setLineWidth(0.15);
+    doc.line(M, y, M + ANCHO, y);
+    y += 4;
+  };
+
+  // ── Encabezado ──
+  y = M;
+  if (banner) {
+    const w = Math.min(96, ANCHO);
+    doc.addImage(bannerUrl(), M, y, w, w * BANNER_ALTO / BANNER_ANCHO);
+    y += w * BANNER_ALTO / BANNER_ANCHO + 5;
+  }
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12.5);
+  doc.splitTextToSize(inf.titulo, ANCHO).forEach(l => { doc.text(l, M, y + 4); y += 6; });
+  y += 1;
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(80);
+  const c = inf.cifras || {};
+  const enfoques = [c.enfoque_vehiculo && `Vehículo ${c.enfoque_vehiculo}`,
+                    c.enfoque_conductor && `Conductor ${c.enfoque_conductor}`]
+    .filter(Boolean).join(' · ');
+  [`Informe No. ${inf.consecutivo}`,
+   `Período: del ${inf.desde} al ${inf.hasta}`,
+   enfoques ? `Alcance: ${enfoques}` : 'Alcance: toda la flota activa',
+   `Emitido el ${new Date(inf.ts).toLocaleString('es-CO')} por ${inf.emitido_por_usuario || ''}`,
+  ].forEach(l => { doc.text(l, M, y + 3.5); y += 4.6; });
+  doc.setTextColor(0);
+  y += 4;
+
+  // ── 1. Resumen ──
+  titulo('1. Resumen de la operación');
+  const t = c.totales || {};
+  const cajas = [
+    ['Días programados', n0(t.programados)],
+    ['Días con desplazamiento', n0(t.ejecutados)],
+    ['Días pagables', n0(t.pagables)],
+    ['Viajes registrados', n0(t.trayectos)],
+    ['Kilómetros recorridos', n0(t.km)],
+    ['Horas de operación', n1(t.horas)],
+  ];
+  const anchoCaja = ANCHO / 3, altoCaja = 15;
+  sitio(altoCaja * 2 + 2);
+  cajas.forEach((caja, i) => {
+    const x = M + (i % 3) * anchoCaja, yc = y + Math.floor(i / 3) * altoCaja;
+    doc.setDrawColor(222, 228, 234); doc.setLineWidth(0.2);
+    doc.rect(x, yc, anchoCaja, altoCaja);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.4); doc.setTextColor(110);
+    doc.text(caja[0].toUpperCase(), x + 2.5, yc + 5);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(20, 30, 42);
+    doc.text(caja[1], x + 2.5, yc + 12);
+    doc.setTextColor(0);
+  });
+  y += altoCaja * 2 + 5;
+
+  // ── 2. Por vehículo ──
+  titulo('2. Operación por vehículo');
+  tabla([
+    ['PLACA', 24, v => v.placa, 'l'],
+    ['TIPO', 26, v => v.tipo || '', 'l'],
+    ['PROPIEDAD', 24, v => v.propiedad || '', 'l'],
+    ['PROGR.', 17, v => n0(v.dias_programados), 'r'],
+    ['CON DESPL.', 20, v => n0(v.dias_con_desplazamiento), 'r'],
+    ['PAGABLES', 19, v => n0(v.dias_pagables), 'r'],
+    ['VIAJES', 16, v => n0(v.trayectos), 'r'],
+    ['KM', 20, v => n0(v.km), 'r'],
+    ['HORAS', 16, v => n1(v.horas), 'r'],
+  ], c.por_vehiculo || []);
+
+  // ── 3. Por conductor ──
+  titulo('3. Operación por conductor');
+  tabla([
+    ['CONDUCTOR', 52, x => (x.conductor || '').trim(), 'l'],
+    ['PROGR.', 17, x => n0(x.dias_programados), 'r'],
+    ['CON DESPL.', 20, x => n0(x.dias_con_desplazamiento), 'r'],
+    ['PAGABLES', 19, x => n0(x.dias_pagables), 'r'],
+    ['VIAJES', 16, x => n0(x.trayectos), 'r'],
+    ['KM', 20, x => n0(x.km), 'r'],
+    ['HORAS', 16, x => n1(x.horas), 'r'],
+    ['NOVEDADES', 22, x => n0(x.novedades), 'r'],
+  ], c.por_conductor || []);
+
+  // ── 4. Calidad del registro ──
+  // Va en el informe y no se omite: un período con la mitad de los viajes sin
+  // GPS no sostiene una liquidación, y el papel tiene que decirlo.
+  titulo('4. Calidad del registro');
+  const q = c.calidad || {};
+  const pct = (parte, total) => !total ? '—'
+    : `${n0(parte)} (${Math.round((parte / total) * 100)}%)`;
+  tabla([
+    ['CONCEPTO', 120, x => x[0], 'l'],
+    ['CANTIDAD', 62, x => x[1], 'r'],
+  ], [
+    ['Viajes del período (sin contar los anulados)', n0(q.total)],
+    ['Viajes cerrados', pct(q.cerrados, q.total)],
+    ['Viajes sin cerrar al corte', pct(q.abiertos, q.total)],
+    ['Salidas sin coordenadas de GPS', pct(q.salidas_sin_gps, q.total)],
+    ['Llegadas sin coordenadas de GPS (de los cerrados)', pct(q.llegadas_sin_gps, q.cerrados)],
+    ['Salidas sin fotografía', pct(q.salidas_sin_foto, q.total)],
+    ['Llegadas sin fotografía (de los cerrados)', pct(q.llegadas_sin_foto, q.cerrados)],
+    ['Marcas tomadas sin señal y sincronizadas después', pct(q.tomados_sin_senal, q.total)],
+    ['Checklists diligenciados', n0(q.checklists)],
+    ['Checklists completos', pct(q.checklists_completos, q.checklists)],
+    ['Viajes anulados en el período (no cuentan arriba)', n0(q.anulados)],
+  ], 6.4);
+
+  // ── 5. Municipios ──
+  if ((c.por_municipio || []).length) {
+    titulo('5. Viajes por municipio de llegada');
+    tabla([
+      ['MUNICIPIO', 120, x => x.municipio, 'l'],
+      ['VIAJES', 62, x => n0(x.trayectos), 'r'],
+    ], c.por_municipio);
+  }
+
+  // ── Observaciones ──
+  if (inf.observaciones) {
+    titulo('Observaciones');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    doc.splitTextToSize(inf.observaciones, ANCHO).forEach(l => {
+      sitio(5); doc.text(l, M, y + 3.5); y += 4.8;
+    });
+    y += 4;
+  }
+
+  // ── Firmas ──
+  // El bloque entero cabe en una hoja o pasa a la siguiente: una firma
+  // separada del informe que firma no vale nada.
+  const firmas = inf.firmantes || [];
+  const altoFirma = 30;
+  const filasFirma = Math.ceil(firmas.length / 2);
+  sitio(14 + altoFirma * filasFirma);
+  titulo('Firmas');
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(110);
+  doc.text('Las cifras de este informe fueron generadas por el sistema de control de flota '
+         + 'y son revisadas y avaladas por quienes firman.',
+           M, y + 3);
+  doc.setTextColor(0);
+  y += 10;
+
+  const anchoFirma = ANCHO / 2;
+  firmas.forEach((f, i) => {
+    const x = M + (i % 2) * anchoFirma;
+    const yf = y + Math.floor(i / 2) * altoFirma;
+    doc.setDrawColor(40); doc.setLineWidth(0.3);
+    doc.line(x + 3, yf + 16, x + anchoFirma - 10, yf + 16);     // la raya de firmar
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+    doc.text(String(f.nombre).toUpperCase(), x + 3, yf + 20.5);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.2); doc.setTextColor(90);
+    if (f.cargo) doc.text(f.cargo, x + 3, yf + 24.3);
+    if (f.documento) doc.text(f.documento, x + 3, yf + 27.8);
+    if (f.rotulo) {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(6.6); doc.setTextColor(30, 90, 168);
+      doc.text(f.rotulo.toUpperCase(), x + 3, yf + 4);
+    }
+    doc.setTextColor(0);
+  });
+  y += altoFirma * filasFirma + 4;
+
+  // ── Anexo ──
+  if ((c.anexo || []).length) {
+    pie(); doc.addPage(); y = M;
+    titulo('Anexo. Detalle de los viajes del período');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(110);
+    doc.text(`${n0(c.anexo.length)} viaje(s). No se incluyen los anulados.`, M, y);
+    y += 5;
+    if (c.anexo_recortado) {
+      doc.setTextColor(170, 60, 20);
+      doc.text(`El período tiene más viajes de los que cabe listar: se incluyen los `
+             + `${n0(c.anexo_recortado)} primeros. Para el detalle completo use la `
+             + `descarga en Excel desde la pantalla de Viajes.`, M, y);
+      y += 5;
+    }
+    doc.setTextColor(0);
+    tabla([
+      ['CONSECUTIVO', 26, x => x.consecutivo || '', 'l'],
+      ['FECHA', 18, x => x.fecha_operacion, 'l'],
+      ['PLACA', 19, x => x.placa || '', 'l'],
+      ['CONDUCTOR', 36, x => (x.conductor || '').trim(), 'l'],
+      ['ORIGEN', 26, x => x.origen || x.lugar_salida || '', 'l'],
+      ['DESTINO', 26, x => x.destino || x.lugar_llegada || '', 'l'],
+      ['KM', 16, x => (x.km_final != null && x.km_inicial != null)
+                        ? n0(x.km_final - x.km_inicial) : '—', 'r'],
+      ['TRIP.', 12, x => x.num_tripulantes ?? '', 'r'],
+      ['ESTADO', 13, x => x.estado === 'cerrado' ? 'cerrado' : 'abierto', 'l'],
+    ], c.anexo, 5.4);
+  }
+
+  pie();
+  doc.save(`${inf.consecutivo}_${inf.desde}_a_${inf.hasta}.pdf`);
 }
 
 // ── Arranque ─────────────────────────────────────────────────────────────────

@@ -410,6 +410,87 @@ try {
   await pag.click('.modal-pie .btn:has-text("Cerrar")');
   await pag.waitForSelector('.modal-caja', { state: 'hidden' });
 
+
+  // ── El informe estadístico firmado (D42) ────────────────────────────────
+  console.log('\n══ El informe firmado ══');
+
+  await pag.click('.nav button:has-text("Trayectos")');
+  await pag.waitForSelector('#tray-tabla');
+  await pag.waitForTimeout(700);
+  verificar('el administrador tiene el botón de informe',
+    await pag.locator('button:has-text("Informe")').count() === 1);
+
+  await pag.click('button:has-text("Informe")');
+  await pag.waitForSelector('#inf-firmantes');
+  await pag.waitForTimeout(400);
+  const mInf = await pag.locator('.modal-caja').innerText();
+  verificar('dice que las cifras las calcula el servidor, no la pantalla',
+    /calcula el servidor/i.test(mInf), mInf.slice(0, 120));
+  verificar('ofrece los administradores como firmantes',
+    await pag.locator('#inf-firmantes input[type=checkbox]').count() >= 1);
+  verificar('y viene uno marcado, para no emitir sin firma por descuido',
+    await pag.locator('#inf-firmantes input[type=checkbox]:checked').count() === 1);
+  verificar('el período arranca en el que se está viendo en Viajes',
+    await pag.inputValue('#inf-desde') === await pag.inputValue('#tr-desde'));
+
+  // Sin firmante no sale.
+  await pag.locator('#inf-firmantes input[type=checkbox]').first().uncheck();
+  await pag.click('#inf-btn');
+  await pag.waitForTimeout(500);
+  verificar('sin marcar a nadie no se emite',
+    await pag.locator('#inf-firmantes').count() === 1
+    && /firmante/i.test(await pag.locator('#avisos').innerText()),
+    (await pag.locator('#avisos').innerText()).replace(/\n/g, ' ').slice(0, 80));
+
+  await pag.locator('#inf-firmantes input[type=checkbox]').first().check();
+  await pag.fill('#inf-firmantes [data-rotulo]', 'Elaboró y aprobó');
+  await pag.fill('#inf-obs', 'Informe de prueba automática.');
+  const [pdf] = await Promise.all([
+    pag.waitForEvent('download'),
+    pag.click('#inf-btn'),
+  ]);
+  const rutaPdf = path.join(descargas, pdf.suggestedFilename());
+  await pdf.saveAs(rutaPdf);
+  const bytes = fs.readFileSync(rutaPdf);
+  verificar('se descarga un PDF de verdad',
+    bytes.slice(0, 5).toString() === '%PDF-' && bytes.length > 4000, bytes.length);
+  verificar('el archivo se llama con el número del informe',
+    /^INF-\d{4}-\d{6}_/.test(pdf.suggestedFilename()), pdf.suggestedFilename());
+
+  // El texto del PDF: basta con buscarlo en crudo para comprobar que lo que
+  // tiene que constar en el papel está en el papel.
+  const crudo = bytes.toString('latin1');
+  const dice = (t) => crudo.includes(t) || crudo.includes([...t].join('\u0000'));
+  verificar('el documento lleva el bloque de firmas',
+    /FIRMAS/i.test(crudo) || dice('Firmas') || /F.{0,3}I.{0,3}R.{0,3}M.{0,3}A.{0,3}S/i.test(crudo));
+  verificar('y el número de informe', /INF-\d{4}-\d{6}/.test(crudo));
+
+  await pag.waitForTimeout(600);
+  verificar('se avisa con el número que quedó emitido',
+    /INF-\d{4}-\d{6}/.test(await pag.locator('#avisos').innerText()),
+    (await pag.locator('#avisos').innerText()).replace(/\n/g, ' ').slice(0, 90));
+
+  // ── Queda guardado y se vuelve a descargar ──────────────────────────────
+  await pag.click('button:has-text("Emitidos")');
+  await pag.waitForSelector('.modal-caja');
+  await pag.waitForTimeout(600);
+  const emitidos = await pag.locator('.modal-caja').innerText();
+  verificar('el informe queda en la lista de emitidos',
+    /INF-\d{4}-\d{6}/.test(emitidos), emitidos.split('\n').slice(0, 8).join(' | '));
+  verificar('con quién firma y qué período cubre',
+    /con anexo/i.test(emitidos) && /\d{4}-\d{2}-\d{2}/.test(emitidos));
+
+  const [pdf2] = await Promise.all([
+    pag.waitForEvent('download'),
+    pag.click('.modal-caja button:has-text("Descargar")'),
+  ]);
+  await pdf2.saveAs(path.join(descargas, 'otra_vez.pdf'));
+  verificar('se puede volver a descargar el mismo informe, con el mismo número',
+    pdf2.suggestedFilename() === pdf.suggestedFilename(),
+    [pdf.suggestedFilename(), pdf2.suggestedFilename()]);
+  await pag.click('.modal-pie .btn:has-text("Cerrar")');
+  await pag.waitForSelector('.modal-caja', { state: 'hidden' });
+
   verificar('ninguna excepción en la consola', errores.length === 0, errores[0]);
 } finally {
   await ctx.close();

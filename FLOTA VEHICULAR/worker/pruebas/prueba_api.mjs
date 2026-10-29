@@ -1673,6 +1673,123 @@ if (rutasRegistradas && rutasRegistradas().length) {       // no aplica al bundl
     sueltas.length === 0, sueltas);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// D42 · Informe estadístico firmado
+// ═══════════════════════════════════════════════════════════════════════════
+console.log('\n── Informe estadístico firmado ───────────────────────────────');
+
+r = await api('GET', '/api/informes/firmantes', null, tokenPrincipal);
+verificar('la lista de firmantes son los administradores activos',
+  r.estado === 200 && r.datos.length >= 1 && r.datos.every(x => !!x.nombre), r.datos);
+const firmante = r.datos[0];
+
+r = await api('GET', '/api/informes/firmantes', null, tCoord);
+verificar('coordinación no puede ver quién firma', r.estado === 403, r.estado);
+
+r = await api('POST', '/api/informes', {
+  desde: '2000-01-01', hasta: '2100-01-01',
+  firmantes: [{ usuario_id: firmante.id, rotulo: 'Elaboró y aprobó' }],
+  con_anexo: true,
+  observaciones: 'Período completo de la prueba.',
+}, tokenPrincipal);
+verificar('el administrador emite el informe',
+  r.estado === 200 && /^INF-\d{4}-\d{6}$/.test(r.datos.consecutivo || ''), r.datos.consecutivo);
+const inf1 = r.datos;
+
+verificar('trae los totales de la operación',
+  inf1.cifras.totales && inf1.cifras.totales.trayectos > 0, inf1.cifras.totales);
+verificar('y la tabla por vehículo', inf1.cifras.por_vehiculo.length > 0);
+verificar('y la tabla por conductor', inf1.cifras.por_conductor.length > 0);
+verificar('y la calidad del registro, con los anulados aparte',
+  inf1.cifras.calidad && inf1.cifras.calidad.total > 0
+  && inf1.cifras.calidad.anulados !== undefined, inf1.cifras.calidad);
+verificar('y el anexo viaje por viaje, con su consecutivo',
+  inf1.cifras.anexo.length > 0 && /^TR-/.test(inf1.cifras.anexo[0].consecutivo),
+  inf1.cifras.anexo[0]);
+
+verificar('el firmante lleva nombre y el rótulo que se le puso',
+  inf1.firmantes.length === 1 && inf1.firmantes[0].rotulo === 'Elaboró y aprobó'
+  && !!inf1.firmantes[0].nombre, inf1.firmantes);
+
+// Las cifras del informe son LAS MISMAS del tablero: una sola fuente.
+r = await api('GET', '/api/dashboard?desde=2000-01-01&hasta=2100-01-01', null, tokenPrincipal);
+verificar('el informe y el Dashboard dicen exactamente lo mismo',
+  r.datos.totales.pagables === inf1.cifras.totales.pagables
+  && r.datos.totales.km === inf1.cifras.totales.km
+  && r.datos.por_vehiculo.length === inf1.cifras.por_vehiculo.length,
+  { tablero: r.datos.totales, informe: inf1.cifras.totales });
+
+// ── Nadie firma a nombre de otro ──────────────────────────────────────────
+r = await api('POST', '/api/informes', {
+  desde: '2000-01-01', hasta: '2100-01-01',
+  firmantes: [{ usuario_id: idCoord, rotulo: 'Aprobó' }],
+}, tokenPrincipal);
+verificar('coordinación no puede figurar como firmante',
+  r.estado === 400 && /no es administrador/i.test(r.datos.error), r.datos);
+
+r = await api('POST', '/api/informes', {
+  desde: '2000-01-01', hasta: '2100-01-01',
+  firmantes: [{ usuario_id: firmante.id, nombre: 'QUIEN YO DIGA', cargo: 'GERENTE' }],
+}, tokenPrincipal);
+verificar('el nombre y el cargo salen de la base, no de lo que mande el navegador',
+  r.datos.firmantes[0].nombre !== 'QUIEN YO DIGA'
+  && r.datos.firmantes[0].cargo !== 'GERENTE', r.datos.firmantes[0]);
+const inf2 = r.datos;
+
+verificar('el consecutivo avanza', inf2.consecutivo !== inf1.consecutivo,
+  [inf1.consecutivo, inf2.consecutivo]);
+
+r = await api('POST', '/api/informes', {
+  desde: '2000-01-01', hasta: '2100-01-01', firmantes: [],
+}, tokenPrincipal);
+verificar('sin firmante no hay informe', r.estado === 400, r.datos);
+
+r = await api('POST', '/api/informes', {
+  desde: '2100-01-01', hasta: '2000-01-01',
+  firmantes: [{ usuario_id: firmante.id }],
+}, tokenPrincipal);
+verificar('un período al revés se rechaza', r.estado === 400, r.datos);
+
+r = await api('POST', '/api/informes', {
+  desde: '2000-01-01', hasta: '2100-01-01',
+  firmantes: [{ usuario_id: firmante.id }],
+}, tCoord);
+verificar('coordinación no emite informes', r.estado === 403, r.estado);
+
+// ── Lo firmado no cambia ──────────────────────────────────────────────────
+// Esta es la razón de guardar las cifras y no la receta: el papel que está en
+// la carpeta y el que sale hoy de la aplicación tienen que ser el mismo.
+const kmAntes = inf1.cifras.totales.km;
+r = await api('GET', `/api/trayectos?desde=2000-01-01&hasta=2100-01-01&limite=5`,
+              null, tokenPrincipal);
+const victima = r.datos.find(t => t.estado === 'cerrado');
+if (victima) {
+  await api('DELETE', `/api/trayectos/${victima.id}`,
+            { motivo: 'Prueba de que el informe no cambia' }, tokenPrincipal);
+}
+r = await api('GET', `/api/informes/${inf1.id}`, null, tokenPrincipal);
+verificar('un informe ya emitido no cambia aunque después se anule un viaje',
+  r.datos.cifras.totales.km === kmAntes, { antes: kmAntes, ahora: r.datos.cifras.totales.km });
+verificar('y se puede volver a descargar entero, con su anexo',
+  r.datos.cifras.anexo.length === inf1.cifras.anexo.length
+  && r.datos.consecutivo === inf1.consecutivo);
+if (victima) {
+  await api('POST', `/api/trayectos/${victima.id}/restaurar`, {}, tokenPrincipal);
+}
+
+r = await api('GET', '/api/informes', null, tokenPrincipal);
+verificar('los informes emitidos quedan listados, el más nuevo primero',
+  r.datos.length >= 2 && r.datos[0].consecutivo === inf2.consecutivo, r.datos.map(x => x.consecutivo));
+
+r = await api('GET', '/api/informes/999999', null, tokenPrincipal);
+verificar('pedir uno que no existe contesta 404', r.estado === 404, r.estado);
+
+r = await api('GET', '/api/auditoria?limite=200', null, tokenPrincipal);
+verificar('emitir un informe queda en la auditoría',
+  r.datos.some(x => x.accion === 'emitir' && x.entidad === 'informes'),
+  r.datos.slice(0, 3).map(x => `${x.accion} ${x.entidad}`));
+
 console.log('\n═══════════════════════════════════════════════════════════════');
 console.log(`  ${pruebas - fallos} de ${pruebas} verificaciones pasaron`);
 if (fallos) { console.log(`  ${fallos} FALLARON`); process.exit(1); }

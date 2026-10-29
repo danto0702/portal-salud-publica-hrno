@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D42 | Informe estadístico firmado | Se **emite**, no se descarga: consecutivo propio, firmantes escogidos entre los administradores y **cifras congeladas**. Volver a bajarlo imprime el mismo papel que se firmó. Las cifras salen del **mismo sitio** que el Dashboard |
 | D41 | La coordinación propone, el administrador dispone | Lo que pide coordinación **no se aplica**: se guarda entera y espera. Al aprobar se vuelve a ejecutar la misma ruta con la sesión de **quien la pidió**. Lo que no se contesta a tiempo **se vence solo** |
 | D40 | La auditoría dice **qué** pasó | El registro guardaba el detalle y la pantalla solo mostraba «crear itinerarios». Ahora hay columna **Detalle**, y una línea **sin número de ficha** se señala como operación **en bloque** |
 | D39 | Creación en bloque | **Copiar período se retiró.** El pincel se anuncia con una barra fija mientras está encendido, y lo creado hace poco se puede **revisar y deshacer** de un golpe |
@@ -928,6 +929,60 @@ en bloque.** Cada ruta que crea o borra de una en una audita con el identificado
 las que trabajan en bloque auditan una sola fila sin identificador, porque no hay *una* ficha que
 nombrar. Esa diferencia ya estaba en los datos y no se veía. Ahora esas filas van resaltadas en
 ámbar, con la etiqueta *en bloque*, y la pantalla lo explica arriba en una línea.
+
+### 5.4.12 El informe estadístico firmado (D42)
+
+En Viajes ya se podía **Descargar**: el CSV de lo que se ve, con todas las columnas, para revisarlo
+en Excel. Eso sirve para trabajar, no para radicar. Lo que hacía falta es un **documento**: con
+número, con período, con las cifras de verdad y con quién responde por ellas.
+
+**Se emite, no se descarga.** `POST /api/informes` calcula, numera (`INF-2026-000001`, por el mismo
+camino del consecutivo de los viajes, D36) y **guarda las cifras en JSON**. No guarda la receta
+para recalcularlas: un papel que alguien firmó tiene que poder reimprimirse idéntico dentro de dos
+años, aunque para entonces un viaje se haya anulado o un kilometraje se haya corregido. Si se
+recalculara, el PDF que está en la carpeta y el que sale hoy de la aplicación dirían cosas
+distintas —y el que lleva la firma sería el que no cuadra—. Hay una prueba que anula un viaje
+después de emitir y comprueba que el informe no se movió.
+
+**Las cifras se calculan en el servidor.** Nunca en el navegador. La pantalla de Viajes solo tiene
+los viajes que alcanzó a descargar (hay un tope de 20 000) y los días pagables ni siquiera están
+ahí: viven en `dias_operacion`. Un informe armado con lo que hay en pantalla diría menos de lo que
+hubo, con una firma debajo.
+
+**Y salen del mismo sitio que el Dashboard.** Los agregados se mudaron a `estadistica.js`, que usan
+los dos. Dos consultas distintas para el mismo número serían dos verdades, y el día que se
+corrigiera una se corregiría en un solo lado: la diferencia aparecería en una auditoría, encima de
+un papel firmado. Una prueba compara las dos salidas y falla si difieren.
+
+**Quién firma.** Se escogen al emitir, entre los usuarios con rol **principal**. El nombre, el
+cargo y la cédula **se leen de la base por el id**, nunca de lo que mande el navegador: si no,
+cualquiera podría emitir un informe firmado a nombre de quien quisiera y con el cargo que se le
+ocurriera. Cada firmante puede llevar su rótulo —*Elaboró*, *Revisó*, *Aprobó*— y el PDF trae la
+raya para firmar a mano con esos datos impresos debajo.
+
+> Si al firmante le falta el cargo o la cédula en su ficha de Personas, **la ventana lo dice antes
+> de emitir**, con la fila resaltada. Un bloque de firma con el nombre de usuario y nada debajo no
+> es una firma, y descubrirlo con el PDF ya impreso cuesta una reimpresión y una explicación.
+
+**Qué trae.** Resumen del período (días programados, con desplazamiento, pagables; viajes, km,
+horas) · operación por vehículo · operación por conductor · **calidad del registro** · viajes por
+municipio · observaciones · firmas · anexo con el detalle viaje por viaje.
+
+La **calidad del registro** va en el documento y no se omite: cuántas salidas y llegadas quedaron
+sin GPS y sin fotografía, cuántos viajes sin cerrar, cuántas marcas se tomaron sin señal, cuántos
+checklists se completaron y **cuántos viajes se anularon** en el período. Un período con la mitad
+de los viajes sin coordenadas no sostiene una liquidación, y el papel tiene que decirlo en vez de
+callarlo. Los anulados se cuentan aparte, a propósito: no entran en ninguna cifra de operación y
+aun así tienen que constar.
+
+**El PDF.** A4 vertical —esto se archiva, se fotocopia y se radica, y en la carpeta todo lo demás
+es vertical—, paginado, con el encabezado de tabla repetido en cada hoja y el pie con el número de
+informe en **todas**: una hoja suelta de un informe firmado tiene que poder identificarse sola. El
+anexo se corta en 3 000 filas y, cuando se corta, **lo dice en el propio papel** y remite al Excel;
+un soporte al que le faltan filas en silencio es peor que no tener anexo.
+
+**Solo el administrador** emite y consulta informes. Es coherente con el resto de la pantalla de
+Viajes —corregir y anular también son suyos— y con D41: la coordinación propone, no firma.
 
 ### 5.4.11 Las fechas de las pruebas no se escriben a mano
 

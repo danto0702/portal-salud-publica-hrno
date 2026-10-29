@@ -623,3 +623,29 @@ CREATE TABLE solicitud_dias (
   vehiculo_id  INTEGER NOT NULL
 );
 CREATE INDEX idx_soldia ON solicitud_dias(fecha, vehiculo_id);
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- INFORMES ESTADÍSTICOS FIRMADOS (D42)
+--
+-- Se guarda el informe EMITIDO, con sus cifras congeladas en JSON, no la
+-- receta para recalcularlo: un papel que alguien firmó tiene que poder volver
+-- a imprimirse idéntico dentro de dos años, aunque para entonces un viaje se
+-- haya anulado o un kilometraje se haya corregido. Si se recalculara, el PDF
+-- archivado y el de la aplicación dirían cosas distintas, y el que lleva la
+-- firma sería el que no cuadra.
+-- ═══════════════════════════════════════════════════════════════════════════
+CREATE TABLE informes (
+  id            INTEGER PRIMARY KEY,
+  consecutivo   TEXT NOT NULL UNIQUE,        -- INF-2026-000001
+  ts            TEXT NOT NULL,
+  emitido_por   INTEGER NOT NULL REFERENCES usuarios(id),
+  titulo        TEXT NOT NULL,
+  desde         TEXT NOT NULL,
+  hasta         TEXT NOT NULL,
+  filtros       TEXT,                        -- JSON: conductor_id, vehiculo_id
+  firmantes     TEXT NOT NULL,               -- JSON: nombre, cargo, documento, rótulo
+  cifras        TEXT NOT NULL,               -- JSON: todo lo que se imprimió
+  con_anexo     INTEGER NOT NULL DEFAULT 0,
+  observaciones TEXT
+);
+CREATE INDEX idx_informes_ts ON informes(ts);

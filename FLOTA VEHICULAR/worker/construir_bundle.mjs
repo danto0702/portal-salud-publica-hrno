@@ -1,13 +1,13 @@
 /**
- * Une los 7 módulos del Worker en UN SOLO archivo, para poder pegarlo
+ * Une los 9 módulos del Worker en UN SOLO archivo, para poder pegarlo
  * directamente en el editor del panel web de Cloudflare, sin terminal.
  *
  *   node construir_bundle.mjs
  */
 import fs from 'node:fs';
 
-const ORDEN = ['router.js', 'lib.js', 'rutas_admin.js', 'rutas_operacion.js',
-                'rutas_fuera_servicio.js', 'rutas_solicitudes.js', 'index.js'];
+const ORDEN = ['router.js', 'lib.js', 'estadistica.js', 'rutas_admin.js', 'rutas_operacion.js',
+                'rutas_fuera_servicio.js', 'rutas_solicitudes.js', 'rutas_informes.js', 'index.js'];
 
 const limpiar = (texto) => texto
   // Quitar los import entre módulos (ya no hay módulos separados)
@@ -25,7 +25,7 @@ let salida = `/**
  *
  * ARCHIVO GENERADO — no editar a mano.
  * Se produce con:  node construir_bundle.mjs
- * El código fuente está en src/ (router, lib, rutas_admin, rutas_operacion,
+ * El código fuente está en src/ (router, lib, estadistica, rutas_admin, rutas_operacion,
  * rutas_fuera_servicio, rutas_solicitudes, index).
  *
  * Este archivo existe para poder pegarlo en el editor del panel web de

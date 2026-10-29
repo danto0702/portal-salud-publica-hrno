@@ -33,7 +33,7 @@
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 18;
+const VERSION_API = 19;
 
 /**
  * Juegos de roles que usan las rutas.
@@ -283,6 +283,30 @@ async function asegurarEsquema(db) {
     )`).run();
   await db.prepare(
     'CREATE INDEX IF NOT EXISTS idx_soldia ON solicitud_dias(fecha, vehiculo_id)').run();
+
+  // Informes estadísticos firmados (D42). Se guarda el informe EMITIDO, con
+  // sus cifras congeladas en JSON, no la receta para recalcularlo: un papel
+  // que alguien firmó tiene que poder volver a imprimirse idéntico dentro de
+  // dos años, aunque para entonces un viaje se haya anulado o corregido. Si se
+  // recalculara, el PDF que está en la carpeta y el que sale de la aplicación
+  // dirían cosas distintas, y el firmado sería el que no cuadra.
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS informes (
+      id           INTEGER PRIMARY KEY,
+      consecutivo  TEXT NOT NULL UNIQUE,
+      ts           TEXT NOT NULL,
+      emitido_por  INTEGER NOT NULL REFERENCES usuarios(id),
+      titulo       TEXT NOT NULL,
+      desde        TEXT NOT NULL,
+      hasta        TEXT NOT NULL,
+      filtros      TEXT,
+      firmantes    TEXT NOT NULL,
+      cifras       TEXT NOT NULL,
+      con_anexo    INTEGER NOT NULL DEFAULT 0,
+      observaciones TEXT
+    )`).run();
+  await db.prepare(
+    'CREATE INDEX IF NOT EXISTS idx_informes_ts ON informes(ts)').run();
 
   // Columnas de anulación de viajes (D35). SQLite no tiene
   // ADD COLUMN IF NOT EXISTS: se intenta y se ignora el error de «ya existe»,

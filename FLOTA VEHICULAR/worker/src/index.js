@@ -20,6 +20,7 @@ import './rutas_admin.js';
 import './rutas_operacion.js';
 import './rutas_fuera_servicio.js';
 import './rutas_solicitudes.js';
+import './rutas_informes.js';
 
 export default {
   async fetch(request, env) {
