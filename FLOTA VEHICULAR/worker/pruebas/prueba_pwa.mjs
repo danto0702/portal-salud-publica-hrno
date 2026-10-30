@@ -244,7 +244,10 @@ if (chromium) {
     }), [src, puntos]);
 
     const claro = c => c && c.every(v => v > 200);
-    const azul = c => c && c[2] > c[0] + 30 && c[0] < 90;
+    // El amarillo de la marca: rojo y verde altos, azul casi en cero. Sirve
+    // además para cazar la vuelta atrás, porque el azul del logotipo anterior
+    // (12,40,88) no pasa ni de lejos.
+    const marca = c => c && c[0] > 200 && c[1] > 140 && c[2] < 90;
 
     const t = await mirar('iconos/icono-512.png', [
       ['muesca', 0.88, 0.09], ['centro', 0.50, 0.42], ['fondo', 0.10, 0.09],
@@ -273,11 +276,12 @@ if (chromium) {
     }));
     verificar('el icono conserva la palabra FLOTA',
       tintaFlota > 0.08, `blanco en la franja: ${(tintaFlota * 100).toFixed(1)} %`);
-    verificar('el icono conserva el azul de la marca', azul(t?.fondo), JSON.stringify(t));
+    verificar('el icono conserva el amarillo de la marca', marca(t?.fondo), JSON.stringify(t));
 
     // El logotipo llena el icono de borde a borde. Si algún día volviera a
-    // encogerse dentro de un cuadro azul —que es lo que pasó con el icono con
-    // máscara— la muesca dejaría de tocar la esquina y esto lo cazaría.
+    // encogerse dentro de un cuadro de relleno —que es lo que pasó con el
+    // icono con máscara— la muesca dejaría de tocar la esquina y esto lo
+    // cazaría.
     // El punto se toma a media altura de la muesca y casi pegado al borde
     // derecho: por debajo de la curva de la esquina, donde el canto ya es recto.
     // Más arriba caería en la esquina redondeada, que es transparente.
@@ -287,10 +291,10 @@ if (chromium) {
     ]);
     verificar('la muesca de PascalIA llega hasta el borde, sin encoger el logotipo',
       claro(esquina?.muescaBorde), JSON.stringify(esquina));
-    verificar('el logotipo llega al borde derecho, sin cuadro azul de relleno',
-      azul(esquina?.bordeDerecho), JSON.stringify(esquina));
+    verificar('el logotipo llega al borde derecho, sin cuadro de relleno',
+      marca(esquina?.bordeDerecho), JSON.stringify(esquina));
     verificar('el logotipo llena el icono de arriba abajo',
-      azul(esquina?.centroArriba) && azul(esquina?.centroAbajo), JSON.stringify(esquina));
+      marca(esquina?.centroArriba) && marca(esquina?.centroAbajo), JSON.stringify(esquina));
 
     verificar('ningún archivo de la aplicación falta', malas.length === 0, malas.join(', '));
     await ctx.close();

@@ -2,23 +2,28 @@
  * Genera los iconos de la aplicación a partir del logotipo de la marca.
  *
  * REGLA: el logotipo NO SE TOCA. `logo-original.png` es el que entregó diseño
- * —cuadro azul, la muesca de «By PascalIA» arriba a la derecha, el emblema en
- * el centro y la palabra FLOTA abajo— y todos los iconos son ese mismo dibujo,
- * entero, sin recortar nada. Lo único que cambia es el tamaño.
+ * —cuadro amarillo, la muesca de «By PascalIA» arriba a la derecha, el emblema
+ * en el centro y la palabra Flota abajo— y todos los iconos son ese mismo
+ * dibujo, entero, sin recortar nada. Lo único que cambia es el tamaño.
  *
  * Lo único que hace este generador, aparte de cambiar el tamaño, es redondear
- * las esquinas al mismo radio que ya tiene el cuadro azul, para quitar el
+ * las esquinas al mismo radio que ya tiene el cuadro amarillo, para quitar el
  * blanco que el archivo lleva por fuera de la curva. Sin eso, en el escritorio
  * del teléfono se verían cuatro esquinas blancas alrededor del icono.
  *
+ * Cambiar la marca es cambiar ESTE archivo y volver a correr el generador: de
+ * aquí salen el icono del teléfono, el del navegador, el de iPhone y el que la
+ * aplicación muestra en el ingreso y en la cabecera. Por eso no hay ninguna
+ * ruta de imagen escrita a mano en index.html que haya que ir a buscar.
+ *
  * NO SE DECLARA ICONO CON MÁSCARA, a propósito. Un icono con máscara lo recorta
  * Android en un círculo, así que para que el círculo no se comiera la muesca de
- * PascalIA ni la palabra FLOTA había que encoger el logotipo y dejarlo pequeño
- * en mitad de un cuadro azul. Se veía encogido y con las esquinas del logotipo
- * marcadas por dentro — que es justo lo que se reportó desde un teléfono. Sin
- * icono con máscara, Android usa el normal y el logotipo se ve entero y a su
- * tamaño, que es como diseño lo entregó: el archivo YA viene con forma de icono,
- * con su cuadro azul y sus esquinas redondeadas.
+ * PascalIA ni la palabra Flota había que encoger el logotipo y dejarlo pequeño
+ * en mitad de un cuadro de color. Se veía encogido y con las esquinas del
+ * logotipo marcadas por dentro — que es justo lo que se reportó desde un
+ * teléfono. Sin icono con máscara, Android usa el normal y el logotipo se ve
+ * entero y a su tamaño, que es como diseño lo entregó: el archivo YA viene con
+ * forma de icono, con su cuadro amarillo y sus esquinas redondeadas.
  *
  * Aparte va `pascalia.png`, la firma del pie de cada pantalla. Esa no sale del
  * logotipo de FLOTA sino de `pascalia-fuente.png`, que es la marca de PascalIA
@@ -44,13 +49,19 @@ const AQUI = fileURLToPath(new URL('.', import.meta.url));
 const destino = process.argv[2] ?? AQUI;
 fs.mkdirSync(destino, { recursive: true });
 
-const AZUL = '#0c2858';        // el azul exacto del logotipo
 /**
- * Radio de las esquinas del cuadro azul, medido sobre el original: 100/800.
- * Se recorta un pelo por dentro (0.132) para que no sobreviva ni un píxel del
- * blanco que el original lleva por fuera de la curva.
+ * El amarillo del borde del logotipo. Solo se ve en el píxel suavizado del
+ * filo redondeado: el dibujo cubre el resto. Se toma del borde y no del
+ * centro porque el fondo del logotipo es un degradado.
  */
-const RADIO = 0.132;
+const FONDO = '#fcc806';
+/**
+ * Radio de las esquinas del cuadro, medido sobre el original: la curva arranca
+ * en x≈46 para y=20, lo que da un radio de unos 109 px sobre 800. Se recorta un
+ * pelo por fuera (0.138) para que no sobreviva ni un píxel del blanco que el
+ * original lleva por fuera de la curva.
+ */
+const RADIO = 0.138;
 const logo = fs.readFileSync(path.join(AQUI, 'logo-original.png')).toString('base64');
 
 /**
@@ -60,7 +71,7 @@ const logo = fs.readFileSync(path.join(AQUI, 'logo-original.png')).toString('bas
 function pagina(size, radio) {
   return `<body style="margin:0">
     <div style="width:${size}px;height:${size}px;border-radius:${size * radio}px;
-                background:${AZUL};overflow:hidden">
+                background:${FONDO};overflow:hidden">
       <img src="data:image/png;base64,${logo}"
            style="width:${size}px;height:${size}px;display:block">
     </div>

@@ -410,8 +410,11 @@ try {
 
   await pag.setViewportSize({ width: 414, height: 896 });
   await pag.evaluate(() => { contarSolicitudes(); ir('solicitudes'); });
-  await pag.waitForSelector('#main .card');
-  await pag.waitForTimeout(700);
+  // Se espera a que la bandeja esté PINTADA, no un rato fijo: con tres suites
+  // de navegador corriendo seguidas, 700 ms a veces no alcanzaban y la prueba
+  // fallaba sin que nada estuviera roto.
+  await pag.waitForSelector('#main .card table, #main .card .nota');
+  await pag.waitForSelector('.nav button[data-v="solicitudes"] .cuenta-nav');
   verificar('al administrador le aparece el número rojo en el menú',
     await pag.locator('.nav button[data-v="solicitudes"] .cuenta-nav').count() === 1);
   verificar('su bandeja dice quién lo pidió',
