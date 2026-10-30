@@ -85,6 +85,7 @@ Se registra como un módulo más en `index.html` y en `index_Principal_Salud_Pub
 | D29 | Sin señal | La aplicación **abre y es usable sin ninguna señal**. Copia local en IndexedDB de catálogos, parámetros, vehículos y el día; la cola guarda las marcas **con su fotografía** |
 | D30 | Itinerario del conductor | Pantalla propia, **solo de consulta**, con su programación de los próximos días. El filtro por conductor lo hace el **servidor**, no la pantalla |
 | D31 | Contador de días | Cuenta los días programados de **toda la operación**, no los del período visible. Se calcula en el servidor (`/api/itinerario/resumen`) |
+| D43 | Reemitir un informe | El **mismo radicado**, vuelto a calcular con los datos de hoy, **con versión**. La anterior se archiva entera y el papel dice a cuál sustituye y por qué. El período no cambia: con otro período sería otro informe |
 | D42 | Informe estadístico firmado | Se **emite**, no se descarga: consecutivo propio, firmantes escogidos entre los administradores y **cifras congeladas**. Volver a bajarlo imprime el mismo papel que se firmó. Las cifras salen del **mismo sitio** que el Dashboard |
 | D41 | La coordinación propone, el administrador dispone | Lo que pide coordinación **no se aplica**: se guarda entera y espera. Al aprobar se vuelve a ejecutar la misma ruta con la sesión de **quien la pidió**. Lo que no se contesta a tiempo **se vence solo** |
 | D40 | La auditoría dice **qué** pasó | El registro guardaba el detalle y la pantalla solo mostraba «crear itinerarios». Ahora hay columna **Detalle**, y una línea **sin número de ficha** se señala como operación **en bloque** |
@@ -929,6 +930,37 @@ en bloque.** Cada ruta que crea o borra de una en una audita con el identificado
 las que trabajan en bloque auditan una sola fila sin identificador, porque no hay *una* ficha que
 nombrar. Esa diferencia ya estaba en los datos y no se veía. Ahora esas filas van resaltadas en
 ámbar, con la etiqueta *en bloque*, y la pantalla lo explica arriba en una línea.
+
+### 5.4.14 Reemitir: el mismo radicado con los datos de hoy (D43)
+
+D42 congela las cifras a propósito: el papel que alguien firmó tiene que poder reimprimirse
+idéntico. Pero hace falta lo contrario cuando el informe **ya se radicó** —el número está anotado
+en el libro, o ya se mandó al contratista— y después se corrige un viaje. Pedir un número nuevo
+obligaría a radicar otra vez y a explicar por qué hay dos informes del mismo período.
+
+**Reemitir conserva el radicado y vuelve a calcular.** Lo que no hace es pisar lo anterior:
+
+| | |
+|---|---|
+| **Versión** | Cada reemisión sube el número. El radicado es `INF-2026-000012`; las versiones son 1, 2, 3 |
+| **Lo sustituido se archiva** | La versión que sale se guarda entera en `informe_versiones` y se puede volver a bajar |
+| **El papel lo dice** | La versión vigente trae una franja ámbar: «REEMPLAZA a la versión N — si tiene impresa una copia anterior, deséchela — Motivo: …». La sustituida trae una franja roja: «VERSIÓN SUSTITUIDA el … — YA NO ESTÁ VIGENTE» |
+| **El motivo es obligatorio** | Mínimo 10 letras, y va impreso. Es lo único que contesta «¿por qué el 000012 dice hoy otra cosa que en noviembre?» |
+
+Un radicado con dos contenidos distintos **y sin forma de distinguirlos** sería peor que no poder
+reemitir: dos papeles iguales por fuera y distintos por dentro, circulando a la vez. Por eso la
+versión va en el encabezado, en la franja, en el **pie de todas las hojas** (`INF-2026-000012 v2`)
+y en el nombre del archivo (`INF-2026-000012_v2_…pdf`), para que dos descargas no se pisen en la
+carpeta.
+
+**El período y el alcance NO se pueden cambiar.** Con otro período sería otro informe, y
+reutilizarle el radicado sería esconder uno nuevo dentro de uno viejo. Lo que sí cambia: las
+cifras —ese es el punto—, los firmantes y las observaciones.
+
+**Las columnas se agregaron con `ALTER TABLE`,** no recreando `informes`: en producción ya hay
+informes emitidos y quien despliega no tiene terminal para una migración a mano. Y el archivado
+ocurre **antes** de pisar la fila vigente: si fallara en medio, se habría perdido lo que alguien
+ya firmó.
 
 ### 5.4.13 El cargo de una persona, y en qué se diferencia de la función
 

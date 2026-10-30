@@ -646,6 +646,31 @@ CREATE TABLE informes (
   firmantes     TEXT NOT NULL,               -- JSON: nombre, cargo, documento, rótulo
   cifras        TEXT NOT NULL,               -- JSON: todo lo que se imprimió
   con_anexo     INTEGER NOT NULL DEFAULT 0,
-  observaciones TEXT
+  observaciones TEXT,
+  -- Reemisión (D43): el mismo radicado, vuelto a calcular. La versión vigente
+  -- vive aquí; las sustituidas, en informe_versiones.
+  version        INTEGER NOT NULL DEFAULT 1,
+  ts_version     TEXT,
+  motivo_reemision TEXT,
+  reemitido_por  INTEGER REFERENCES usuarios(id)
 );
 CREATE INDEX idx_informes_ts ON informes(ts);
+
+-- Versiones SUSTITUIDAS de un informe reemitido. No se borran: cada una se
+-- imprimió y pudo firmarse, y el día que alguien pregunte por qué el radicado
+-- dice hoy otra cosa, la respuesta tiene que estar guardada.
+CREATE TABLE informe_versiones (
+  id             INTEGER PRIMARY KEY,
+  informe_id     INTEGER NOT NULL REFERENCES informes(id) ON DELETE CASCADE,
+  version        INTEGER NOT NULL,
+  ts             TEXT NOT NULL,
+  emitido_por    INTEGER NOT NULL,
+  firmantes      TEXT NOT NULL,
+  cifras         TEXT NOT NULL,
+  con_anexo      INTEGER NOT NULL DEFAULT 0,
+  observaciones  TEXT,
+  sustituida_en  TEXT NOT NULL,
+  sustituida_por INTEGER,
+  motivo         TEXT,
+  UNIQUE (informe_id, version)
+);

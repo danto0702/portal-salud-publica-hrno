@@ -1790,6 +1790,117 @@ verificar('emitir un informe queda en la auditoría',
   r.datos.some(x => x.accion === 'emitir' && x.entidad === 'informes'),
   r.datos.slice(0, 3).map(x => `${x.accion} ${x.entidad}`));
 
+
+// ── Reemitir: el mismo radicado, con los datos de hoy (D43) ───────────────
+console.log('\n── Reemitir un informe ───────────────────────────────────────');
+
+r = await api('POST', '/api/informes', {
+  desde: '2000-01-01', hasta: '2100-01-01',
+  firmantes: [{ usuario_id: firmante.id, rotulo: 'Elaboró' }],
+  con_anexo: true, observaciones: 'Primera versión.',
+}, tokenPrincipal);
+const base = r.datos;
+verificar('un informe nace en la versión 1', base.version === 1, base.version);
+
+// Se cambia el mundo: se anula un viaje del período.
+r = await api('GET', '/api/trayectos?desde=2000-01-01&hasta=2100-01-01&limite=20',
+              null, tokenPrincipal);
+const paraAnular = r.datos.find(t => t.estado === 'cerrado');
+await api('DELETE', `/api/trayectos/${paraAnular.id}`,
+          { motivo: 'Se registró con el vehículo equivocado' }, tokenPrincipal);
+
+r = await api('POST', `/api/informes/${base.id}/reemitir`,
+              { motivo: 'corto', firmantes: [{ usuario_id: firmante.id }] }, tokenPrincipal);
+verificar('reemitir sin explicar por qué no se permite',
+  r.estado === 400 && /por qué se reemite/i.test(r.datos.error), r.datos);
+
+r = await api('POST', `/api/informes/${base.id}/reemitir`, {
+  motivo: 'Se anuló un viaje que estaba cargado al vehículo equivocado',
+  firmantes: [{ usuario_id: firmante.id, rotulo: 'Elaboró y aprobó' }],
+  observaciones: 'Segunda versión, con el viaje anulado descontado.',
+}, tokenPrincipal);
+verificar('se reemite y queda en la versión 2', r.estado === 200 && r.datos.version === 2, r.datos.version);
+const v2 = r.datos;
+
+verificar('CONSERVA el mismo radicado', v2.consecutivo === base.consecutivo,
+  [base.consecutivo, v2.consecutivo]);
+verificar('y conserva la fecha en que se radicó, no la de hoy', v2.ts === base.ts);
+// La fecha de la versión va aparte de la del radicado. Aquí las dos caen en
+// el mismo segundo —la prueba corre de un tirón—, así que lo que se comprueba
+// es que el campo exista y no sea anterior; que avanza de verdad se ve abajo,
+// en la versión archivada, que conserva LA SUYA.
+verificar('la versión trae su propia fecha, aparte de la del radicado',
+  !!v2.ts_version && v2.ts_version >= base.ts_version, [base.ts_version, v2.ts_version]);
+verificar('las cifras se volvieron a calcular: el viaje anulado ya no cuenta',
+  v2.cifras.totales.trayectos < base.cifras.totales.trayectos,
+  { antes: base.cifras.totales.trayectos, ahora: v2.cifras.totales.trayectos });
+verificar('y el anulado aparece contado aparte',
+  v2.cifras.calidad.anulados > base.cifras.calidad.anulados,
+  { antes: base.cifras.calidad.anulados, ahora: v2.cifras.calidad.anulados });
+verificar('el documento dice a qué versión sustituye y por qué',
+  v2.sustituye_a === 1 && /vehículo equivocado/.test(v2.motivo_reemision), v2.motivo_reemision);
+verificar('el período no cambia al reemitir',
+  v2.desde === base.desde && v2.hasta === base.hasta);
+
+// Lo que ya se había firmado sigue estando.
+r = await api('GET', `/api/informes/${base.id}/versiones`, null, tokenPrincipal);
+verificar('la versión anterior queda archivada, no se pisa',
+  r.estado === 200 && r.datos.length === 1 && r.datos[0].version === 1, r.datos);
+verificar('con quién la sustituyó y con qué motivo',
+  !!r.datos[0].sustituida_por_usuario && /vehículo equivocado/.test(r.datos[0].motivo || ''),
+  r.datos[0]);
+
+r = await api('GET', `/api/informes/${base.id}/versiones/1`, null, tokenPrincipal);
+verificar('la versión 1 se puede volver a bajar tal cual se firmó',
+  r.datos.cifras.totales.trayectos === base.cifras.totales.trayectos
+  && r.datos.consecutivo === base.consecutivo && r.datos.version === 1,
+  { v1: r.datos.cifras.totales.trayectos, original: base.cifras.totales.trayectos });
+verificar('y dice que fue sustituida, y cuándo',
+  !!r.datos.sustituida_en && r.datos.sustituida_en >= r.datos.ts_version,
+  { ts_version: r.datos.ts_version, sustituida_en: r.datos.sustituida_en });
+verificar('la versión archivada conserva SU fecha, no la de la reemisión',
+  r.datos.ts_version === base.ts_version, [base.ts_version, r.datos.ts_version]);
+
+r = await api('GET', `/api/informes/${base.id}`, null, tokenPrincipal);
+verificar('lo que se baja por defecto es la versión vigente', r.datos.version === 2);
+
+// Una tercera reemisión apila, no reemplaza el historial.
+r = await api('POST', `/api/informes/${base.id}/reemitir`, {
+  motivo: 'Se restauró el viaje: la anulación fue un error de digitación',
+  firmantes: [{ usuario_id: firmante.id }],
+}, tokenPrincipal);
+verificar('se puede reemitir otra vez y la versión sigue subiendo', r.datos.version === 3);
+r = await api('GET', `/api/informes/${base.id}/versiones`, null, tokenPrincipal);
+verificar('quedan guardadas las dos versiones anteriores',
+  r.datos.length === 2 && r.datos[0].version === 2 && r.datos[1].version === 1,
+  r.datos.map(x => x.version));
+
+r = await api('POST', `/api/informes/${base.id}/reemitir`, {
+  motivo: 'Un motivo cualquiera que sí es largo',
+  firmantes: [{ usuario_id: idCoord }],
+}, tokenPrincipal);
+verificar('al reemitir tampoco puede firmar quien no es administrador',
+  r.estado === 400 && /no es administrador/i.test(r.datos.error), r.datos);
+
+r = await api('POST', `/api/informes/${base.id}/reemitir`, {
+  motivo: 'Un motivo cualquiera que sí es largo',
+  firmantes: [{ usuario_id: firmante.id }],
+}, tCoord);
+verificar('y coordinación no reemite', r.estado === 403, r.estado);
+
+r = await api('POST', '/api/informes/999999/reemitir', {
+  motivo: 'Un motivo cualquiera que sí es largo',
+  firmantes: [{ usuario_id: firmante.id }],
+}, tokenPrincipal);
+verificar('reemitir uno que no existe contesta 404', r.estado === 404, r.estado);
+
+r = await api('GET', '/api/auditoria?limite=200', null, tokenPrincipal);
+verificar('cada reemisión queda en la auditoría',
+  r.datos.filter(x => x.accion === 'reemitir' && x.entidad === 'informes').length >= 2,
+  r.datos.filter(x => x.accion === 'reemitir').length);
+
+await api('POST', `/api/trayectos/${paraAnular.id}/restaurar`, {}, tokenPrincipal);
+
 console.log('\n═══════════════════════════════════════════════════════════════');
 console.log(`  ${pruebas - fallos} de ${pruebas} verificaciones pasaron`);
 if (fallos) { console.log(`  ${fallos} FALLARON`); process.exit(1); }

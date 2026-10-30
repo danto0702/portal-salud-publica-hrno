@@ -17,7 +17,7 @@
  * peticiones e ignora en silencio lo que no entiende — un campo que no se
  * guarda y ningún mensaje de error. Por eso se comprueba y se avisa.
  */
-const VERSION_API_REQUERIDA = 19;
+const VERSION_API_REQUERIDA = 20;
 
 const esLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 const API = localStorage.getItem('flota_api') ||
@@ -5123,19 +5123,167 @@ async function verInformesEmitidos() {
   try { lista = await api('/api/informes'); }
   catch (e) { return aviso(e.message, 'mal'); }
 
+  window._informes = lista;
   abrirModal('Informes emitidos', lista.length ? `
+    <p style="font-size:.78rem;color:var(--muted);margin:0 0 .7rem">
+      <b>Reemitir</b> vuelve a calcular el informe con los datos de hoy y
+      <b>conserva el mismo radicado</b>, subiéndole la versión. La versión
+      anterior se guarda y se puede volver a bajar: si alguien tiene impresa
+      una copia vieja, se puede saber qué decía.
+    </p>
     <div class="tabla-env" style="border:0"><table>
-    <thead><tr><th>Número</th><th>Emitido</th><th>Período</th><th>Firman</th><th></th></tr></thead>
+    <thead><tr><th>Radicado</th><th>Radicado el</th><th>Período</th><th>Firman</th><th></th></tr></thead>
     <tbody>${lista.map(x => `<tr>
-      <td style="white-space:nowrap"><b>${esc(x.consecutivo)}</b>${
-        x.con_anexo ? '<br><span class="etq gris">con anexo</span>' : ''}</td>
+      <td style="white-space:nowrap"><b>${esc(x.consecutivo)}</b>
+        ${(x.version || 1) > 1
+          ? `<br><span class="etq ambar">versión ${x.version}</span>`
+          : ''}${x.con_anexo ? '<br><span class="etq gris">con anexo</span>' : ''}</td>
       <td style="white-space:nowrap">${fechaHora(x.ts)}<br>
-        <span style="font-size:.68rem;color:var(--muted)">${esc(x.emitido_por_usuario || '')}</span></td>
+        <span style="font-size:.68rem;color:var(--muted)">${esc(x.emitido_por_usuario || '')}</span>
+        ${(x.version || 1) > 1 ? `<br><span style="font-size:.68rem;color:var(--ambar)">
+          v${x.version} el ${fechaHora(x.ts_version)}</span>` : ''}</td>
       <td style="white-space:nowrap">${esc(x.desde)}<br>al ${esc(x.hasta)}</td>
       <td style="font-size:.74rem">${x.firmantes.map(f => esc(f.nombre)).join('<br>')}</td>
-      <td><button class="btn sm sec" onclick="descargarInforme(${x.id})">Descargar</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn sm sec" onclick="descargarInforme(${x.id})">Descargar</button>
+        <button class="btn sm sec" onclick="modalReemitir(${x.id})">Reemitir</button>
+        ${(x.version || 1) > 1
+          ? `<button class="btn sm sec" onclick="verVersiones(${x.id})">Versiones</button>` : ''}
+      </td>
     </tr>`).join('')}</tbody></table></div>`
     : '<div class="nota">Todavía no se ha emitido ningún informe.</div>');
+}
+
+/**
+ * Reemitir el mismo radicado con los datos de hoy (D43).
+ *
+ * El período y el alcance NO se pueden cambiar aquí: con otro período sería
+ * otro informe, y reutilizarle el radicado sería esconder uno nuevo dentro de
+ * uno viejo. Para eso está «Informe», que saca número nuevo.
+ */
+async function modalReemitir(id) {
+  const x = (window._informes || []).find(i => i.id === id);
+  if (!x) return;
+  try { firmantesDisponibles = await api('/api/informes/firmantes'); }
+  catch (e) { return aviso(e.message, 'mal'); }
+
+  const yaFirman = new Set((x.firmantes || []).map(f => f.usuario_id));
+  const rotuloDe = (u) => (x.firmantes || []).find(f => f.usuario_id === u.id)?.rotulo || '';
+
+  abrirModal(`Reemitir ${x.consecutivo}`, `
+    <div class="nota avi" style="margin-bottom:.9rem">
+      Se vuelve a calcular todo con los datos de hoy y <b>se conserva el
+      radicado ${esc(x.consecutivo)}</b>. Pasará a ser la <b>versión
+      ${(x.version || 1) + 1}</b>; la ${x.version || 1} queda guardada y el
+      documento dirá a cuál sustituye y por qué.
+    </div>
+
+    <div class="campo"><label class="lb">Período (no cambia al reemitir)</label>
+      <input class="inp" value="del ${esc(x.desde)} al ${esc(x.hasta)}" disabled>
+      <p style="font-size:.7rem;color:var(--muted);margin:.25rem 0 0">
+        Con otro período sería otro informe. Para eso use <b>Informe</b>, que
+        saca un radicado nuevo.</p></div>
+
+    <div class="campo"><label class="lb">Por qué se reemite <span class="req">*</span></label>
+      <textarea class="inp" id="rm-motivo" rows="2"
+        placeholder="Se anuló un viaje que estaba cargado al vehículo equivocado"></textarea>
+      <p style="font-size:.7rem;color:var(--muted);margin:.25rem 0 0">
+        Va impreso en la primera página. Es lo que contesta por qué el mismo
+        radicado dice hoy otra cosa.</p></div>
+
+    <label class="lb" style="margin-top:.3rem">Quiénes firman <span class="req">*</span></label>
+    <div id="inf-firmantes">
+      ${firmantesDisponibles.map(u => {
+        const falta = [!u.cargo && 'el cargo', !u.numero_doc && 'la cédula'].filter(Boolean);
+        return `
+        <label class="firmante-fila${falta.length ? ' incompleto' : ''}">
+          <input type="checkbox" data-id="${u.id}" ${yaFirman.has(u.id) ? 'checked' : ''}>
+          <span class="nom"><b>${esc(u.nombre)}</b>
+            <span class="sub">${falta.length
+              ? `<span style="color:var(--ambar)">Le falta ${esc(falta.join(' y '))}
+                 en su ficha de Personas</span>`
+              : esc(u.cargo) + ' · ' + esc(u.tipo_doc || 'CC') + ' ' + esc(u.numero_doc)}</span></span>
+          <input class="inp sm" data-rotulo="${u.id}" value="${esc(rotuloDe(u))}"
+            placeholder="Elaboró, Revisó, Aprobó..." style="max-width:170px">
+        </label>`; }).join('')}
+    </div>
+
+    <label class="marca-check" style="margin-top:.9rem">
+      <input type="checkbox" id="rm-anexo" ${x.con_anexo ? 'checked' : ''}>
+      Incluir el anexo con el detalle viaje por viaje</label>
+
+    <div class="campo" style="margin-top:.8rem">
+      <label class="lb">Observaciones</label>
+      <textarea class="inp" id="rm-obs" rows="2"
+        placeholder="Dejar vacío para conservar las de la versión anterior"></textarea></div>`,
+    `<button class="btn sec" onclick="cerrarModal()">Cancelar</button>
+     <button class="btn" id="rm-btn" onclick="reemitirInforme(${id})">Reemitir y descargar</button>`);
+}
+
+async function reemitirInforme(id) {
+  const motivo = ($('#rm-motivo').value || '').trim();
+  if (motivo.length < 10) {
+    return aviso('Escriba por qué se reemite', 'mal', 'Falta el motivo');
+  }
+  const marcados = [...document.querySelectorAll('#inf-firmantes input[type=checkbox]')]
+    .filter(c => c.checked)
+    .map(c => ({
+      usuario_id: Number(c.dataset.id),
+      rotulo: $(`#inf-firmantes [data-rotulo="${c.dataset.id}"]`)?.value.trim() || null,
+    }));
+  if (!marcados.length) return aviso('Escoja quién firma', 'mal', 'Falta el firmante');
+
+  const btn = $('#rm-btn'); btn.disabled = true; btn.textContent = 'Reemitiendo...';
+  const obs = $('#rm-obs').value.trim();
+  try {
+    const inf = await api(`/api/informes/${id}/reemitir`, {
+      metodo: 'POST',
+      cuerpo: {
+        motivo, firmantes: marcados, con_anexo: $('#rm-anexo').checked,
+        ...(obs ? { observaciones: obs } : {}),
+      },
+    });
+    cerrarModal();
+    pdfInforme(inf);
+    aviso(`${inf.consecutivo} reemitido como versión ${inf.version}`, 'ok', 'Listo');
+  } catch (e) {
+    aviso(e.message, 'mal', 'No se pudo reemitir');
+    btn.disabled = false; btn.textContent = 'Reemitir y descargar';
+  }
+}
+
+/** Las versiones sustituidas: qué decía el papel que alguien tenga impreso. */
+async function verVersiones(id) {
+  const x = (window._informes || []).find(i => i.id === id);
+  let vs;
+  try { vs = await api(`/api/informes/${id}/versiones`); }
+  catch (e) { return aviso(e.message, 'mal'); }
+
+  abrirModal(`Versiones de ${x ? x.consecutivo : 'el informe'}`, `
+    <p style="font-size:.78rem;color:var(--muted);margin:0 0 .8rem">
+      La versión <b>${x ? x.version : ''}</b> es la vigente. Estas quedaron
+      sustituidas y se conservan tal cual se imprimieron.
+    </p>
+    <div class="tabla-env" style="border:0"><table>
+    <thead><tr><th>Versión</th><th>Hecha el</th><th>Sustituida el</th>
+      <th>Por qué se reemitió</th><th></th></tr></thead>
+    <tbody>${vs.map(v => `<tr>
+      <td><b>v${v.version}</b></td>
+      <td style="white-space:nowrap">${fechaHora(v.ts)}<br>
+        <span style="font-size:.68rem;color:var(--muted)">${esc(v.emitido_por_usuario || '')}</span></td>
+      <td style="white-space:nowrap">${fechaHora(v.sustituida_en)}<br>
+        <span style="font-size:.68rem;color:var(--muted)">${esc(v.sustituida_por_usuario || '')}</span></td>
+      <td style="font-size:.76rem">${esc(v.motivo || '—')}</td>
+      <td><button class="btn sm sec"
+        onclick="descargarVersion(${id},${v.version})">Descargar</button></td>
+    </tr>`).join('')}</tbody></table></div>`);
+}
+
+async function descargarVersion(id, version) {
+  try {
+    pdfInforme(await api(`/api/informes/${id}/versiones/${version}`));
+    aviso(`Versión ${version} descargada`, 'ok');
+  } catch (e) { aviso(e.message, 'mal', 'No se pudo descargar'); }
 }
 
 async function descargarInforme(id) {
@@ -5171,7 +5319,8 @@ function pdfInforme(inf) {
   const pie = () => {
     const p = doc.internal.getNumberOfPages();
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(120);
-    doc.text(`${inf.consecutivo} · ESE Hospital Regional Noroccidental`, M, ALTO - 8);
+    doc.text(`${inf.consecutivo}${(inf.version || 1) > 1 ? ` v${inf.version}` : ''}`
+           + ` · ESE Hospital Regional Noroccidental`, M, ALTO - 8);
     doc.text(`Página ${p}`, A - M, ALTO - 8, { align: 'right' });
     doc.setTextColor(0);
   };
@@ -5250,13 +5399,59 @@ function pdfInforme(inf) {
   const enfoques = [c.enfoque_vehiculo && `Vehículo ${c.enfoque_vehiculo}`,
                     c.enfoque_conductor && `Conductor ${c.enfoque_conductor}`]
     .filter(Boolean).join(' · ');
-  [`Informe No. ${inf.consecutivo}`,
+  const ver = inf.version || 1;
+  // La versión se nombra siempre que importe: cuando hay más de una, y
+  // también en una copia ya sustituida aunque sea la primera — ahí es
+  // justamente el dato que dice cuál de las dos se está leyendo.
+  const diceVersion = ver > 1 || !!inf.sustituida_en;
+  [`Informe No. ${inf.consecutivo}${diceVersion ? ` — Versión ${ver}` : ''}`,
    `Período: del ${inf.desde} al ${inf.hasta}`,
    enfoques ? `Alcance: ${enfoques}` : 'Alcance: toda la flota activa',
-   `Emitido el ${new Date(inf.ts).toLocaleString('es-CO')} por ${inf.emitido_por_usuario || ''}`,
-  ].forEach(l => { doc.text(l, M, y + 3.5); y += 4.6; });
+   `Radicado el ${new Date(inf.ts).toLocaleString('es-CO')} por ${inf.emitido_por_usuario || ''}`,
+   diceVersion && inf.ts_version
+     ? `Esta versión: ${new Date(inf.ts_version).toLocaleString('es-CO')}` : null,
+  ].filter(Boolean).forEach(l => { doc.text(l, M, y + 3.5); y += 4.6; });
   doc.setTextColor(0);
   y += 4;
+
+  // ── La franja de la reemisión (D43) ──
+  // Un radicado con dos contenidos distintos y sin forma de distinguirlos
+  // sería peor que no poder reemitir. Va arriba, en ámbar y antes de la
+  // primera cifra: quien recibe el papel tiene que saber, antes de leerlo,
+  // que hay una copia anterior que ya no vale.
+  if (ver > 1 && inf.motivo_reemision) {
+    const texto = `Este documento REEMPLAZA a la versión ${ver - 1} del mismo radicado. `
+                + `Si tiene impresa una copia anterior, deséchela. `
+                + `Motivo: ${inf.motivo_reemision}`;
+    const lineas = doc.splitTextToSize(texto, ANCHO - 8);
+    const alto = 6 + lineas.length * 4.2;
+    sitio(alto + 4);
+    doc.setFillColor(253, 246, 234); doc.setDrawColor(162, 98, 10); doc.setLineWidth(0.4);
+    doc.rect(M, y, ANCHO, alto, 'FD');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(120, 72, 8);
+    lineas.forEach((l, i) => doc.text(l, M + 4, y + 5.5 + i * 4.2));
+    doc.setTextColor(0); doc.setDrawColor(0);
+    y += alto + 5;
+  }
+
+  // Una versión que YA fue sustituida se puede volver a bajar, y tiene que
+  // decirlo: si no, circularía como si fuera la buena.
+  if (inf.sustituida_en) {
+    const texto = `VERSIÓN SUSTITUIDA el `
+                + `${new Date(inf.sustituida_en).toLocaleString('es-CO')}. `
+                + `Este documento YA NO ESTÁ VIGENTE; se conserva como constancia de lo que `
+                + `decía el radicado ${inf.consecutivo} en su versión ${ver}.`
+                + (inf.motivo_sustitucion ? ` Motivo: ${inf.motivo_sustitucion}` : '');
+    const lineas = doc.splitTextToSize(texto, ANCHO - 8);
+    const alto = 6 + lineas.length * 4.2;
+    sitio(alto + 4);
+    doc.setFillColor(252, 237, 236); doc.setDrawColor(194, 46, 36); doc.setLineWidth(0.4);
+    doc.rect(M, y, ANCHO, alto, 'FD');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(150, 30, 22);
+    lineas.forEach((l, i) => doc.text(l, M + 4, y + 5.5 + i * 4.2));
+    doc.setTextColor(0); doc.setDrawColor(0);
+    y += alto + 5;
+  }
 
   // ── 1. Resumen ──
   titulo('1. Resumen de la operación');
@@ -5417,7 +5612,10 @@ function pdfInforme(inf) {
   }
 
   pie();
-  doc.save(`${inf.consecutivo}_${inf.desde}_a_${inf.hasta}.pdf`);
+  // El nombre del archivo lleva la versión: dos PDF del mismo radicado en la
+  // carpeta de Descargas, uno pisando al otro, serían el mismo problema.
+  doc.save(`${inf.consecutivo}${(inf.version || 1) > 1 ? `_v${inf.version}` : ''}`
+         + `_${inf.desde}_a_${inf.hasta}.pdf`);
 }
 
 // ── Arranque ─────────────────────────────────────────────────────────────────

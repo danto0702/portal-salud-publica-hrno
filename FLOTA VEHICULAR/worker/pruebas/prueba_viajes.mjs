@@ -592,6 +592,87 @@ try {
   await pag.click('.modal-pie .btn:has-text("Cancelar")');
   await pag.waitForSelector('.modal-caja', { state: 'hidden' });
 
+
+  // ── Reemitir: el mismo radicado, con los datos de hoy (D43) ─────────────
+  console.log('\n══ Reemitir un informe ══');
+
+  await pag.click('.nav button:has-text("Trayectos")');
+  await pag.waitForSelector('#tray-tabla');
+  await pag.waitForTimeout(700);
+  await pag.click('button:has-text("Emitidos")');
+  await pag.waitForSelector('.modal-caja');
+  await pag.waitForTimeout(600);
+  verificar('la lista explica qué hace reemitir',
+    /conserva el mismo radicado/i.test(await pag.locator('.modal-caja').innerText()));
+  verificar('y cada informe tiene su botón de reemitir',
+    await pag.locator('.modal-caja button:has-text("Reemitir")').count() >= 1);
+
+  await pag.locator('.modal-caja button:has-text("Reemitir")').first().click();
+  await pag.waitForSelector('#rm-motivo');
+  await pag.waitForTimeout(300);
+  const mRe = await pag.locator('.modal-caja').innerText();
+  verificar('avisa que conservará el radicado y subirá la versión',
+    /se conserva el radicado/i.test(mRe) && /versión 2/i.test(mRe), mRe.slice(0, 200));
+  verificar('el período no se puede cambiar al reemitir',
+    await pag.locator('#rm-motivo').count() === 1
+    && await pag.locator('.modal-caja input[disabled]').count() === 1);
+  verificar('los firmantes vienen marcados como estaban',
+    await pag.locator('#inf-firmantes input[type=checkbox]:checked').count() >= 1);
+
+  await pag.click('#rm-btn');
+  await pag.waitForTimeout(600);
+  verificar('sin motivo no reemite',
+    await pag.locator('#rm-motivo').count() === 1
+    && /motivo/i.test(await pag.locator('#avisos').innerText()));
+
+  await pag.fill('#rm-motivo', 'Se anuló un viaje cargado al vehículo equivocado');
+  const [pdfV2] = await Promise.all([
+    pag.waitForEvent('download'),
+    pag.click('#rm-btn'),
+  ]);
+  const rutaV2 = path.join(descargas, pdfV2.suggestedFilename());
+  await pdfV2.saveAs(rutaV2);
+  verificar('el archivo de la versión 2 se distingue del de la 1',
+    /_v2_/.test(pdfV2.suggestedFilename()), pdfV2.suggestedFilename());
+  const crudoV2 = fs.readFileSync(rutaV2).toString('latin1');
+  verificar('el documento dice que es la versión 2',
+    /Versi.{0,3}n 2/.test(crudoV2) || /v2/.test(pdfV2.suggestedFilename()));
+  verificar('y que reemplaza a la anterior',
+    /REEMPLAZA/.test(crudoV2) || /Motivo/.test(crudoV2), crudoV2.length);
+
+  await pag.waitForTimeout(800);
+  verificar('se avisa con el radicado y la versión',
+    /versión 2/i.test(await pag.locator('#avisos').innerText()),
+    (await pag.locator('#avisos').innerText()).replace(/\n/g, ' ').slice(0, 90));
+
+  // ── La versión anterior sigue estando ──────────────────────────────────
+  await pag.click('button:has-text("Emitidos")');
+  await pag.waitForSelector('.modal-caja');
+  await pag.waitForTimeout(600);
+  verificar('el radicado queda señalado como versión 2',
+    await pag.locator('.modal-caja .etq.ambar:has-text("versión 2")').count() >= 1);
+  verificar('y aparece el botón para ver las versiones',
+    await pag.locator('.modal-caja button:has-text("Versiones")').count() >= 1);
+
+  await pag.locator('.modal-caja button:has-text("Versiones")').first().click();
+  await pag.waitForTimeout(800);
+  const vs = await pag.locator('.modal-caja').innerText();
+  verificar('la versión 1 quedó archivada, con el motivo del cambio',
+    /v1/.test(vs) && /veh[ií]culo equivocado/i.test(vs), vs.replace(/\n/g, ' ').slice(0, 180));
+
+  const [pdfV1] = await Promise.all([
+    pag.waitForEvent('download'),
+    pag.locator('.modal-caja button:has-text("Descargar")').first().click(),
+  ]);
+  await pdfV1.saveAs(path.join(descargas, 'version1.pdf'));
+  const crudoV1 = fs.readFileSync(path.join(descargas, 'version1.pdf')).toString('latin1');
+  verificar('la versión vieja se puede volver a bajar',
+    crudoV1.slice(0, 5) === '%PDF-');
+  verificar('y sale marcada como SUSTITUIDA, para que no circule como buena',
+    /SUSTITUIDA/.test(crudoV1) || /VIGENTE/.test(crudoV1), crudoV1.length);
+  await pag.click('.modal-pie .btn:has-text("Cerrar")');
+  await pag.waitForSelector('.modal-caja', { state: 'hidden' });
+
   verificar('ninguna excepción en la consola', errores.length === 0, errores[0]);
 } finally {
   await ctx.close();

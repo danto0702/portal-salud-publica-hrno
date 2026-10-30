@@ -33,7 +33,7 @@
  *      y día operativo en hora de Colombia
  *   6  kilometraje y tripulación obligatorios, fotografías de salida y llegada
  */
-const VERSION_API = 19;
+const VERSION_API = 20;
 
 /**
  * Juegos de roles que usan las rutas.
@@ -307,6 +307,37 @@ async function asegurarEsquema(db) {
     )`).run();
   await db.prepare(
     'CREATE INDEX IF NOT EXISTS idx_informes_ts ON informes(ts)').run();
+
+  // Versiones anteriores de un informe reemitido (D43). Aquí viven las que
+  // quedaron SUSTITUIDAS; la vigente sigue en `informes`. No se borran: cada
+  // una se imprimió y pudo firmarse, y el día que alguien pregunte por qué el
+  // radicado 000012 dice hoy otra cosa que en noviembre, la respuesta tiene
+  // que estar guardada y no en la memoria de quien lo reemitió.
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS informe_versiones (
+      id            INTEGER PRIMARY KEY,
+      informe_id    INTEGER NOT NULL REFERENCES informes(id) ON DELETE CASCADE,
+      version       INTEGER NOT NULL,
+      ts            TEXT NOT NULL,
+      emitido_por   INTEGER NOT NULL,
+      firmantes     TEXT NOT NULL,
+      cifras        TEXT NOT NULL,
+      con_anexo     INTEGER NOT NULL DEFAULT 0,
+      observaciones TEXT,
+      sustituida_en TEXT NOT NULL,
+      sustituida_por INTEGER,
+      motivo        TEXT,
+      UNIQUE (informe_id, version)
+    )`).run();
+
+  // Columnas de la reemisión en el propio informe. Se agregan con ALTER y no
+  // recreando la tabla: en producción ya hay informes emitidos, y quien
+  // despliega no tiene terminal para hacer una migración a mano.
+  for (const col of ['version INTEGER NOT NULL DEFAULT 1', 'ts_version TEXT',
+                     'motivo_reemision TEXT', 'reemitido_por INTEGER']) {
+    try { await db.prepare(`ALTER TABLE informes ADD COLUMN ${col}`).run(); }
+    catch { /* ya estaba */ }
+  }
 
   // Columnas de anulación de viajes (D35). SQLite no tiene
   // ADD COLUMN IF NOT EXISTS: se intenta y se ignora el error de «ya existe»,
