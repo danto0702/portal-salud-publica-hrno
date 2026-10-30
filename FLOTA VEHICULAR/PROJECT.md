@@ -930,6 +930,36 @@ las que trabajan en bloque auditan una sola fila sin identificador, porque no ha
 nombrar. Esa diferencia ya estaba en los datos y no se veía. Ahora esas filas van resaltadas en
 ámbar, con la etiqueta *en bloque*, y la pantalla lo explica arriba en una línea.
 
+### 5.4.13 El cargo de una persona, y en qué se diferencia de la función
+
+La ficha de Personas preguntaba una sola cosa sobre el papel de alguien: si **conduce** y si **va a
+bordo**. La columna `cargo` existía en la base desde el principio, con `'CONDUCTOR'` por omisión, y
+el formulario nunca la enviaba — así que todo el mundo quedaba registrado como conductor, incluido
+el coordinador. Se vio al estrenar el informe firmado (D42): el bloque de firma salía con el
+nombre de usuario y nada debajo.
+
+Son dos cosas distintas y ahora se preguntan por separado:
+
+| | |
+|---|---|
+| **Cargo** | Lo que la persona **es** en la institución. Uno solo. Es lo que sale impreso bajo la raya de firma del informe |
+| **Función en la operación** | Lo que la persona **hace en un viaje**: conducir, ir a bordo. Son casillas porque puede ser las dos. Lo usa el sistema: solo a quien conduce se le puede adjudicar un vehículo |
+
+La lista de cargos trae los que pidió la coordinación —**Administrador** y **Coordinador**— más
+conductor, tripulante, supervisor y los del equipo básico de salud que viaja en el vehículo. Queda
+**abierta con «Otro»**: un hospital tiene más cargos de los que quepan en una lista, y una lista
+cerrada estaría incompleta en un mes.
+
+> Un cargo guardado antes que no esté en la lista **no se pierde ni se cambia por otro parecido**:
+> se agrega como una opción más y queda escogido. Editarle el teléfono a alguien no puede
+> cambiarle el cargo en silencio.
+
+Donde hace falta, la aplicación lo dice: al crear una cuenta de **administrador** se advierte que
+sin persona vinculada esa cuenta **no podrá firmar un informe**, y al escoger los firmantes se
+resalta en ámbar a quien le falte el cargo o la cédula. Antes de imprimir, no después.
+
+**No hubo que tocar el Worker:** la API ya aceptaba y guardaba `cargo` en las dos rutas.
+
 ### 5.4.12 El informe estadístico firmado (D42)
 
 En Viajes ya se podía **Descargar**: el CSV de lo que se ve, con todas las columnas, para revisarlo

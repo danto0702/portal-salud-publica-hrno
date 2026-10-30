@@ -491,6 +491,107 @@ try {
   await pag.click('.modal-pie .btn:has-text("Cerrar")');
   await pag.waitForSelector('.modal-caja', { state: 'hidden' });
 
+
+  // ── El cargo de una persona ─────────────────────────────────────────────
+  // Es lo que sale impreso bajo la raya de firma del informe. Sin este campo
+  // el formulario solo preguntaba si la persona conduce o va a bordo, y el
+  // cargo se quedaba en el 'CONDUCTOR' que pone la base por omisión.
+  console.log('\n══ El cargo de una persona ══');
+
+  await pag.click('.nav button:has-text("Personas")');
+  await pag.waitForSelector('#main h1:has-text("Personas")');
+  await pag.waitForTimeout(600);
+  verificar('la tabla de personas tiene columna de cargo',
+    await pag.locator('#main thead th:has-text("Cargo")').count() === 1);
+
+  await pag.click('button:has-text("Registrar persona")');
+  await pag.waitForSelector('#p-cargo');
+  const cargos = await pag.locator('#p-cargo option').allInnerTexts();
+  verificar('el cargo ofrece Administrador', cargos.some(c => /^ADMINISTRADOR$/i.test(c.trim())),
+    cargos.slice(0, 6));
+  verificar('y Coordinador', cargos.some(c => /^COORDINADOR$/i.test(c.trim())));
+  verificar('y sigue ofreciendo Conductor y Tripulante',
+    cargos.some(c => /^CONDUCTOR$/i.test(c.trim()))
+    && cargos.some(c => /^TRIPULANTE$/i.test(c.trim())));
+  verificar('el cargo no se confunde con la función del viaje',
+    /no es el cargo/i.test(await pag.locator('.modal-caja').innerText()));
+
+  // Lo que no esté en la lista se puede escribir.
+  verificar('el campo libre está escondido mientras no haga falta',
+    !(await pag.locator('#p-cargo-otro').isVisible()));
+  await pag.selectOption('#p-cargo', '__otro');
+  await pag.waitForTimeout(200);
+  verificar('al escoger «Otro» aparece dónde escribirlo',
+    await pag.locator('#p-cargo-otro').isVisible());
+
+  await pag.fill('#p-nom', 'ANA LUCÍA');
+  await pag.fill('#p-ape', 'PEÑARANDA');
+  await pag.fill('#p-doc', '1090987654');
+  await pag.selectOption('#p-cargo', 'COORDINADOR');
+  await pag.click('#p-btn');
+  await pag.waitForSelector('.modal-caja', { state: 'hidden' });
+  await pag.waitForTimeout(1200);
+
+  const filaAna = pag.locator('#main tbody tr:has-text("ANA LUCÍA")');
+  verificar('la persona queda con el cargo que se le puso',
+    /COORDINADOR/.test(await filaAna.innerText()), await filaAna.innerText());
+
+  // Un cargo guardado antes que no está en la lista NO se pierde al editar:
+  // cambiarle el teléfono a alguien no puede cambiarle el cargo en silencio.
+  const idAna = await pag.evaluate(() =>
+    personas.find(p => p.nombres === 'ANA LUCÍA').id);
+  await pag.evaluate(id => api('/api/personas/' + id,
+    { metodo: 'PUT', cuerpo: { cargo: 'REFERENTE DE SALUD AMBIENTAL' } }), idAna);
+  await pag.evaluate(() => verPersonas());
+  await pag.waitForTimeout(900);
+  await pag.evaluate(id => modalPersona(id), idAna);
+  await pag.waitForSelector('#p-cargo');
+  verificar('un cargo que no está en la lista se conserva y sale escogido',
+    await pag.inputValue('#p-cargo') === 'REFERENTE DE SALUD AMBIENTAL',
+    await pag.inputValue('#p-cargo'));
+  await pag.fill('#p-tel', '3151234567');
+  await pag.click('#p-btn');
+  await pag.waitForSelector('.modal-caja', { state: 'hidden' });
+  await pag.waitForTimeout(1000);
+  verificar('y editar otro dato no se lo cambia',
+    /REFERENTE DE SALUD AMBIENTAL/.test(await filaAna.innerText()), await filaAna.innerText());
+
+  // ── Y llega hasta la firma del informe ──────────────────────────────────
+  await pag.click('.nav button:has-text("Usuarios")');
+  await pag.waitForSelector('#main h1:has-text("Usuarios")');
+  await pag.waitForTimeout(600);
+  await pag.click('button:has-text("Crear usuario")');
+  await pag.waitForSelector('#u-persona');
+  verificar('al vincular una persona a una cuenta se ve su cargo',
+    /REFERENTE DE SALUD AMBIENTAL/.test(
+      (await pag.locator('#u-persona option').allInnerTexts()).join(' | ')));
+  await pag.selectOption('#u-rol', 'principal');
+  await pag.waitForTimeout(200);
+  verificar('se advierte que un administrador sin persona no puede firmar',
+    /no puede firmar/i.test(await pag.locator('#u-persona-nota').innerText()),
+    await pag.locator('#u-persona-nota').innerText());
+  await pag.fill('#u-usuario', 'apenaranda');
+  await pag.selectOption('#u-persona', String(idAna));
+  await pag.fill('#u-clave', 'ClaveTemporal2026');
+  await pag.click('#u-btn');
+  await pag.waitForSelector('.modal-caja', { state: 'hidden' });
+  await pag.waitForTimeout(1200);
+
+  await pag.click('.nav button:has-text("Trayectos")');
+  await pag.waitForSelector('#tray-tabla');
+  await pag.waitForTimeout(700);
+  await pag.click('button:has-text("Informe")');
+  await pag.waitForSelector('#inf-firmantes');
+  await pag.waitForTimeout(400);
+  const listaFirm = await pag.locator('#inf-firmantes').innerText();
+  verificar('la nueva administradora puede firmar, con su cargo y su cédula',
+    /ANA LUC[IÍ]A/i.test(listaFirm) && /REFERENTE DE SALUD AMBIENTAL/.test(listaFirm)
+    && /1090987654/.test(listaFirm), listaFirm.replace(/\n/g, ' ').slice(0, 200));
+  verificar('y a quien le falte el cargo se le avisa antes de emitir',
+    await pag.locator('.firmante-fila.incompleto').count() >= 1);
+  await pag.click('.modal-pie .btn:has-text("Cancelar")');
+  await pag.waitForSelector('.modal-caja', { state: 'hidden' });
+
   verificar('ninguna excepción en la consola', errores.length === 0, errores[0]);
 } finally {
   await ctx.close();

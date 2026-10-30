@@ -32,6 +32,37 @@ const TIPOS_JORNADA = {
   administrativo:  { et: 'Administrativo', color: 'gris'   },
 };
 
+/**
+ * Cargos de una persona.
+ *
+ * El cargo es LO QUE LA PERSONA ES en la institución, y es lo que sale impreso
+ * bajo la raya de firma del informe estadístico (D42). No se confunde con la
+ * «función»: esa dice qué hace la persona EN UN VIAJE —conducir, ir a bordo—,
+ * la usa el sistema para saber a quién se le puede adjudicar un vehículo, y
+ * son casillas porque una misma persona puede ser las dos cosas.
+ *
+ * La lista queda abierta con «Otro»: un hospital tiene más cargos de los que
+ * quepan aquí, y una lista cerrada estaría incompleta en un mes.
+ */
+const CARGOS = [
+  'ADMINISTRADOR',
+  'COORDINADOR',
+  'CONDUCTOR',
+  'TRIPULANTE',
+  'SUPERVISOR',
+  'MÉDICO',
+  'ENFERMERO',
+  'AUXILIAR DE ENFERMERÍA',
+  'ODONTÓLOGO',
+  'HIGIENISTA ORAL',
+  'PSICÓLOGO',
+  'TRABAJADOR SOCIAL',
+  'PROMOTOR DE SALUD',
+  'TÉCNICO',
+  'PROFESIONAL DE APOYO',
+  'AUXILIAR ADMINISTRATIVO',
+];
+
 // Checklist: 5 distintivos del vehículo + 4 elementos.
 const DISTINTIVOS = [
   ['lateral_izquierdo', 'Lateral izquierdo'],
@@ -4414,10 +4445,12 @@ async function verPersonas() {
       Los datos personales se guardan solo en esta aplicación, nunca en el repositorio de código.
     </div>
     ${personas.length ? `<div class="tabla-env"><table>
-      <thead><tr><th>Nombre</th><th>Documento</th><th>Teléfono</th><th>Municipio</th><th>Rol</th><th></th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Cargo</th><th>Documento</th><th>Teléfono</th>
+        <th>Municipio</th><th>Función</th><th></th></tr></thead>
       <tbody>${personas.map(p => `
         <tr>
           <td><b>${esc(p.nombres)} ${esc(p.apellidos || '')}</b></td>
+          <td>${p.cargo ? esc(p.cargo) : '<span class="etq ambar">falta</span>'}</td>
           <td>${p.numero_doc ? esc(p.numero_doc) : '<span class="etq ambar">falta</span>'}</td>
           <td>${p.telefono ? esc(p.telefono) : '<span class="etq ambar">falta</span>'}</td>
           <td>${esc(p.municipio || '—')}</td>
@@ -4454,16 +4487,59 @@ function modalPersona(id) {
           ${['planta', 'contrato', 'ops', 'tercero'].map(v => `<option value="${v}" ${p?.vinculacion === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
     </div>
     <div class="campo"><label class="lb">Correo</label><input class="inp" id="p-cor" type="email" value="${esc(p?.correo || '')}"></div>
+
+    <div class="campo"><label class="lb">Cargo</label>
+      <select class="inp" id="p-cargo" onchange="otroCargo()">
+        ${listaCargos(p?.cargo)}
+        <option value="__otro">Otro (escribirlo)</option>
+      </select>
+      <input class="inp" id="p-cargo-otro" style="display:none;margin-top:.4rem"
+        placeholder="Escriba el cargo" maxlength="60">
+      <p style="font-size:.7rem;color:var(--muted);margin:.25rem 0 0">
+        Es lo que sale impreso bajo la firma en el informe estadístico.</p></div>
+
     <div class="campo">
-      <label class="lb" style="display:block;margin-bottom:.4rem">Función</label>
+      <label class="lb" style="display:block;margin-bottom:.2rem">Función en la operación</label>
+      <p style="font-size:.7rem;color:var(--muted);margin:0 0 .45rem">
+        Esto no es el cargo: dice qué hace la persona <b>en un viaje</b>. Solo a
+        quien esté marcado como conductor se le puede adjudicar un vehículo.</p>
       <label style="display:inline-flex;gap:.35rem;align-items:center;margin-right:1rem;font-size:.88rem">
-        <input type="checkbox" id="p-cond" ${p?.es_conductor ? 'checked' : ''}> Conductor</label>
+        <input type="checkbox" id="p-cond" ${p?.es_conductor ? 'checked' : ''}> Conduce</label>
       <label style="display:inline-flex;gap:.35rem;align-items:center;font-size:.88rem">
-        <input type="checkbox" id="p-trip" ${p?.es_tripulante ? 'checked' : ''}> Tripulante</label>
+        <input type="checkbox" id="p-trip" ${p?.es_tripulante ? 'checked' : ''}> Va a bordo (tripulante)</label>
     </div>`,
     `<button class="btn sec" onclick="cerrarModal()">Cancelar</button>
      <button class="btn" id="p-btn" onclick="guardarPersona(${id || 'null'})">Guardar</button>`);
 }
+
+/**
+ * Las opciones del cargo, con la que ya tenga la persona seleccionada.
+ *
+ * Un cargo guardado antes que no esté en la lista NO se pierde ni se cambia
+ * por otro parecido: se agrega como una opción más y queda escogido. Editarle
+ * el teléfono a alguien no puede cambiarle el cargo en silencio.
+ */
+function listaCargos(actual) {
+  const a = (actual || '').trim().toUpperCase();
+  const lista = a && !CARGOS.includes(a) ? [a, ...CARGOS] : CARGOS;
+  return ['<option value="">— Sin definir —</option>']
+    .concat(lista.map(c =>
+      `<option value="${esc(c)}" ${a === c ? 'selected' : ''}>${esc(c)}</option>`))
+    .join('');
+}
+
+/** Muestra el campo libre cuando se escoge «Otro». */
+function otroCargo() {
+  const otro = $('#p-cargo').value === '__otro';
+  $('#p-cargo-otro').style.display = otro ? '' : 'none';
+  if (otro) $('#p-cargo-otro').focus();
+}
+
+const cargoEscogido = () => {
+  const v = $('#p-cargo').value;
+  if (v !== '__otro') return v || null;
+  return $('#p-cargo-otro').value.trim().toUpperCase() || null;
+};
 
 async function guardarPersona(id) {
   const nombres = $('#p-nom').value.trim();
@@ -4476,6 +4552,7 @@ async function guardarPersona(id) {
     correo: $('#p-cor').value.trim() || null,
     municipio_id: $('#p-mun').value ? Number($('#p-mun').value) : null,
     vinculacion: $('#p-vinc').value || null,
+    cargo: cargoEscogido(),
     es_conductor: $('#p-cond').checked ? 1 : 0,
     es_tripulante: $('#p-trip').checked ? 1 : 0,
   };
@@ -4544,7 +4621,10 @@ function modalUsuario(id) {
     <div class="campo">
       <label class="lb">Persona vinculada <span class="req" id="u-persona-req">*</span></label>
       <select class="inp" id="u-persona"><option value="">— Ninguna —</option>
-        ${sinCuenta.map(p => `<option value="${p.id}" ${u?.persona_id == p.id ? 'selected' : ''}>${esc(p.nombres)} ${esc(p.apellidos || '')}${p.es_conductor ? '' : ' (no marcada como conductor)'}</option>`).join('')}
+        ${sinCuenta.map(p => `<option value="${p.id}" ${u?.persona_id == p.id ? 'selected' : ''}>${
+          esc(p.nombres)} ${esc(p.apellidos || '')}${
+          p.cargo ? ' — ' + esc(p.cargo) : ''}${
+          p.es_conductor ? '' : ' (no conduce)'}</option>`).join('')}
       </select>
       <p style="font-size:.72rem;color:var(--muted);margin:.25rem 0 0" id="u-persona-nota">
         Obligatorio para los conductores: es lo que conecta la cuenta con su itinerario.
@@ -4571,9 +4651,14 @@ function usuarioToggleRol() {
   if (req) req.style.display = esConductor ? '' : 'none';
   const nota = $('#u-persona-nota');
   if (nota) {
+    const rol = $('#u-rol')?.value;
     nota.textContent = esConductor
       ? 'Obligatorio: es lo que conecta la cuenta con su itinerario. Sin esto la persona entra pero no ve nada.'
-      : 'Opcional para coordinación y administración.';
+      : rol === 'principal'
+        ? 'La cuenta funciona sin ella, pero un administrador SIN persona vinculada no puede '
+          + 'firmar un informe: el nombre, el cargo y la cédula que se imprimen bajo la firma '
+          + 'salen de su ficha de Personas.'
+        : 'Opcional para coordinación.';
   }
 }
 
