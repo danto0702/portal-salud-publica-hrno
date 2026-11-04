@@ -375,6 +375,7 @@ table.data tr:hover td{background:var(--surface2);}
           <button class="mini-btn" onclick="loadRegistros()">↻ Actualizar</button>
           <button class="mini-btn" onclick="exportCSV()">⬇ CSV</button>
           <button class="mini-btn" id="btn-zip" onclick="descargarZip()">⬇ ZIP (PDF)</button>
+          <button class="mini-btn" id="btn-zipp" onclick="descargarZipPaciente()">⬇ ZIP x paciente</button>
         </div>
       </div>
       <div class="kpis" id="admin-kpis"></div>
@@ -1150,6 +1151,49 @@ async function descargarZip(){
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),4000);
     toast(data.length+' PDF descargados en ZIP','ok');
+  }catch(err){ toast('Error al generar ZIP: '+err.message,'err'); }
+  btn.disabled=false; btn.innerHTML=original;
+}
+async function descargarZipPaciente(){
+  const data=filtrados();
+  if(!data.length){ toast('No hay tamizajes para descargar','err'); return; }
+  if(typeof JSZip==='undefined'){ toast('No se pudo cargar JSZip','err'); return; }
+  const btn=$('btn-zipp'); const original=btn.innerHTML; btn.disabled=true;
+  try{
+    // agrupar por paciente (documento o, en su defecto, nombre)
+    const grupos={};
+    data.forEach(r=>{
+      const key=(String(r.num_doc||'').trim()||String(r.paciente_nombre||'').trim()||'sin_id');
+      (grupos[key]=grupos[key]||[]).push(r);
+    });
+    const zip=new JSZip();
+    const claves=Object.keys(grupos);
+    let hechos=0;
+    for(const key of claves){
+      const regs=grupos[key];
+      const ref=regs[0];
+      const carpeta=(String(ref.paciente_nombre||'paciente')+'_'+String(ref.tipo_doc||'')+String(ref.num_doc||''))
+        .replace(/[^a-zA-Z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,60) || 'paciente';
+      const folder=zip.folder(carpeta);
+      const usados={};
+      for(const r of regs){
+        hechos++; btn.innerHTML='⏳ '+hechos+'/'+data.length;
+        const out = r.tipo_tamizaje==='VISUAL' ? pdfVisual(r,true) : pdfAuditivo(r,true);
+        let name=out.name;
+        if(usados[name]){ usados[name]++; name=name.replace(/\.pdf$/i,'')+'_'+usados[name]+'.pdf'; }
+        else usados[out.name]=1;
+        folder.file(name, out.doc.output('blob'));
+        if(hechos%5===0)await new Promise(res=>setTimeout(res,0));
+      }
+    }
+    btn.innerHTML='📦 Comprimiendo...';
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='Tamizajes_por_paciente_HRNO_'+new Date().toISOString().slice(0,10)+'.zip';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast(claves.length+' pacientes · '+data.length+' PDF en ZIP','ok');
   }catch(err){ toast('Error al generar ZIP: '+err.message,'err'); }
   btn.disabled=false; btn.innerHTML=original;
 }
