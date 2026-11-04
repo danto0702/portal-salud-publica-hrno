@@ -9,6 +9,7 @@
 <meta name="format-detection" content="telephone=no">
 <title>Tamizaje Visual y Auditivo · ESE HRNO</title>
 <script src="jspdf.umd.min.js"></script>
+<script src="../libs/jszip.min.js"></script>
 <style>
 /* ─────────── RESET & BASE ─────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -373,6 +374,7 @@ table.data tr:hover td{background:var(--surface2);}
         <div style="display:flex;gap:8px">
           <button class="mini-btn" onclick="loadRegistros()">↻ Actualizar</button>
           <button class="mini-btn" onclick="exportCSV()">⬇ CSV</button>
+          <button class="mini-btn" id="btn-zip" onclick="descargarZip()">⬇ ZIP (PDF)</button>
         </div>
       </div>
       <div class="kpis" id="admin-kpis"></div>
@@ -981,7 +983,7 @@ function nombreArchivo(rec,tipo){
   const n=(rec.paciente_nombre||'paciente').replace(/[^a-zA-Z0-9]/g,'_').slice(0,30);
   return 'Tamizaje_'+tipo+'_'+n+'_'+(rec.num_doc||'')+'.pdf';
 }
-function pdfVisual(rec){
+function pdfVisual(rec,ret){
   const {jsPDF}=window.jspdf; const doc=new jsPDF('p','mm','a4');
   let y=pdfHeader(doc);
   doc.setTextColor(15,76,129); doc.setFont('helvetica','bold'); doc.setFontSize(14);
@@ -1006,9 +1008,11 @@ function pdfVisual(rec){
   y=pdfResultBox(doc,y,ok,ok?'RESULTADO: NORMAL':'RESULTADO: REMISIÓN',rec.motivo_remision+(ok?'':'  Conducta: remitir a optometría / oftalmología.'));
   if(rec.observaciones){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(12,27,51);doc.text('Observaciones:',M,y);y+=5;doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.text(doc.splitTextToSize(rec.observaciones,W-2*M),M,y);}
   pdfFooter(doc,rec);
-  doc.save(nombreArchivo(rec,'Visual'));
+  const nom=nombreArchivo(rec,'Visual');
+  if(ret)return {doc,name:nom};
+  doc.save(nom);
 }
-function pdfAuditivo(rec){
+function pdfAuditivo(rec,ret){
   const {jsPDF}=window.jspdf; const doc=new jsPDF('p','mm','a4');
   let y=pdfHeader(doc);
   doc.setTextColor(15,76,129); doc.setFont('helvetica','bold'); doc.setFontSize(13);
@@ -1039,7 +1043,9 @@ function pdfAuditivo(rec){
   if(anomalias.length){ if(y>250){doc.addPage();y=20;} y+=2; doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(180,83,9);doc.text('Hallazgos estructurales:',M,y);y+=5;doc.setFont('helvetica','normal');doc.setTextColor(60,60,60);doc.setFontSize(8);
     anomalias.forEach(a=>{doc.text('- '+a.estructura+': presencia '+(a.presencia||'—')+', integridad '+(a.integridad||'—'),M,y);y+=4.5;}); }
   pdfFooter(doc,rec);
-  doc.save(nombreArchivo(rec,'Auditivo_VALE'));
+  const nom=nombreArchivo(rec,'Auditivo_VALE');
+  if(ret)return {doc,name:nom};
+  doc.save(nom);
 }
 
 /* ════════════════════ ADMIN ════════════════════ */
@@ -1116,6 +1122,36 @@ function descargarRegistro(tipo,id){
   const rec=arr.find(r=>String(r.id)===String(id));
   if(!rec){toast('Registro no encontrado','err');return;}
   tipo==='VISUAL'?pdfVisual(rec):pdfAuditivo(rec);
+}
+async function descargarZip(){
+  const data=filtrados();
+  if(!data.length){ toast('No hay tamizajes para descargar','err'); return; }
+  if(typeof JSZip==='undefined'){ toast('No se pudo cargar JSZip','err'); return; }
+  const btn=$('btn-zip'); const original=btn.innerHTML; btn.disabled=true;
+  try{
+    const zip=new JSZip();
+    const usados={};
+    for(let i=0;i<data.length;i++){
+      const r=data[i];
+      btn.innerHTML='⏳ '+(i+1)+'/'+data.length;
+      const out = r.tipo_tamizaje==='VISUAL' ? pdfVisual(r,true) : pdfAuditivo(r,true);
+      let name=out.name;
+      // evitar nombres repetidos
+      if(usados[name]){ usados[name]++; name=name.replace(/\.pdf$/i,'')+'_'+usados[name]+'.pdf'; }
+      else usados[out.name]=1;
+      zip.file(name, out.doc.output('blob'));
+      if(i%5===0)await new Promise(res=>setTimeout(res,0)); // no bloquear la UI
+    }
+    btn.innerHTML='📦 Comprimiendo...';
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='Tamizajes_HRNO_'+new Date().toISOString().slice(0,10)+'.zip';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast(data.length+' PDF descargados en ZIP','ok');
+  }catch(err){ toast('Error al generar ZIP: '+err.message,'err'); }
+  btn.disabled=false; btn.innerHTML=original;
 }
 function exportCSV(){
   const data=filtrados();
