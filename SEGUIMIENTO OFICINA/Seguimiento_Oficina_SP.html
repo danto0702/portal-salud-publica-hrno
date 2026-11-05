@@ -32,6 +32,7 @@ nav{display:flex;gap:4px;padding:4px 20px 0;border-bottom:1px solid var(--borde)
 nav button{background:none;border:none;border-bottom:3px solid transparent;padding:10px 14px;cursor:pointer;color:var(--txt2);white-space:nowrap}
 nav button.act{color:var(--carbon);border-color:var(--oro);font-weight:700}
 nav button:hover{color:var(--carbon)}
+nav{scrollbar-width:none}nav::-webkit-scrollbar{display:none}
 nav .cnt{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--rojo);color:#fff;font-size:11px;text-align:center}
 main{padding:20px;max-width:1400px;margin:0 auto}
 .vista{display:none}.vista.act{display:block}
@@ -115,9 +116,12 @@ body.admin .solo-pub{display:none!important}
 /* ---- Pulido: superficies del navegador ---- */
 [hidden]{display:none!important}
 /* Pie de la aplicación: firma de quien desarrolla (igual que en Flota) */
-.pie-app{display:flex;align-items:center;justify-content:center;gap:.45rem;padding:1.1rem 1rem calc(1.1rem + env(safe-area-inset-bottom));margin-top:12px;border-top:1px solid var(--borde);background:var(--panel)}
-.pie-app span{font-size:.68rem;font-weight:600;color:var(--txt2);letter-spacing:.02em}
-.pie-app img{width:104px;height:auto;display:block;opacity:.92}
+/* La página es una columna: el pie blanco ocupa desde la línea divisoria hasta el borde inferior */
+body{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+main{flex:1 0 auto;width:100%}
+.pie-app{flex:none;display:flex;align-items:center;justify-content:center;gap:.6rem;padding:1.25rem 1rem calc(1.4rem + env(safe-area-inset-bottom));margin-top:28px;border-top:1px solid var(--borde);background:var(--panel)}
+.pie-app span{font-size:.68rem;font-weight:600;color:var(--txt2);letter-spacing:.06em;text-transform:uppercase}
+.pie-app img{width:116px;height:auto;display:block}
 #tOficios td:nth-child(5){min-width:300px}#tOficios td:nth-child(3),#tOficios td:nth-child(9){min-width:150px}
 #tTareas td:nth-child(2){min-width:260px}
 .al .t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -307,7 +311,7 @@ tr.resaltado{background:var(--oro-suave)!important}
 </main>
 <footer class="pie-app">
   <span>By</span>
-  <img src="assets/pascalia.png" alt="PascalIA" width="454" height="120">
+  <img src="assets/pascalia-transparente.png" alt="PascalIA" width="679" height="221">
 </footer>
 
 <!-- MODALES -->
