@@ -1614,148 +1614,197 @@ async function submitInfraccion(e){
 function generarPDFInfraccion(d){
   const {jsPDF} = window.jspdf;
   const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
-  const PW=210, PM=15, cw=PW-PM*2;
+  const PW=210, PH=297, PM=15, cw=PW-PM*2;
+  const MAX_Y = PH - 18; // margen inferior para pie de página
   let y = PM;
 
-  // ── Helpers ─────────────────────────────────────────────────────
+  // ── Helpers base ─────────────────────────────────────────────────
   function borde(x,yy,w,h){ doc.setDrawColor(0,0,0); doc.setLineWidth(0.25); doc.rect(x,yy,w,h); }
 
-  // Celda simple: label bold pequeño + valor normal, una sola línea
   function celda(x,yy,w,h,label,val,vfs){
     borde(x,yy,w,h);
-    const mid = yy+h*0.65;
+    const mid=yy+h*0.65;
     doc.setTextColor(0,0,0);
     if(label){ doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.text(label,x+1.5,mid); }
-    const lw = label ? doc.getTextWidth(label)+0.8 : 0;
+    const lw=label?doc.getTextWidth(label)+0.8:0;
     doc.setFont('helvetica','normal'); doc.setFontSize(vfs||8);
-    doc.text(String(val||''), x+1.5+lw, mid, {maxWidth:w-lw-3});
+    doc.text(String(val||''),x+1.5+lw,mid,{maxWidth:w-lw-3});
   }
 
-  // Encabezado de sección gris
   function secHead(yy,text){
     doc.setFillColor(195,195,195); doc.setDrawColor(0,0,0); doc.setLineWidth(0.25);
     doc.rect(PM,yy,cw,6,'FD');
     doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,0,0);
-    doc.text(text, PM+cw/2, yy+4.2, {align:'center'});
+    doc.text(text,PM+cw/2,yy+4.2,{align:'center'});
     return yy+6;
   }
 
-  // Celda multilinea (descripción, emblema, etc.) — altura dinámica
-  function celdaMulti(x,yy,w,label,val,minH,fs){
-    fs = fs||7.5;
-    const lh=4.2, pad=2;
-    const avail = w - pad*2;
-    const lines = doc.splitTextToSize(String(val||''), avail);
-    const h = Math.max(lines.length*lh + (label?9:5), minH||8);
-    borde(x,yy,w,h);
-    doc.setTextColor(0,0,0);
-    let ty = yy+4.5;
-    if(label){ doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.text(label,x+pad,ty); ty+=5; }
-    doc.setFont('helvetica','normal'); doc.setFontSize(fs);
-    lines.forEach((l,i)=>doc.text(l,x+pad,ty+i*lh));
-    return yy+h;
+  // ── Pie de página (llamado antes de agregar página nueva) ─────────
+  function drawFooter(){
+    doc.setDrawColor(170,170,170); doc.setLineWidth(0.3);
+    doc.line(PM,MAX_Y+2,PW-PM,MAX_Y+2);
+    doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(110,110,110);
+    doc.text('Documento generado automáticamente · Sistema de Gestión Misión Médica · ESE Hospital Regional Noroccidental',PW/2,MAX_Y+7,{align:'center'});
   }
 
-  const RH=8; // altura estándar de fila
+  // ── Encabezado de continuación (páginas 2+) ───────────────────────
+  function drawContinuationHeader(){
+    doc.setFillColor(218,41,28); doc.rect(0,0,PW,3,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,0,0);
+    doc.text('FORMATO DE REPORTE DE INFRACCIONES E INCIDENTES A LA MISIÓN MÉDICA EN COLOMBIA',PM,10);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(80,80,80);
+    doc.text('Radicado: '+String(d.radicado||''),PW-PM,10,{align:'right'});
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.3);
+    doc.line(PM,13,PW-PM,13);
+    y=18;
+  }
 
-  // ── RADICADO (esquina superior izquierda) ────────────────────────
-  celda(PM, y, 72, 7, 'Radicado:', d.radicado, 8);
+  // ── Verificar espacio; si no alcanza, agregar página ──────────────
+  function checkY(h){
+    if(y+h>MAX_Y){
+      drawFooter();
+      doc.addPage();
+      drawContinuationHeader();
+    }
+  }
 
-  // Texto resolución a la derecha del radicado
+  // ── celdaMulti con soporte de salto de página ─────────────────────
+  function celdaMulti(x,w,label,val,minH,fs){
+    fs=fs||7.5;
+    const lh=4.2, pad=2;
+    const avail=w-pad*2;
+    const allLines=doc.splitTextToSize(String(val||''),avail);
+    const labelH=label?9:0;
+
+    // Procesar líneas en chunks que caben en la página
+    let remaining=[...allLines];
+    let firstChunk=true;
+
+    while(remaining.length>0){
+      const availH=MAX_Y-y;
+      const startH=firstChunk?(labelH+5):5;
+      const maxLines=Math.max(1,Math.floor((availH-startH)/lh));
+      const chunk=remaining.slice(0,maxLines);
+      remaining=remaining.slice(maxLines);
+
+      const h=Math.max(chunk.length*lh+startH+1, firstChunk?(minH||8):8);
+      borde(x,y,w,h);
+      doc.setTextColor(0,0,0);
+      let ty=y+4.5;
+      if(firstChunk&&label){
+        doc.setFont('helvetica','bold'); doc.setFontSize(6.5);
+        doc.text(label,x+pad,ty); ty+=5;
+      }
+      doc.setFont('helvetica','normal'); doc.setFontSize(fs);
+      chunk.forEach((l,i)=>doc.text(l,x+pad,ty+i*lh));
+      y+=h;
+
+      if(remaining.length>0){
+        drawFooter();
+        doc.addPage();
+        drawContinuationHeader();
+        firstChunk=false;
+      }
+    }
+  }
+
+  const RH=8;
+
+  // ══════════════════════════════════════════════════════
+  // PÁGINA 1 — ENCABEZADO PRINCIPAL
+  // ══════════════════════════════════════════════════════
+  celda(PM,y,72,7,'Radicado:',d.radicado,8);
   doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(40,40,40);
-  const resLines = doc.splitTextToSize(
+  const resLines=doc.splitTextToSize(
     'Resolución Nro. 4481 de 2012, "Por la cual se adopta el Manual de Misión Médica y se establecen normas relacionadas con la señalización y divulgación de su Emblema"',
     cw-76
   );
-  resLines.forEach((l,i)=>doc.text(l, PM+75, y+3+i*3.3));
+  resLines.forEach((l,i)=>doc.text(l,PM+75,y+3+i*3.3));
+  y+=12;
 
-  y += 12;
-
-  // ── TÍTULOS ──────────────────────────────────────────────────────
   doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(0,0,0);
-  doc.text('FORMATO DE REPORTE DE INFRACCIONES', PW/2, y, {align:'center'}); y+=6;
-  doc.text('E INCIDENTES A LA MISIÓN MÉDICA EN COLOMBIA', PW/2, y, {align:'center'}); y+=5;
+  doc.text('FORMATO DE REPORTE DE INFRACCIONES',PW/2,y,{align:'center'}); y+=6;
+  doc.text('E INCIDENTES A LA MISIÓN MÉDICA EN COLOMBIA',PW/2,y,{align:'center'}); y+=5;
   doc.setFont('helvetica','bolditalic'); doc.setFontSize(9);
-  doc.text('Antes de diligenciar el formulario, por favor lea el instructivo', PW/2, y, {align:'center'});
-  y += 9;
+  doc.text('Antes de diligenciar el formulario, por favor lea el instructivo',PW/2,y,{align:'center'});
+  y+=9;
 
-  // ── CHECKBOXES Infracción / Incidente ────────────────────────────
-  const ckW=58, ckH=7, ckX=PW/2-ckW;
-  borde(ckX, y, ckW, ckH); borde(ckX+ckW, y, ckW, ckH);
-  doc.setFontSize(9); doc.setTextColor(0,0,0);
+  const ckW=58,ckH=7,ckX=PW/2-ckW;
+  borde(ckX,y,ckW,ckH); borde(ckX+ckW,y,ckW,ckH);
   const ckY=y+5;
-  doc.setFont('helvetica','bold');
-  doc.text(d.tipo_evento==='Infracción'?'X':' ', ckX+3, ckY);
-  doc.text(d.tipo_evento==='Incidente' ?'X':' ', ckX+ckW+3, ckY);
+  doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(0,0,0);
+  doc.text(d.tipo_evento==='Infracción'?'X':' ',ckX+3,ckY);
+  doc.text(d.tipo_evento==='Incidente'?'X':' ',ckX+ckW+3,ckY);
   doc.setFont('helvetica','normal');
-  doc.text('Infracción', ckX+8, ckY);
-  doc.text('Incidente',  ckX+ckW+8, ckY);
-  y += ckH+4;
+  doc.text('Infracción',ckX+8,ckY); doc.text('Incidente',ckX+ckW+8,ckY);
+  y+=ckH+4;
 
-  // ── SECCIÓN 1: DILIGENCIAMIENTO ──────────────────────────────────
-  y = secHead(y, 'INFORMACIÓN DEL DILIGENCIAMIENTO DEL FORMULARIO');
-  celda(PM,        y, 62,  RH, 'Fecha reporte:', fmtDate(d.fecha_reporte));
-  celda(PM+62,     y, cw-62, RH, 'Quien diligencia (institución o persona):', d.quien_diligencia);
-  y += RH;
-  celda(PM,        y, 55,  RH, 'Lugar:', d.lugar_diligenciamiento);
-  celda(PM+55,     y, 65,  RH, 'Municipio:', d.municipio_diligenciamiento);
-  celda(PM+120,    y, cw-120, RH, 'Departamento:', d.departamento_diligenciamiento);
-  y += RH+3;
+  // ── SECCIÓN 1 ────────────────────────────────────────────────────
+  checkY(6+RH*2+3);
+  y=secHead(y,'INFORMACIÓN DEL DILIGENCIAMIENTO DEL FORMULARIO');
+  celda(PM,y,62,RH,'Fecha reporte:',fmtDate(d.fecha_reporte));
+  celda(PM+62,y,cw-62,RH,'Quien diligencia (institución o persona):',d.quien_diligencia);
+  y+=RH;
+  celda(PM,y,55,RH,'Lugar:',d.lugar_diligenciamiento);
+  celda(PM+55,y,65,RH,'Municipio:',d.municipio_diligenciamiento);
+  celda(PM+120,y,cw-120,RH,'Departamento:',d.departamento_diligenciamiento);
+  y+=RH+3;
 
-  // ── SECCIÓN 2: SOBRE LA INFRACCIÓN/INCIDENTE ─────────────────────
-  y = secHead(y, 'INFORMACIÓN SOBRE LA '+(d.tipo_evento||'INFRACCIÓN O INCIDENTE').toUpperCase());
+  // ── SECCIÓN 2 ────────────────────────────────────────────────────
+  checkY(6+RH*5+20);
+  y=secHead(y,'INFORMACIÓN SOBRE LA '+(d.tipo_evento||'INFRACCIÓN O INCIDENTE').toUpperCase());
   const H2=cw/2;
-  celda(PM,     y, H2,     RH, 'Fecha ocurrencia:', fmtDate(d.fecha_ocurrencia));
-  celda(PM+H2,  y, H2,     RH, 'Lugar:', d.lugar_ocurrencia);
-  y += RH;
-  celda(PM,     y, H2,     RH, 'Municipio:', d.municipio_ocurrencia);
-  celda(PM+H2,  y, H2,     RH, 'Departamento:', d.departamento_ocurrencia);
-  y += RH;
-  celda(PM,     y, cw,     RH, 'Institución afectada:', d.institucion_afectada);
-  y += RH;
+  celda(PM,y,H2,RH,'Fecha ocurrencia:',fmtDate(d.fecha_ocurrencia));
+  celda(PM+H2,y,H2,RH,'Lugar:',d.lugar_ocurrencia);
+  y+=RH;
+  celda(PM,y,H2,RH,'Municipio:',d.municipio_ocurrencia);
+  celda(PM+H2,y,H2,RH,'Departamento:',d.departamento_ocurrencia);
+  y+=RH;
+  celda(PM,y,cw,RH,'Institución afectada:',d.institucion_afectada);
+  y+=RH;
+  const tp=d.tipo_institucion||'';
+  const tipoTxt='Publica: '+(tp==='Publica'?'X':'__')+'   Privada: '+(tp==='Privada'?'X':'__')+'     Hospital: __   Puesto de salud: __   Centro de salud: __   Otra, cual: '+(d.detalle_institucion||'');
+  celda(PM,y,cw,RH,'',tipoTxt,7.5); y+=RH;
+  celda(PM,y,cw,RH,'Fuente de la información (institución o persona):',d.fuente_informacion); y+=RH;
 
-  // Tipo institución: Publica / Privada / detalle
-  const tp = d.tipo_institucion||'';
-  const tipoTxt = `Publica: ${tp==='Publica'?'X':'__'}   Privada: ${tp==='Privada'?'X':'__'}     Hospital: __   Puesto de salud: __   Centro de salud: __   Otra, cual: ${d.detalle_institucion||''}`;
-  celda(PM, y, cw, RH, '', tipoTxt, 7.5); y += RH;
-
-  celda(PM, y, cw, RH, 'Fuente de la información (institución o persona):', d.fuente_informacion); y += RH;
-
-  // Emblema / Personal identificado — celdas gemelas de altura dinámica
-  const emTxt = '¿Las instalaciones o medios de transporte estaban debidamente señalizados con el Emblema Protector?  SI '+
-    (d.emblema==='SI'?'X':'__')+'   NO '+(d.emblema==='NO'?'X':'__')+'   NO SABE: '+(d.emblema==='NO SABE'?'X':'__');
-  const peTxt = '¿El personal sanitario estaba debidamente identificado?  SI '+
-    (d.personal_identificado==='SI'?'X':'__')+'   NO '+(d.personal_identificado==='NO'?'X':'__')+'   NO SABE: '+(d.personal_identificado==='NO SABE'?'X':'__');
-  const eLs = doc.splitTextToSize(emTxt, H2-4);
-  const pLs = doc.splitTextToSize(peTxt, H2-4);
-  const dblH = Math.max(eLs.length, pLs.length)*4.2+6;
-  borde(PM,    y, H2, dblH); borde(PM+H2, y, H2, dblH);
+  const emTxt='¿Las instalaciones o medios de transporte estaban debidamente señalizados con el Emblema Protector?  SI '+(d.emblema==='SI'?'X':'__')+'   NO '+(d.emblema==='NO'?'X':'__')+'   NO SABE: '+(d.emblema==='NO SABE'?'X':'__');
+  const peTxt='¿El personal sanitario estaba debidamente identificado?  SI '+(d.personal_identificado==='SI'?'X':'__')+'   NO '+(d.personal_identificado==='NO'?'X':'__')+'   NO SABE: '+(d.personal_identificado==='NO SABE'?'X':'__');
+  const eLs=doc.splitTextToSize(emTxt,H2-4);
+  const pLs=doc.splitTextToSize(peTxt,H2-4);
+  const dblH=Math.max(eLs.length,pLs.length)*4.2+6;
+  checkY(dblH+4);
+  borde(PM,y,H2,dblH); borde(PM+H2,y,H2,dblH);
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(0,0,0);
-  eLs.forEach((l,i)=>doc.text(l, PM+2,    y+5+i*4.2));
-  pLs.forEach((l,i)=>doc.text(l, PM+H2+2, y+5+i*4.2));
-  y += dblH+4;
+  eLs.forEach((l,i)=>doc.text(l,PM+2,y+5+i*4.2));
+  pLs.forEach((l,i)=>doc.text(l,PM+H2+2,y+5+i*4.2));
+  y+=dblH+4;
 
-  // ── DESCRIPCIÓN (ajustable al contenido) ─────────────────────────
+  // ── DESCRIPCIÓN (con salto de página automático) ─────────────────
+  checkY(15);
   doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,0,0);
-  doc.text('DESCRIPCIÓN DE LA INFRACCIÓN O INCIDENTE:', PM, y+4);
-  y += 7;
-  y = celdaMulti(PM, y, cw, null, d.descripcion, 35, 8);
-  y += 4;
+  doc.text('DESCRIPCIÓN DE LA INFRACCIÓN O INCIDENTE:',PM,y+4);
+  y+=7;
+  celdaMulti(PM,cw,null,d.descripcion,35,8);
+  y+=4;
 
   // ── SECCIÓN 3: APOYO ─────────────────────────────────────────────
-  y = secHead(y, 'APOYO O SOPORTE RECIBIDO');
-  const apTxt = '¿Recibió apoyo inicial la institución o persona afectada?   SI: '+
-    (d.apoyo==='SI'?'X':'__')+'   NO: '+(d.apoyo==='NO'?'X':'__')+'   NO SABE: '+(d.apoyo==='NO SABE'?'X':'__');
-  celda(PM, y, cw, RH, '', apTxt, 7.5); y += RH;
-  if(d.cual_apoyo){ celda(PM, y, cw, RH, '¿Cuál apoyo recibió?:', d.cual_apoyo); y += RH; }
+  checkY(6+RH*2+8);
+  y=secHead(y,'APOYO O SOPORTE RECIBIDO');
+  const apTxt='¿Recibió apoyo inicial la institución o persona afectada?   SI: '+(d.apoyo==='SI'?'X':'__')+'   NO: '+(d.apoyo==='NO'?'X':'__')+'   NO SABE: '+(d.apoyo==='NO SABE'?'X':'__');
+  celda(PM,y,cw,RH,'',apTxt,7.5); y+=RH;
+  if(d.cual_apoyo){ checkY(RH); celda(PM,y,cw,RH,'¿Cuál apoyo recibió?:',d.cual_apoyo); y+=RH; }
+  y+=8;
 
-  y += 8;
+  // ── PIE DE ÚLTIMA PÁGINA ─────────────────────────────────────────
+  drawFooter();
 
-  // ── PIE DE PÁGINA ────────────────────────────────────────────────
-  doc.setDrawColor(170,170,170); doc.setLineWidth(0.3);
-  doc.line(PM, y, PW-PM, y);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(110,110,110);
-  doc.text('Documento generado automáticamente por el Sistema de Gestión Misión Médica · ESE Hospital Regional Noroccidental', PW/2, y+4, {align:'center'});
+  // ── NUMERACIÓN DE PÁGINAS (retroactiva) ──────────────────────────
+  const total=doc.getNumberOfPages();
+  for(let p=1;p<=total;p++){
+    doc.setPage(p);
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
+    doc.text('Página '+p+' de '+total, PW-PM, MAX_Y+7, {align:'right'});
+  }
 
   doc.save(`${d.radicado}.pdf`);
 }
@@ -3296,6 +3345,7 @@ async function loadEstadisticas(){
     <div class="section-title" style="margin-bottom:0;flex:1">Estadísticas de Infracciones e Incidentes</div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
       <button class="btn btn-secondary btn-sm" onclick="generarInformeEstadistico()" style="white-space:nowrap">⬇ Informe PDF</button>
+      <button class="btn btn-secondary btn-sm" onclick="descargarTodosPDFs()" style="white-space:nowrap">⬇ Todos los reportes</button>
       <select id="filt-tipo" class="form-select" style="min-width:140px;padding:.35rem .6rem;font-size:.8rem" onchange="filtrarTabla()">
         <option value="">Todos los tipos</option>
         <option value="Infracción">Solo Infracciones</option>
@@ -3410,6 +3460,27 @@ function descargarPDFAdmin(id){
   const d = (window._infraccionesData||[]).find(r=>r.id===id);
   if(!d){ toast('Registro no encontrado','error'); return; }
   generarPDFInfraccion(d);
+}
+
+async function descargarTodosPDFs(){
+  const tipo = document.getElementById('filt-tipo')?.value||'';
+  const cat  = document.getElementById('filt-cat')?.value||'';
+  const mun  = document.getElementById('filt-mun')?.value||'';
+  const anio = document.getElementById('filt-anio')?.value||'';
+  let registros = window._infraccionesData||[];
+  if(tipo) registros=registros.filter(r=>r.tipo_evento===tipo);
+  if(cat)  registros=registros.filter(r=>r.categoria_evento===cat);
+  if(mun)  registros=registros.filter(r=>r.municipio_ocurrencia===mun);
+  if(anio) registros=registros.filter(r=>r.fecha_ocurrencia?.startsWith(anio));
+  if(!registros.length){ toast('No hay registros con los filtros actuales','error'); return; }
+  const total=registros.length;
+  toast(`Generando ${total} PDF${total>1?'s':''}…`,'info',3000);
+  for(let i=0;i<registros.length;i++){
+    generarPDFInfraccion(registros[i]);
+    // pequeña pausa entre descargas para no saturar el navegador
+    await new Promise(r=>setTimeout(r,600));
+  }
+  toast(`${total} PDF${total>1?'s':''} descargado${total>1?'s':''}`,`success`,5000);
 }
 
 function filtrarTabla(){
