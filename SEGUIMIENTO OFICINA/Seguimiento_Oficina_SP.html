@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seguimiento Oficina de Salud Pública · HRNO</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --borde:#2a3340; --txt:#e6edf3; --txt2:#9aa7b4;
+  --rojo:#e94560; --morado:#7c1d6f; --azul:#4a6fa5; --verde:#38c793; --amarillo:#ffb432; --gris:#6b7685;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;font-size:14px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+header{background:linear-gradient(90deg,var(--morado),#4b1245);padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+header h1{font-size:18px;font-weight:700}
+header .sub{font-size:12px;opacity:.8}
+header .der{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{background:var(--panel2);border:1px solid var(--borde);border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--azul)}
+.btn.pri{background:var(--rojo);border-color:var(--rojo);color:#fff;font-weight:600}
+.btn.sm{padding:4px 8px;font-size:12px}
+.btn.fant{background:transparent;border-color:transparent;color:var(--txt2)}
+.btn.fant:hover{color:var(--txt);border-color:var(--borde)}
+nav{display:flex;gap:4px;padding:10px 20px 0;border-bottom:1px solid var(--borde);overflow-x:auto;background:var(--panel)}
+nav button{background:none;border:none;border-bottom:3px solid transparent;padding:10px 14px;cursor:pointer;color:var(--txt2);white-space:nowrap}
+nav button.act{color:var(--txt);border-color:var(--rojo);font-weight:600}
+nav .cnt{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--rojo);color:#fff;font-size:11px;text-align:center}
+main{padding:20px;max-width:1400px;margin:0 auto}
+.vista{display:none}.vista.act{display:block}
+.barra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.barra input,.barra select{background:var(--panel);border:1px solid var(--borde);border-radius:8px;padding:7px 10px;min-width:0}
+.barra .esp{flex:1}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px}
+.kpi{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:14px 16px}
+.kpi h3{font-size:12px;color:var(--txt2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+.semrow{display:flex;gap:14px}
+.semrow div{display:flex;flex-direction:column;align-items:flex-start}
+.semrow b{font-size:24px;font-variant-numeric:tabular-nums;line-height:1.1}
+.semrow span{font-size:11px;color:var(--txt2)}
+.c-rojo{color:var(--rojo)}.c-amarillo{color:var(--amarillo)}.c-verde{color:var(--verde)}.c-gris{color:var(--gris)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:14px 16px}
+.card h2{font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.lista-al{display:flex;flex-direction:column;gap:6px}
+.al{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:8px;background:var(--panel2);cursor:pointer}
+.al:hover{outline:1px solid var(--borde)}
+.al .t{font-weight:600}
+.al .m{font-size:12px;color:var(--txt2)}
+.dot{width:12px;height:12px;border-radius:50%;flex:none;margin-top:4px}
+.dot.rojo{background:var(--rojo);box-shadow:0 0 0 3px rgba(233,69,96,.2)}
+.dot.amarillo{background:var(--amarillo)}
+.dot.verde{background:var(--verde)}
+.dot.gris{background:var(--gris)}
+.tw{overflow-x:auto;background:var(--panel);border:1px solid var(--borde);border-radius:12px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--borde);vertical-align:top}
+th{font-size:12px;color:var(--txt2);font-weight:600;background:var(--panel2);white-space:nowrap;position:sticky;top:0}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:rgba(74,111,165,.08)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.rojo{background:rgba(233,69,96,.15);color:var(--rojo)}
+.pill.amarillo{background:rgba(255,180,50,.15);color:var(--amarillo)}
+.pill.verde{background:rgba(56,199,147,.15);color:var(--verde)}
+.pill.gris{background:rgba(107,118,133,.2);color:#aab4c0}
+.tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;background:rgba(74,111,165,.25);color:#b8cbe8}
+.tag.correo{background:rgba(124,29,111,.35);color:#f0b8e6}
+.sin{color:var(--txt2);font-style:italic}
+.muted{color:var(--txt2);font-size:12px}
+.vacio{padding:30px;text-align:center;color:var(--txt2)}
+.acc{white-space:nowrap}
+.modal-f{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal-f.act{display:flex}
+.modal{background:var(--panel);border:1px solid var(--borde);border-radius:14px;width:100%;max-width:560px;max-height:92vh;overflow:auto;padding:20px}
+.modal h3{font-size:16px;margin-bottom:14px}
+.campos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.campos .full{grid-column:1/-1}
+@media(max-width:560px){.campos{grid-template-columns:1fr}}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--txt2)}
+label input,label select,label textarea{background:var(--bg);border:1px solid var(--borde);border-radius:8px;padding:8px 10px;color:var(--txt);font-size:14px}
+label textarea{min-height:70px;resize:vertical}
+.pie{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+#toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:60}
+.toast{background:var(--panel2);border:1px solid var(--borde);border-left:4px solid var(--verde);padding:10px 14px;border-radius:8px;max-width:340px}
+.toast.err{border-left-color:var(--rojo)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .dh{font-size:11px;color:var(--txt2);text-align:center;padding:4px}
+.cal .d{min-height:86px;background:var(--panel);border:1px solid var(--borde);border-radius:8px;padding:4px 6px;font-size:12px;overflow:hidden}
+.cal .d.fuera{opacity:.35}
+.cal .d.hoy{border-color:var(--rojo)}
+.cal .d.fest{background:#1a1520}
+.cal .n{font-weight:600;font-size:12px;color:var(--txt2)}
+.cal .ev{display:block;margin-top:3px;padding:1px 5px;border-radius:4px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border-left:3px solid var(--gris);background:var(--panel2)}
+.cal .ev.rojo{border-color:var(--rojo)}.cal .ev.amarillo{border-color:var(--amarillo)}.cal .ev.verde{border-color:var(--verde)}
+@media(max-width:700px){.cal .d{min-height:54px}.cal .ev{font-size:0;height:6px;padding:0}}
+.leyenda{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--txt2);margin-bottom:12px}
+.leyenda span{display:inline-flex;align-items:center;gap:6px}
+.leyenda .dot{margin:0;width:10px;height:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;gap:6px;align-items:center;background:var(--panel2);border:1px solid var(--borde);border-radius:999px;padding:3px 10px;font-size:12px}
+.chip button{background:none;border:none;color:var(--txt2);cursor:pointer}
+body:not(.admin) .admin-only{display:none!important}
+body.admin .solo-pub{display:none!important}
+.estado-admin{font-size:12px;padding:3px 9px;border-radius:999px;background:rgba(56,199,147,.2);color:var(--verde)}
+#loader{position:fixed;top:0;left:0;height:3px;background:var(--rojo);width:0;transition:width .3s;z-index:70}
+/* ---- Pulido: superficies del navegador ---- */
+[hidden]{display:none!important}
+#tOficios td:nth-child(5){min-width:300px}#tOficios td:nth-child(3),#tOficios td:nth-child(9){min-width:150px}
+#tTareas td:nth-child(2){min-width:260px}
+.al .t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+::selection{background:rgba(233,69,96,.35);color:#fff}
+html{scrollbar-color:#2f3a48 var(--bg);color-scheme:dark}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:#2f3a48;border-radius:10px;border:2px solid var(--bg)}::-webkit-scrollbar-thumb:hover{background:var(--azul)}
+:focus-visible{outline:2px solid var(--amarillo);outline-offset:2px;border-radius:6px}
+input,select,textarea{caret-color:var(--rojo);accent-color:var(--rojo)}
+td,.semrow b,.chip{font-variant-numeric:tabular-nums}
+a{color:#8fb4ff;text-underline-offset:3px}
+.ic{width:16px;height:16px;flex:none;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn{display:inline-flex;align-items:center;gap:6px;transition:border-color .15s,background .15s,transform .1s}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.girando .ic{animation:gira .8s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+/* ---- KPIs interactivos ---- */
+.kpi{cursor:pointer;transition:border-color .2s,transform .2s cubic-bezier(.2,.8,.2,1)}
+.kpi:hover{border-color:var(--azul);transform:translateY(-2px)}
+.kpi .barra-sem{display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:12px;background:var(--panel2)}
+.kpi .barra-sem i{display:block;height:100%;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+/* ---- Momento de movimiento: las alertas rojas laten ---- */
+.dot.rojo{animation:late 2.4s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes late{0%{box-shadow:0 0 0 0 rgba(233,69,96,.55)}70%{box-shadow:0 0 0 7px rgba(233,69,96,0)}100%{box-shadow:0 0 0 0 rgba(233,69,96,0)}}
+.vista.act{animation:entra .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes entra{from{opacity:.4;transform:translateY(4px)}to{opacity:1;transform:none}}
+.modal-f.act .modal{animation:entra .25s cubic-bezier(.2,.8,.2,1)}
+tbody tr{transition:background .15s}
+tr.resaltado{background:rgba(233,69,96,.12)!important}
+/* ---- Calendario: punto en vez de borde lateral ---- */
+.cal .ev{border-left:none;display:flex;align-items:center;gap:5px}
+.cal .ev::before{content:"";width:7px;height:7px;border-radius:50%;flex:none;background:var(--gris)}
+.cal .ev.rojo::before{background:var(--rojo)}.cal .ev.amarillo::before{background:var(--amarillo)}.cal .ev.verde::before{background:var(--verde)}
+/* ---- Esqueleto de carga ---- */
+.esq{height:14px;border-radius:6px;background:linear-gradient(90deg,var(--panel2) 0%,#253041 50%,var(--panel2) 100%);background-size:200% 100%;animation:brillo 1.2s ease-in-out infinite;margin:8px 0}
+@keyframes brillo{to{background-position:-200% 0}}
+.vivo{display:inline-flex;align-items:center;gap:6px}
+.vivo i{width:7px;height:7px;border-radius:50%;background:var(--verde)}
+.vivo.off i{background:var(--gris)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="loader"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+  <symbol id="i-izq" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-der" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+</svg>
+<header>
+  <div>
+    <h1>Seguimiento Oficina de Salud Pública</h1>
+    <div class="sub">ESE Hospital Regional Noroccidental · Coordinación de Salud Pública</div>
+  </div>
+  <div class="der">
+    <label style="flex-direction:row;align-items:center;gap:6px;color:#fff">Ver:
+      <select id="fResp" onchange="renderTodo()" style="padding:6px 8px"></select>
+    </label>
+    <span class="vivo" id="vivo" style="color:#f2d7ee;font-size:12px" title="Se actualiza sola cada 2 minutos"><i></i><span id="actualizado">Cargando…</span></span>
+    <button class="btn" id="btnRef" onclick="cargarTodo()"><svg class="ic"><use href="#i-refresh"/></svg>Actualizar</button>
+    <span class="estado-admin admin-only">Administrador</span>
+    <button class="btn solo-pub" onclick="abrir('mLogin')"><svg class="ic"><use href="#i-lock"/></svg>Ingresar como admin</button>
+    <button class="btn admin-only" onclick="salirAdmin()"><svg class="ic"><use href="#i-out"/></svg>Salir</button>
+  </div>
+</header>
+<nav id="nav">
+  <button class="act" data-v="resumen">Resumen</button>
+  <button data-v="tareas">Tareas <span class="cnt" id="cntTar" hidden></span></button>
+  <button data-v="agenda">Agenda de reuniones <span class="cnt" id="cntReu" hidden></span></button>
+  <button data-v="oficios">Términos de oficios <span class="cnt" id="cntOf" hidden></span></button>
+  <button data-v="correo">Registros del correo</button>
+  <button data-v="config" class="admin-only">Configuración</button>
+</nav>
+<main>
+  <div class="leyenda">
+    <span><i class="dot verde"></i>Más de 3 días</span>
+    <span><i class="dot amarillo"></i>1 a 3 días</span>
+    <span><i class="dot rojo"></i>Vence hoy o vencido</span>
+    <span><i class="dot gris"></i>Cerrado / sin fecha</span>
+    <span>· Oficios en días hábiles (sin fines de semana ni festivos)</span>
+  </div>
+
+  <!-- RESUMEN -->
+  <section class="vista act" id="v-resumen">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2">
+      <div class="card"><h2><i class="dot rojo"></i>Alertas rojas</h2><div class="lista-al" id="alRojas"></div></div>
+      <div class="card"><h2><i class="dot amarillo"></i>Próximos a vencer</h2><div class="lista-al" id="alAmarillas"></div></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h2>Carga por responsable</h2><div class="tw" style="border:none"><table id="tCarga"></table></div></div>
+  </section>
+
+  <!-- TAREAS -->
+  <section class="vista" id="v-tareas">
+    <div class="barra">
+      <input id="bTar" placeholder="Buscar tarea…" oninput="renderTareas()">
+      <select id="fTarEst" onchange="renderTareas()">
+        <option value="abiertas">Abiertas</option><option value="">Todas</option>
+        <option value="pendiente">Pendientes</option><option value="en_curso">En curso</option><option value="cerrada">Cerradas</option>
+      </select>
+      <select id="fTarSem" onchange="renderTareas()">
+        <option value="">Todo semáforo</option><option value="rojo">Rojo</option><option value="amarillo">Amarillo</option><option value="verde">Verde</option>
+      </select>
+      <span class="esp"></span>
+      <button class="btn pri admin-only" onclick="editarTarea()"><svg class="ic"><use href="#i-plus"/></svg>Nueva tarea</button>
+    </div>
+    <div class="tw"><table id="tTareas"></table></div>
+  </section>
+
+  <!-- AGENDA -->
+  <section class="vista" id="v-agenda">
+    <div class="barra">
+      <button class="btn sm" onclick="mesCal(-1)" aria-label="Mes anterior"><svg class="ic"><use href="#i-izq"/></svg></button>
+      <b id="calTit" style="min-width:150px;text-align:center"></b>
+      <button class="btn sm" onclick="mesCal(1)" aria-label="Mes siguiente"><svg class="ic"><use href="#i-der"/></svg></button>
+      <button class="btn sm" onclick="mesCal(0)">Hoy</button>
+      <span class="esp"></span>
+      <button class="btn pri admin-only" onclick="editarReunion()"><svg class="ic"><use href="#i-plus"/></svg>Nueva reunión</button>
+    </div>
+    <div class="cal" id="cal"></div>
+    <h2 style="font-size:15px;margin:20px 0 10px">Próximas reuniones</h2>
+    <div class="tw"><table id="tReuniones"></table></div>
+  </section>
+
+  <!-- OFICIOS -->
+  <section class="vista" id="v-oficios">
+    <div class="barra">
+      <input id="bOf" placeholder="Buscar radicado, remitente, asunto…" oninput="renderOficios()">
+      <select id="fOfEst" onchange="renderOficios()">
+        <option value="abiertos">Sin responder</option><option value="">Todos</option><option value="Respondido">Respondidos</option>
+      </select>
+      <select id="fOfSem" onchange="renderOficios()">
+        <option value="">Todo semáforo</option><option value="rojo">Rojo</option><option value="amarillo">Amarillo</option><option value="verde">Verde</option>
+      </select>
+      <span class="esp"></span>
+      <a class="btn" href="../OFICIOS%20ENVIADOS/RADICADOR_index.html" target="_blank" rel="noopener" style="text-decoration:none">Abrir radicador<svg class="ic"><use href="#i-ext"/></svg></a>
+    </div>
+    <p class="muted" style="margin-bottom:10px">Los oficios se leen del radicador de oficios recibidos. El término interno se cuenta en días hábiles desde la fecha de recepción; el estado (Pendiente / En proceso / Respondido) se cambia aquí o en el radicador.</p>
+    <div class="tw"><table id="tOficios"></table></div>
+  </section>
+
+  <!-- CORREO -->
+  <section class="vista" id="v-correo">
+    <p class="muted" style="margin-bottom:10px">Correos de saludpublica@esehrno.gov.co que el agente diario revisó y lo que hizo con cada uno.</p>
+    <div class="tw"><table id="tCorreo"></table></div>
+  </section>
+
+  <!-- CONFIG -->
+  <section class="vista" id="v-config">
+    <div class="grid2">
+      <div class="card">
+        <h2>Responsables</h2>
+        <p class="muted" style="margin-bottom:10px">Lista que aparece al asignar tareas, reuniones y oficios.</p>
+        <div class="barra"><button class="btn pri" onclick="editarResp()"><svg class="ic"><use href="#i-plus"/></svg>Agregar responsable</button></div>
+        <div class="tw" style="border:none"><table id="tResp"></table></div>
+      </div>
+      <div class="card">
+        <h2>Términos de respuesta (días hábiles)</h2>
+        <p class="muted" style="margin-bottom:10px">Plazo interno por tipo de oficio. Si un tipo no tiene plazo propio usa el plazo por defecto.</p>
+        <div id="plazosForm" class="campos"></div>
+        <div class="pie"><button class="btn pri" onclick="guardarPlazos()">Guardar términos</button></div>
+      </div>
+      <div class="card">
+        <h2>Días no hábiles</h2>
+        <p class="muted" style="margin-bottom:10px">Festivos de Colombia 2026–2027 ya cargados. Agregue cierres, vacancias u otros días no hábiles del hospital.</p>
+        <div class="barra"><input type="date" id="nuevoNH"><button class="btn" onclick="agregarNH()">Agregar día</button></div>
+        <div class="chips" id="chipsNH"></div>
+        <details style="margin-top:12px"><summary class="muted" style="cursor:pointer">Ver festivos cargados</summary><div class="chips" id="chipsFest" style="margin-top:8px"></div></details>
+      </div>
+      <div class="card">
+        <h2>Clave de administrador</h2>
+        <div class="campos">
+          <label class="full">Nueva clave<input type="password" id="nuevaClave" autocomplete="new-password"></label>
+        </div>
+        <div class="pie"><button class="btn" onclick="cambiarClave()">Cambiar clave</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- MODALES -->
+<div class="modal-f" id="mLogin"><div class="modal">
+  <h3>Ingreso de administrador</h3>
+  <label>Clave<input type="password" id="claveIn" onkeydown="if(event.key==='Enter')login()"></label>
+  <div class="pie"><button class="btn fant" onclick="cerrar('mLogin')">Cancelar</button><button class="btn pri" onclick="login()">Ingresar</button></div>
+</div></div>
+
+<div class="modal-f" id="mTarea"><div class="modal">
+  <h3 id="mTareaTit">Tarea</h3>
+  <div class="campos">
+    <input type="hidden" id="tId">
+    <label class="full">Tarea<input id="tTitulo"></label>
+    <label class="full">Descripción<textarea id="tDesc"></textarea></label>
+    <label>Responsable<select id="tResp"></select></label>
+    <label>Programa<select id="tProg"></select></label>
+    <label>Prioridad<select id="tPrio"><option value="alta">Alta</option><option value="media" selected>Media</option><option value="baja">Baja</option></select></label>
+    <label>Fecha límite<input type="date" id="tFecha"></label>
+    <label>Estado<select id="tEst"><option value="pendiente">Pendiente</option><option value="en_curso">En curso</option><option value="cerrada">Cerrada</option></select></label>
+  </div>
+  <div class="pie"><button class="btn fant" onclick="cerrar('mTarea')">Cancelar</button><button class="btn pri" onclick="guardarTarea()">Guardar</button></div>
+</div></div>
+
+<div class="modal-f" id="mReunion"><div class="modal">
+  <h3 id="mReuTit">Reunión</h3>
+  <div class="campos">
+    <input type="hidden" id="rId">
+    <label class="full">Reunión<input id="rTitulo"></label>
+    <label>Fecha<input type="date" id="rFecha"></label>
+    <label>Hora<input type="time" id="rHora"></label>
+    <label>Modalidad<select id="rModal"><option>Presencial</option><option>Virtual</option><option>Mixta</option></select></label>
+    <label>Lugar<input id="rLugar"></label>
+    <label>Convoca<input id="rConvoca" placeholder="Entidad o persona"></label>
+    <label>Responsable de asistir<select id="rResp"></select></label>
+    <label class="full">Enlace (si es virtual)<input id="rEnlace"></label>
+    <label class="full">Asistentes / acompañantes<input id="rAsist"></label>
+    <label class="full">Notas / insumos a preparar<textarea id="rNotas"></textarea></label>
+    <label>Estado<select id="rEst"><option value="programada">Programada</option><option value="realizada">Realizada</option><option value="cancelada">Cancelada</option></select></label>
+  </div>
+  <div class="pie"><button class="btn fant" onclick="cerrar('mReunion')">Cancelar</button><button class="btn pri" onclick="guardarReunion()">Guardar</button></div>
+</div></div>
+
+<div class="modal-f" id="mOficio"><div class="modal">
+  <h3>Asignar oficio</h3>
+  <p class="muted" id="oInfo" style="margin-bottom:12px"></p>
+  <div class="campos">
+    <input type="hidden" id="oKey">
+    <label>Responsable<select id="oResp"></select></label>
+    <label>Término (días hábiles)<input type="number" min="1" max="60" id="oPlazo" placeholder="Según tipo"></label>
+    <label class="full">Notas<textarea id="oNotas"></textarea></label>
+  </div>
+  <div class="pie"><button class="btn fant" onclick="cerrar('mOficio')">Cancelar</button><button class="btn pri" onclick="guardarOficio()">Guardar</button></div>
+</div></div>
+
+<div class="modal-f" id="mResp"><div class="modal">
+  <h3>Responsable</h3>
+  <div class="campos">
+    <input type="hidden" id="pId">
+    <label class="full">Nombre completo<input id="pNombre"></label>
+    <label>Cargo<input id="pCargo"></label>
+    <label>Programa<select id="pProg"></select></label>
+    <label class="full">Correo<input id="pCorreo" type="email"></label>
+    <label>Activo<select id="pActivo"><option value="true">Sí</option><option value="false">No</option></select></label>
+  </div>
+  <div class="pie"><button class="btn fant" onclick="cerrar('mResp')">Cancelar</button><button class="btn pri" onclick="guardarResp()">Guardar</button></div>
+</div></div>
+
+<div id="toasts"></div>
+
+<script>
+/* ===================== CONFIGURACION ===================== */
+const CFG = {
+  SUPA_URL: 'https://wttljozqyaxlzilomnef.supabase.co',
+  SUPA_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0dGxqb3pxeWF4bHppbG9tbmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDg5NTEsImV4cCI6MjA5NDg4NDk1MX0.kAQkgGq7RmZxTM9KlwI6KI7BjhEBy-8w6OdHVkOPBDM',
+  RADICADOR_URL: 'https://script.google.com/macros/s/AKfycbxmK-803QUbEO0Xy5BPEdj2OSFqK6pv_IcgYmE_qnc-fEjv548tI9aJvqZE1-WmATM/exec',
+  PLAZO_LEGAL_DP: 15
+};
+const PROGRAMAS = ['Coordinación Salud Pública','PAI','EBS','PIC','Jóvenes en Paz','Misión Médica','SIVIGILA','Salud Mental','Nutrición','Administrativo','Otro'];
+const TIPOS_OFICIO = ['Oficio','Circular','Resolución','Derecho de petición','Requerimiento','Memorando','Comunicación'];
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+let ST = { tareas:[], reuniones:[], oficios:[], meta:{}, resp:[], correos:[], plazos:{_defecto:7}, festivos:[], noHab:[], calMes:null, errRad:null };
+let CLAVE = sessionStorageGet('seg_clave');
+
+/* ===================== UTILIDADES ===================== */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function sessionStorageGet(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }
+function sessionStorageSet(k,v){ try{ v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v); }catch(e){} }
+function toast(msg,err){ const d=document.createElement('div'); d.className='toast'+(err?' err':''); d.textContent=msg; $('toasts').appendChild(d); setTimeout(()=>d.remove(),3800); }
+function carga(on){ $('loader').style.width = on ? '70%' : '100%'; if(!on) setTimeout(()=>{$('loader').style.width='0';},300); }
+function abrir(id){ $(id).classList.add('act'); const f=$(id).querySelector('input:not([type=hidden]),select'); if(f) setTimeout(()=>f.focus(),50); }
+function cerrar(id){ $(id).classList.remove('act'); }
+document.querySelectorAll('.modal-f').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('act'); }));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-f.act').forEach(m=>m.classList.remove('act')); });
+
+function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function hoy(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
+function deIso(s){ if(!s) return null; const p=String(s).slice(0,10).split('-'); if(p.length<3) return null; return new Date(+p[0],+p[1]-1,+p[2]); }
+function fmt(d){ if(!d) return '—'; if(typeof d==='string') d=deIso(d); return d ? String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear() : '—'; }
+/* El radicador devuelve fechas como texto de Date de JS o dd/mm/aaaa */
+function fechaRad(s){
+  if(!s) return null; const t=String(s).trim();
+  let m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return new Date(+m[3],+m[2]-1,+m[1]);
+  m=t.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  const d=new Date(t); if(isNaN(d)) return null; d.setHours(0,0,0,0); return d;
+}
+function diasCal(desde,hasta){ return Math.round((hasta-desde)/86400000); }
+
+/* ---- Dias habiles ---- */
+function esHabil(d){ const w=d.getDay(); if(w===0||w===6) return false; const k=iso(d); return !ST.festivos.includes(k) && !ST.noHab.includes(k); }
+function sumarHabiles(desde,n){ const d=new Date(desde); let k=0; while(k<n){ d.setDate(d.getDate()+1); if(esHabil(d)) k++; } return d; }
+/* Habiles que faltan desde hoy (excluido) hasta el limite (incluido); negativo si ya paso */
+function habilesRestantes(limite){
+  const h=hoy(); if(+limite===+h) return 0;
+  let n=0; const d=new Date(h);
+  if(limite>h){ while(d<limite){ d.setDate(d.getDate()+1); if(esHabil(d)) n++; } return n; }
+  while(d>limite){ if(esHabil(d)) n--; d.setDate(d.getDate()-1); } return n;
+}
+
+/* ---- Semaforo ---- */
+function color(dias){ if(dias==null) return 'gris'; if(dias<=0) return 'rojo'; if(dias<=3) return 'amarillo'; return 'verde'; }
+function etiqueta(dias,unidad){
+  if(dias==null) return 'Sin fecha';
+  if(dias<0) return 'Vencido hace '+(-dias)+' '+unidad+(dias===-1?'':'s');
+  if(dias===0) return 'Vence hoy';
+  return dias+' '+unidad+(dias===1?'':'s')+' restante'+(dias===1?'':'s');
+}
+function semTarea(t){
+  if(t.estado==='cerrada') return {c:'gris',l:'Cerrada',d:null};
+  if(!t.fecha_limite) return {c:'gris',l:'Sin fecha',d:null};
+  const d=diasCal(hoy(),deIso(t.fecha_limite)); return {c:color(d),l:etiqueta(d,'día'),d};
+}
+function semReunion(r){
+  if(r.estado==='realizada') return {c:'gris',l:'Realizada',d:null};
+  if(r.estado==='cancelada') return {c:'gris',l:'Cancelada',d:null};
+  const d=diasCal(hoy(),deIso(r.fecha));
+  if(d<0) return {c:'rojo',l:'Pasó sin marcar',d};
+  if(d===0) return {c:'rojo',l:'Hoy'+(r.hora?' '+r.hora:''),d};
+  if(d===1) return {c:'amarillo',l:'Mañana',d};
+  return {c:color(d),l:'En '+d+' días',d};
+}
+function claveOficio(o){ return String(o.radicadoRem||o.id||o.no); }
+function plazoDe(o){ const m=ST.meta[claveOficio(o)]; if(m && m.plazo_habiles) return m.plazo_habiles; const tipo=(m&&m.tipo)||o.tipo; return ST.plazos[tipo] || ST.plazos._defecto || 7; }
+function infoOficio(o){
+  const rec=fechaRad(o.fechaRecepcion), m=ST.meta[claveOficio(o)]||{};
+  const plazo=plazoDe(o);
+  const limite= rec ? sumarHabiles(rec,plazo) : null;
+  const legal = rec ? sumarHabiles(rec,CFG.PLAZO_LEGAL_DP) : null;
+  const resp = m.responsable || o.responsable || '';
+  let s;
+  if(o.estado==='Respondido') s={c:'gris',l:'Respondido',d:null};
+  else if(!limite) s={c:'gris',l:'Sin fecha',d:null};
+  else { const d=habilesRestantes(limite); s={c:color(d),l:etiqueta(d,'día hábil').replace('día hábils','días hábiles').replace('hábil restantes','hábiles restantes'),d}; }
+  return {rec,plazo,limite,legal,resp,s,m};
+}
+
+/* ===================== DATOS ===================== */
+async function sb(path){
+  const r=await fetch(CFG.SUPA_URL+'/rest/v1/'+path,{headers:{apikey:CFG.SUPA_KEY,Authorization:'Bearer '+CFG.SUPA_KEY}});
+  if(!r.ok) throw new Error('Supabase '+r.status); return r.json();
+}
+async function rpc(fn,args){
+  const r=await fetch(CFG.SUPA_URL+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:CFG.SUPA_KEY,Authorization:'Bearer '+CFG.SUPA_KEY,'Content-Type':'application/json'},body:JSON.stringify(args)});
+  const txt=await r.text(); let j=null; try{ j=txt?JSON.parse(txt):null; }catch(e){}
+  if(!r.ok) throw new Error((j&&j.message)||('Error '+r.status)); return j;
+}
+async function radicador(params){
+  const u=new URL(CFG.RADICADOR_URL); Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v)); u.searchParams.set('_ts',Date.now());
+  const r=await fetch(u.toString(),{redirect:'follow',cache:'no-store'}); return r.json();
+}
+let ULTIMA=null, CARGANDO=false;
+async function cargarTodo(){
+  if(CARGANDO) return; CARGANDO=true;
+  carga(true); $('btnRef').classList.add('girando'); $('btnRef').disabled=true;
+  if(!ULTIMA) ['alRojas','alAmarillas'].forEach(id=>$(id).innerHTML='<div class="esq"></div><div class="esq" style="width:70%"></div><div class="esq" style="width:85%"></div>');
+  const [tar,reu,meta,resp,cor,cfg,rad]=await Promise.allSettled([
+    sb('seg_tareas?select=*&order=fecha_limite.asc.nullslast'),
+    sb('seg_reuniones?select=*&order=fecha.asc,hora.asc'),
+    sb('seg_oficios_meta?select=*'),
+    sb('seg_responsables?select=*&order=nombre.asc'),
+    sb('seg_correos_procesados?select=*&order=procesado.desc&limit=200'),
+    sb('seg_config?select=*'),
+    radicador({action:'listarRecibidos'})
+  ]);
+  const ok=p=>p.status==='fulfilled'?p.value:null;
+  if(tar.status==='rejected') toast('No se pudo leer Supabase: '+tar.reason.message,true);
+  ST.tareas=ok(tar)||[]; ST.reuniones=ok(reu)||[]; ST.resp=ok(resp)||[]; ST.correos=ok(cor)||[];
+  ST.meta={}; (ok(meta)||[]).forEach(m=>ST.meta[m.radicado_rem]=m);
+  (ok(cfg)||[]).forEach(c=>{ if(c.clave==='plazos') ST.plazos=c.valor; if(c.clave==='festivos') ST.festivos=c.valor; if(c.clave==='no_habiles_extra') ST.noHab=c.valor; });
+  if(rad.status==='fulfilled'){ ST.oficios=(rad.value&&rad.value.entradas)||[]; ST.errRad=null; }
+  else { ST.errRad=rad.reason.message; toast('No se pudo leer el radicador',true); }
+  ULTIMA=Date.now(); CARGANDO=false; $('btnRef').classList.remove('girando'); $('btnRef').disabled=false;
+  $('vivo').classList.toggle('off', tar.status==='rejected' || !!ST.errRad); relojVivo();
+  carga(false); llenarSelects(); renderTodo();
+}
+function relojVivo(){
+  if(!ULTIMA) return; const m=Math.floor((Date.now()-ULTIMA)/60000);
+  $('actualizado').textContent = m<1 ? 'En vivo · actualizado ahora' : 'Actualizado hace '+m+' min';
+}
+/* Autorrefresco: cada 2 minutos con la pestaña visible, y al volver a ella */
+setInterval(()=>{ relojVivo(); if(!document.hidden && Date.now()-(ULTIMA||0)>120000 && !document.querySelector('.modal-f.act')) cargarTodo(); },20000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden && Date.now()-(ULTIMA||0)>60000) cargarTodo(); });
+/* A medianoche cambian todos los semáforos */
+(function medianoche(){ const n=new Date(); const t=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1,0,0,5)-n; setTimeout(()=>{ renderTodo(); medianoche(); },t); })();
+
+/* ===================== FILTRO GLOBAL ===================== */
+function nombresResp(){
+  const s=new Set(ST.resp.filter(r=>r.activo).map(r=>r.nombre));
+  ST.tareas.forEach(t=>t.responsable&&s.add(t.responsable));
+  ST.reuniones.forEach(r=>r.responsable&&s.add(r.responsable));
+  ST.oficios.forEach(o=>{ const i=infoOficio(o); i.resp&&s.add(i.resp); });
+  return [...s].sort((a,b)=>a.localeCompare(b,'es'));
+}
+function llenarSelects(){
+  const actual=$('fResp').value;
+  $('fResp').innerHTML='<option value="">Toda la oficina</option><option value="__sin">Sin responsable</option>'+nombresResp().map(n=>`<option>${esc(n)}</option>`).join('');
+  $('fResp').value=actual;
+  const activos=ST.resp.filter(r=>r.activo).map(r=>r.nombre);
+  const opR='<option value="">— Por asignar —</option>'+activos.map(n=>`<option>${esc(n)}</option>`).join('');
+  ['tResp','rResp','oResp'].forEach(id=>$(id).innerHTML=opR);
+  const opP='<option value="">—</option>'+PROGRAMAS.map(p=>`<option>${esc(p)}</option>`).join('');
+  ['tProg','pProg'].forEach(id=>$(id).innerHTML=opP);
+}
+function pasaResp(nombre){ const f=$('fResp').value; if(!f) return true; if(f==='__sin') return !nombre; return nombre===f; }
+function respHtml(n){ return n?esc(n):'<span class="sin">Por asignar</span>'; }
+function origenHtml(o){ return o==='correo'?' <span class="tag correo" title="Creado por el agente de correo">correo</span>':''; }
+function setResp(sel,val){ if(val && ![...sel.options].some(o=>o.value===val)){ const op=document.createElement('option'); op.textContent=val; sel.appendChild(op); } sel.value=val||''; }
+
+/* ===================== RENDER ===================== */
+function renderTodo(){ renderResumen(); renderTareas(); renderAgenda(); renderOficios(); renderCorreo(); if(document.body.classList.contains('admin')) renderConfig(); }
+
+function itemsAlerta(){
+  const it=[];
+  ST.tareas.forEach(t=>{ const s=semTarea(t); if(pasaResp(t.responsable)) it.push({tipo:'Tarea',c:s.c,d:s.d,l:s.l,t:t.titulo,resp:t.responsable,click:`editarTarea(${t.id})`}); });
+  ST.reuniones.forEach(r=>{ const s=semReunion(r); if(pasaResp(r.responsable)) it.push({tipo:'Reunión',c:s.c,d:s.d,l:s.l+' · '+fmt(r.fecha),t:r.titulo,resp:r.responsable,click:`editarReunion(${r.id})`}); });
+  ST.oficios.forEach(o=>{ const i=infoOficio(o); if(pasaResp(i.resp)) it.push({tipo:o.tipo||'Oficio',c:i.s.c,d:i.s.d,l:i.s.l+' · '+(o.radicadoRem||''),t:(o.remitente||'')+' · '+(o.asunto||''),resp:i.resp,click:`irOficio(${JSON.stringify(claveOficio(o))})`}); });
+  return it;
+}
+function renderResumen(){
+  const cuenta=(arr,f)=>{ const r={rojo:0,amarillo:0,verde:0,gris:0}; arr.forEach(x=>r[f(x).c]++); return r; };
+  const tf=ST.tareas.filter(t=>pasaResp(t.responsable)), rf=ST.reuniones.filter(r=>pasaResp(r.responsable)), of=ST.oficios.filter(o=>pasaResp(infoOficio(o).resp));
+  const kt=cuenta(tf,semTarea), kr=cuenta(rf,semReunion), ko=cuenta(of,o=>infoOficio(o).s);
+  const bloque=(tit,k,gl,vista)=>{ const tot=k.rojo+k.amarillo+k.verde||1; return `<div class="kpi" role="button" tabindex="0" onclick="cambiarVista('${vista}')" onkeydown="if(event.key==='Enter')cambiarVista('${vista}')" aria-label="Ver ${tit}"><h3>${tit}</h3><div class="semrow">
+    <div><b class="c-rojo" data-n="${k.rojo}">0</b><span>Rojo</span></div><div><b class="c-amarillo" data-n="${k.amarillo}">0</b><span>Amarillo</span></div>
+    <div><b class="c-verde" data-n="${k.verde}">0</b><span>Verde</span></div><div><b class="c-gris" data-n="${k.gris}">0</b><span>${gl}</span></div></div>
+    <div class="barra-sem"><i style="width:${k.rojo/tot*100}%;background:var(--rojo)"></i><i style="width:${k.amarillo/tot*100}%;background:var(--amarillo)"></i><i style="width:${k.verde/tot*100}%;background:var(--verde)"></i></div></div>`; };
+  const sinR=tf.filter(t=>!t.responsable&&t.estado!=='cerrada').length+rf.filter(r=>!r.responsable&&r.estado==='programada').length+of.filter(o=>!infoOficio(o).resp&&o.estado!=='Respondido').length;
+  $('kpis').innerHTML=bloque('Tareas',kt,'Cerradas','tareas')+bloque('Reuniones',kr,'Realizadas','agenda')+bloque('Oficios recibidos',ko,'Respondidos','oficios')
+    +`<div class="kpi" role="button" tabindex="0" onclick="verSinResp()" onkeydown="if(event.key==='Enter')verSinResp()"><h3>Sin responsable</h3><div class="semrow"><div><b class="${sinR?'c-amarillo':'c-verde'}" data-n="${sinR}">0</b><span>${sinR?'por asignar':'todo asignado'}</span></div></div></div>`;
+  contar();
+  setCnt('cntTar',kt.rojo); setCnt('cntReu',kr.rojo); setCnt('cntOf',ko.rojo);
+  const it=itemsAlerta();
+  const li=arr=>arr.length?arr.map(a=>`<div class="al" onclick='${a.click}'><i class="dot ${a.c}"></i><div><div class="t">${esc(a.tipo)} · ${esc(a.t)}</div><div class="m">${esc(a.l)} · ${respHtml(a.resp)}</div></div></div>`).join(''):'<div class="vacio"><svg class="ic c-verde"><use href="#i-ok"/></svg> Nada pendiente en este nivel</div>';
+  $('alRojas').innerHTML=li(it.filter(a=>a.c==='rojo').sort((a,b)=>a.d-b.d));
+  $('alAmarillas').innerHTML=li(it.filter(a=>a.c==='amarillo').sort((a,b)=>a.d-b.d));
+  if(ST.errRad) $('alRojas').insertAdjacentHTML('afterbegin','<div class="al"><i class="dot gris"></i><div class="m">No se pudo leer el radicador; los oficios no aparecen.</div></div>');
+  // Carga por responsable
+  const mapa={};
+  it.forEach(a=>{ if(a.c==='gris') return; const k=a.resp||''; mapa[k]=mapa[k]||{rojo:0,amarillo:0,verde:0}; mapa[k][a.c]++; });
+  const filas=Object.entries(mapa).sort((a,b)=>b[1].rojo-a[1].rojo||b[1].amarillo-a[1].amarillo);
+  $('tCarga').innerHTML=filas.length?'<thead><tr><th>Responsable</th><th>Rojo</th><th>Amarillo</th><th>Verde</th><th>Total abiertos</th></tr></thead><tbody>'+filas.map(([n,k])=>`<tr><td>${respHtml(n)}</td><td class="c-rojo">${k.rojo}</td><td class="c-amarillo">${k.amarillo}</td><td class="c-verde">${k.verde}</td><td>${k.rojo+k.amarillo+k.verde}</td></tr>`).join('')+'</tbody>':'<tbody><tr><td class="vacio">Sin pendientes abiertos</td></tr></tbody>';
+}
+/* Contadores animados: suben desde el valor anterior hasta el nuevo */
+const PREV={};
+function contar(){
+  document.querySelectorAll('#kpis b[data-n]').forEach((el,i)=>{
+    const fin=+el.dataset.n, ini=PREV[i]||0; PREV[i]=fin;
+    if(ini===fin||matchMedia('(prefers-reduced-motion: reduce)').matches){ el.textContent=fin; return; }
+    const t0=performance.now(), dur=700;
+    (function paso(t){ const p=Math.min(1,(t-t0)/dur), e=1-Math.pow(2,-10*p); el.textContent=Math.round(ini+(fin-ini)*(p===1?1:e)); if(p<1) requestAnimationFrame(paso); })(t0);
+  });
+}
+function verSinResp(){ $('fResp').value='__sin'; renderTodo(); }
+function setCnt(id,n){ $(id).hidden=!n; $(id).textContent=n; }
+
+function renderTareas(){
+  const q=$('bTar').value.toLowerCase(), fe=$('fTarEst').value, fs=$('fTarSem').value;
+  const ord={rojo:0,amarillo:1,verde:2,gris:3};
+  const l=ST.tareas.filter(t=>pasaResp(t.responsable))
+    .filter(t=>!fe||(fe==='abiertas'?t.estado!=='cerrada':t.estado===fe))
+    .filter(t=>!fs||semTarea(t).c===fs)
+    .filter(t=>!q||(t.titulo+' '+(t.descripcion||'')+' '+(t.responsable||'')+' '+(t.programa||'')).toLowerCase().includes(q))
+    .sort((a,b)=>ord[semTarea(a).c]-ord[semTarea(b).c]||(a.fecha_limite||'9').localeCompare(b.fecha_limite||'9'));
+  const est={pendiente:'Pendiente',en_curso:'En curso',cerrada:'Cerrada'};
+  $('tTareas').innerHTML=l.length?'<thead><tr><th>Alerta</th><th>Tarea</th><th>Responsable</th><th>Programa</th><th>Prioridad</th><th>Fecha límite</th><th>Estado</th><th class="admin-only"></th></tr></thead><tbody>'+l.map(t=>{const s=semTarea(t);return `<tr>
+    <td><span class="pill ${s.c}">${esc(s.l)}</span></td>
+    <td><b>${esc(t.titulo)}</b>${origenHtml(t.origen)}${t.descripcion?`<div class="muted">${esc(t.descripcion)}</div>`:''}</td>
+    <td>${respHtml(t.responsable)}</td><td>${esc(t.programa||'—')}</td>
+    <td>${t.prioridad==='alta'?'<span class="pill rojo">Alta</span>':t.prioridad==='baja'?'<span class="pill gris">Baja</span>':'<span class="pill amarillo">Media</span>'}</td>
+    <td>${fmt(t.fecha_limite)}</td>
+    <td>${document.body.classList.contains('admin')?`<select onchange="estadoTarea(${t.id},this.value)" style="background:var(--bg);border:1px solid var(--borde);border-radius:6px;padding:3px">${Object.entries(est).map(([k,v])=>`<option value="${k}"${t.estado===k?' selected':''}>${v}</option>`).join('')}</select>`:esc(est[t.estado])}</td>
+    <td class="acc admin-only"><button class="btn sm" onclick="editarTarea(${t.id})">Editar</button> <button class="btn sm fant" onclick="borrar('seg_tareas',${t.id})" aria-label="Eliminar tarea"><svg class="ic"><use href="#i-x"/></svg></button></td></tr>`;}).join('')+'</tbody>':'<tbody><tr><td class="vacio">No hay tareas con estos filtros.</td></tr></tbody>';
+}
+
+function mesCal(n){ if(n===0||!ST.calMes){ const h=hoy(); ST.calMes=new Date(h.getFullYear(),h.getMonth(),1); } else ST.calMes=new Date(ST.calMes.getFullYear(),ST.calMes.getMonth()+n,1); renderAgenda(); }
+function renderAgenda(){
+  if(!ST.calMes) mesCal(0);
+  const m=ST.calMes; $('calTit').textContent=MESES[m.getMonth()].replace(/^./,c=>c.toUpperCase())+' '+m.getFullYear();
+  const ini=new Date(m); const off=(ini.getDay()+6)%7; ini.setDate(1-off);
+  const rf=ST.reuniones.filter(r=>pasaResp(r.responsable));
+  let h=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<div class="dh">${d}</div>`).join('');
+  const hk=iso(hoy());
+  for(let i=0;i<42;i++){
+    const d=new Date(ini); d.setDate(ini.getDate()+i); const k=iso(d);
+    const evs=rf.filter(r=>String(r.fecha).slice(0,10)===k).sort((a,b)=>(a.hora||'').localeCompare(b.hora||''));
+    const fest=ST.festivos.includes(k)||ST.noHab.includes(k);
+    h+=`<div class="d${d.getMonth()!==m.getMonth()?' fuera':''}${k===hk?' hoy':''}${fest?' fest':''}"><div class="n">${d.getDate()}${fest?' · no hábil':''}</div>`+
+      evs.map(r=>`<span class="ev ${semReunion(r).c}" onclick="editarReunion(${r.id})" title="${esc((r.hora||'')+' '+r.titulo+' · '+(r.responsable||'Por asignar'))}">${esc((r.hora?r.hora+' ':'')+r.titulo)}</span>`).join('')+'</div>';
+    if(i===34 && d.getMonth()!==m.getMonth()) break;
+  }
+  $('cal').innerHTML=h;
+  const prox=rf.filter(r=>r.estado==='programada'||semReunion(r).c==='rojo').sort((a,b)=>(a.fecha+(a.hora||'')).localeCompare(b.fecha+(b.hora||'')));
+  $('tReuniones').innerHTML=prox.length?'<thead><tr><th>Alerta</th><th>Fecha</th><th>Reunión</th><th>Convoca</th><th>Lugar / modalidad</th><th>Responsable</th><th class="admin-only"></th></tr></thead><tbody>'+prox.map(r=>{const s=semReunion(r);return `<tr>
+    <td><span class="pill ${s.c}">${esc(s.l)}</span></td><td style="white-space:nowrap">${fmt(r.fecha)}${r.hora?'<div class="muted">'+esc(r.hora)+'</div>':''}</td>
+    <td><b>${esc(r.titulo)}</b>${origenHtml(r.origen)}${r.notas?`<div class="muted">${esc(r.notas)}</div>`:''}</td>
+    <td>${esc(r.convoca||'—')}</td><td>${esc([r.lugar,r.modalidad].filter(Boolean).join(' · ')||'—')}${r.enlace?` <a href="${esc(r.enlace)}" target="_blank" rel="noopener" style="color:#8fb4ff">enlace</a>`:''}</td>
+    <td>${respHtml(r.responsable)}</td>
+    <td class="acc admin-only"><button class="btn sm" onclick="editarReunion(${r.id})">Editar</button> <button class="btn sm fant" onclick="borrar('seg_reuniones',${r.id})" aria-label="Eliminar reunión"><svg class="ic"><use href="#i-x"/></svg></button></td></tr>`;}).join('')+'</tbody>':'<tbody><tr><td class="vacio">No hay reuniones programadas.</td></tr></tbody>';
+}
+
+function renderOficios(){
+  const q=$('bOf').value.toLowerCase(), fe=$('fOfEst').value, fs=$('fOfSem').value;
+  const ord={rojo:0,amarillo:1,verde:2,gris:3};
+  const l=ST.oficios.map(o=>({o,i:infoOficio(o)})).filter(x=>pasaResp(x.i.resp))
+    .filter(x=>!fe||(fe==='abiertos'?x.o.estado!=='Respondido':x.o.estado===fe))
+    .filter(x=>!fs||x.i.s.c===fs)
+    .filter(x=>!q||[x.o.radicadoRem,x.o.remitente,x.o.asunto,x.o.tipo,x.i.resp,x.o.observaciones].join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>ord[a.i.s.c]-ord[b.i.s.c]||(a.i.limite||0)-(b.i.limite||0));
+  if(ST.errRad){ $('tOficios').innerHTML='<tbody><tr><td class="vacio">No se pudo conectar con el radicador ('+esc(ST.errRad)+').</td></tr></tbody>'; return; }
+  const adm=document.body.classList.contains('admin');
+  $('tOficios').innerHTML=l.length?'<thead><tr><th>Alerta</th><th>Radicado</th><th>Remitente</th><th>Tipo</th><th>Asunto</th><th>Recibido</th><th>Límite interno</th><th>Límite legal</th><th>Responsable</th><th>Estado</th><th class="admin-only"></th></tr></thead><tbody>'+l.map(({o,i})=>`<tr id="of-${esc(claveOficio(o))}">
+    <td><span class="pill ${i.s.c}">${esc(i.s.l)}</span></td>
+    <td style="font-family:Consolas,monospace;font-size:12px">${esc(o.radicadoRem||'—')}${origenHtml(i.m.origen)}</td>
+    <td>${esc(o.remitente||'—')}</td><td>${esc(o.tipo||'—')}</td>
+    <td>${esc(o.asunto||'')}${i.m.notas?`<div class="muted">${esc(i.m.notas)}</div>`:''}</td>
+    <td style="white-space:nowrap">${fmt(i.rec)}</td>
+    <td style="white-space:nowrap">${fmt(i.limite)}<div class="muted">${i.plazo} días hábiles</div></td>
+    <td style="white-space:nowrap" class="muted">${o.tipo==='Derecho de petición'?fmt(i.legal)+'<div>15 hábiles</div>':'—'}</td>
+    <td>${respHtml(i.resp)}</td>
+    <td>${adm?`<select onchange='estadoOficio(${JSON.stringify(o.id||'')},${JSON.stringify(o.no||'')},this.value)' style="background:var(--bg);border:1px solid var(--borde);border-radius:6px;padding:3px">${['Pendiente','En proceso','Respondido'].map(e=>`<option${o.estado===e?' selected':''}>${e}</option>`).join('')}</select>`:esc(o.estado||'Pendiente')}</td>
+    <td class="acc admin-only"><button class="btn sm" onclick='editarOficio(${JSON.stringify(claveOficio(o))})'>Asignar</button></td></tr>`).join('')+'</tbody>':'<tbody><tr><td class="vacio">No hay oficios con estos filtros.</td></tr></tbody>';
+}
+function irOficio(k){ cambiarVista('oficios'); $('fOfEst').value=''; $('fOfSem').value=''; $('bOf').value=''; renderOficios(); const el=$('of-'+k); if(el){ el.scrollIntoView({block:'center',behavior:'smooth'}); el.classList.add('resaltado'); setTimeout(()=>el.classList.remove('resaltado'),2200); } }
+
+function renderCorreo(){
+  const c=ST.correos;
+  const nom={oficio:'Oficio radicado',reunion:'Reunión agendada',tarea:'Tarea creada',ignorado:'Sin acción'};
+  $('tCorreo').innerHTML=c.length?'<thead><tr><th>Revisado</th><th>Fecha correo</th><th>Remitente</th><th>Asunto</th><th>Acción del agente</th></tr></thead><tbody>'+c.map(x=>`<tr>
+    <td style="white-space:nowrap">${new Date(x.procesado).toLocaleString('es-CO',{dateStyle:'short',timeStyle:'short'})}</td>
+    <td style="white-space:nowrap">${x.fecha_correo?new Date(x.fecha_correo).toLocaleDateString('es-CO'):'—'}</td>
+    <td>${esc(x.remitente||'')}</td><td>${esc(x.asunto||'')}</td>
+    <td><span class="pill ${x.clasificacion==='ignorado'?'gris':x.clasificacion==='oficio'?'rojo':'verde'}">${esc(nom[x.clasificacion]||x.clasificacion)}</span>${x.destino?`<div class="muted">${esc(x.destino)}</div>`:''}</td></tr>`).join('')+'</tbody>':'<tbody><tr><td class="vacio">El agente de correo aún no ha registrado correos.</td></tr></tbody>';
+}
+
+function renderConfig(){
+  $('tResp').innerHTML=ST.resp.length?'<thead><tr><th>Nombre</th><th>Cargo / programa</th><th></th></tr></thead><tbody>'+ST.resp.map(r=>`<tr${r.activo?'':' style="opacity:.5"'}><td><b>${esc(r.nombre)}</b>${r.correo?`<div class="muted">${esc(r.correo)}</div>`:''}</td><td>${esc(r.cargo||'')}<div class="muted">${esc(r.programa||'')}</div></td><td class="acc"><button class="btn sm" onclick="editarResp(${r.id})">Editar</button> <button class="btn sm fant" onclick="borrar('seg_responsables',${r.id})" aria-label="Eliminar responsable"><svg class="ic"><use href="#i-x"/></svg></button></td></tr>`).join('')+'</tbody>':'<tbody><tr><td class="vacio">Agregue el primer responsable.</td></tr></tbody>';
+  $('plazosForm').innerHTML=`<label class="full">Plazo por defecto<input type="number" min="1" max="60" id="pl__defecto" value="${ST.plazos._defecto||7}"></label>`+TIPOS_OFICIO.map((t,i)=>`<label>${esc(t)}<input type="number" min="1" max="60" id="pl_${i}" value="${ST.plazos[t]||''}" placeholder="${ST.plazos._defecto||7}"></label>`).join('');
+  $('chipsNH').innerHTML=ST.noHab.length?ST.noHab.slice().sort().map(d=>`<span class="chip">${fmt(d)}<button onclick="quitarNH('${d}')" aria-label="Quitar día"><svg class="ic" style="width:12px;height:12px"><use href="#i-x"/></svg></button></span>`).join(''):'<span class="muted">Ninguno</span>';
+  $('chipsFest').innerHTML=ST.festivos.map(d=>`<span class="chip">${fmt(d)}</span>`).join('');
+}
+
+/* ===================== VISTAS ===================== */
+function cambiarVista(v){ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('act',b.dataset.v===v)); document.querySelectorAll('.vista').forEach(s=>s.classList.toggle('act',s.id==='v-'+v)); try{ localStorage.setItem('seg_vista',v); }catch(e){} }
+$('nav').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) cambiarVista(b.dataset.v); });
+
+/* ===================== ADMIN ===================== */
+async function login(){
+  const c=$('claveIn').value; if(!c) return;
+  try{ const ok=await rpc('seg_login',{p_clave:c}); if(!ok){ toast('Clave incorrecta',true); return; }
+    CLAVE=c; sessionStorageSet('seg_clave',c); document.body.classList.add('admin'); cerrar('mLogin'); $('claveIn').value=''; renderTodo(); toast('Modo administrador activo');
+  }catch(e){ toast(e.message,true); }
+}
+function salirAdmin(){ CLAVE=null; sessionStorageSet('seg_clave',null); document.body.classList.remove('admin'); if($('v-config').classList.contains('act')) cambiarVista('resumen'); renderTodo(); }
+function exigeAdmin(){ if(!CLAVE){ abrir('mLogin'); return false; } return true; }
+async function guardar(tabla,fila){
+  try{ carga(true); const r=await rpc('seg_guardar',{p_clave:CLAVE,p_tabla:tabla,p_fila:fila}); carga(false); return r; }
+  catch(e){ carga(false); toast(e.message,true); if(/Clave/.test(e.message)) salirAdmin(); return null; }
+}
+async function borrar(tabla,id){
+  if(!confirm('¿Eliminar este registro? No se puede deshacer.')) return;
+  try{ await rpc('seg_borrar',{p_clave:CLAVE,p_tabla:tabla,p_id:id}); toast('Eliminado'); cargarTodo(); }catch(e){ toast(e.message,true); }
+}
+
+/* Tareas */
+function editarTarea(id){
+  if(!exigeAdmin()) return;
+  const t=ST.tareas.find(x=>x.id===id)||{};
+  $('mTareaTit').textContent=t.id?'Editar tarea':'Nueva tarea';
+  $('tId').value=t.id||''; $('tTitulo').value=t.titulo||''; $('tDesc').value=t.descripcion||''; setResp($('tResp'),t.responsable);
+  $('tProg').value=t.programa||''; $('tPrio').value=t.prioridad||'media'; $('tFecha').value=t.fecha_limite||''; $('tEst').value=t.estado||'pendiente';
+  abrir('mTarea');
+}
+async function guardarTarea(){
+  if(!$('tTitulo').value.trim()){ toast('Escriba la tarea',true); return; }
+  const r=await guardar('seg_tareas',{id:$('tId').value,titulo:$('tTitulo').value.trim(),descripcion:$('tDesc').value.trim(),responsable:$('tResp').value,programa:$('tProg').value,prioridad:$('tPrio').value,fecha_limite:$('tFecha').value,estado:$('tEst').value});
+  if(r){ cerrar('mTarea'); toast('Tarea guardada'); cargarTodo(); }
+}
+async function estadoTarea(id,est){ const t=ST.tareas.find(x=>x.id===id); if(!t) return; const r=await guardar('seg_tareas',{...t,estado:est}); if(r){ Object.assign(t,r); renderTodo(); toast('Estado actualizado'); } }
+
+/* Reuniones */
+function editarReunion(id){
+  if(!exigeAdmin()) return;
+  const r=ST.reuniones.find(x=>x.id===id)||{};
+  $('mReuTit').textContent=r.id?'Editar reunión':'Nueva reunión';
+  $('rId').value=r.id||''; $('rTitulo').value=r.titulo||''; $('rFecha').value=r.fecha||iso(hoy()); $('rHora').value=r.hora||'';
+  $('rModal').value=r.modalidad||'Presencial'; $('rLugar').value=r.lugar||''; $('rConvoca').value=r.convoca||''; setResp($('rResp'),r.responsable);
+  $('rEnlace').value=r.enlace||''; $('rAsist').value=r.asistentes||''; $('rNotas').value=r.notas||''; $('rEst').value=r.estado||'programada';
+  abrir('mReunion');
+}
+async function guardarReunion(){
+  if(!$('rTitulo').value.trim()||!$('rFecha').value){ toast('Escriba la reunión y la fecha',true); return; }
+  const r=await guardar('seg_reuniones',{id:$('rId').value,titulo:$('rTitulo').value.trim(),fecha:$('rFecha').value,hora:$('rHora').value,modalidad:$('rModal').value,lugar:$('rLugar').value.trim(),convoca:$('rConvoca').value.trim(),responsable:$('rResp').value,enlace:$('rEnlace').value.trim(),asistentes:$('rAsist').value.trim(),notas:$('rNotas').value.trim(),estado:$('rEst').value});
+  if(r){ cerrar('mReunion'); toast('Reunión guardada'); cargarTodo(); }
+}
+
+/* Oficios */
+function editarOficio(k){
+  if(!exigeAdmin()) return;
+  const o=ST.oficios.find(x=>claveOficio(x)===k); if(!o) return; const i=infoOficio(o);
+  $('oKey').value=k; $('oInfo').textContent=(o.radicadoRem||'')+' · '+(o.remitente||'')+' · '+(o.asunto||'');
+  setResp($('oResp'),i.resp); $('oPlazo').value=(i.m.plazo_habiles)||''; $('oPlazo').placeholder='Según tipo ('+(ST.plazos[o.tipo]||ST.plazos._defecto||7)+')'; $('oNotas').value=i.m.notas||'';
+  abrir('mOficio');
+}
+async function guardarOficio(){
+  const k=$('oKey').value, o=ST.oficios.find(x=>claveOficio(x)===k);
+  const r=await guardar('seg_oficios_meta',{radicado_rem:k,responsable:$('oResp').value,tipo:o&&o.tipo,plazo_habiles:$('oPlazo').value,notas:$('oNotas').value.trim()});
+  if(r){ ST.meta[k]=r; cerrar('mOficio'); llenarSelects(); renderTodo(); toast('Oficio asignado'); }
+}
+async function estadoOficio(id,no,est){
+  if(!exigeAdmin()) return;
+  try{ const r=await radicador({action:'actualizarEstadoRecibido',id,no,estado:est});
+    if(r&&r.exito){ ST.oficios.forEach(o=>{ if((id&&o.id===id)||(!id&&String(o.no)===String(no))) o.estado=est; }); renderTodo(); toast('Estado actualizado en el radicador'); }
+    else toast('El radicador no aceptó el cambio',true);
+  }catch(e){ toast('Error con el radicador: '+e.message,true); }
+}
+
+/* Responsables */
+function editarResp(id){
+  const r=ST.resp.find(x=>x.id===id)||{};
+  $('pId').value=r.id||''; $('pNombre').value=r.nombre||''; $('pCargo').value=r.cargo||''; $('pProg').value=r.programa||''; $('pCorreo').value=r.correo||''; $('pActivo').value=String(r.activo!==false);
+  abrir('mResp');
+}
+async function guardarResp(){
+  if(!$('pNombre').value.trim()){ toast('Escriba el nombre',true); return; }
+  const r=await guardar('seg_responsables',{id:$('pId').value,nombre:$('pNombre').value.trim().toUpperCase(),cargo:$('pCargo').value.trim(),programa:$('pProg').value,correo:$('pCorreo').value.trim(),activo:$('pActivo').value==='true'});
+  if(r){ cerrar('mResp'); toast('Responsable guardado'); cargarTodo(); }
+}
+
+/* Configuracion */
+async function guardarPlazos(){
+  const p={_defecto:Math.max(1,+$('pl__defecto').value||7)};
+  TIPOS_OFICIO.forEach((t,i)=>{ const v=+$('pl_'+i).value; if(v>0) p[t]=v; });
+  const r=await guardar('seg_config',{clave:'plazos',valor:p}); if(r){ ST.plazos=p; renderTodo(); toast('Términos guardados'); }
+}
+async function agregarNH(){
+  const v=$('nuevoNH').value; if(!v||ST.noHab.includes(v)) return;
+  const n=[...ST.noHab,v].sort(); const r=await guardar('seg_config',{clave:'no_habiles_extra',valor:n}); if(r){ ST.noHab=n; $('nuevoNH').value=''; renderTodo(); toast('Día no hábil agregado'); }
+}
+async function quitarNH(v){ const n=ST.noHab.filter(x=>x!==v); const r=await guardar('seg_config',{clave:'no_habiles_extra',valor:n}); if(r){ ST.noHab=n; renderTodo(); } }
+async function cambiarClave(){
+  const n=$('nuevaClave').value; if(n.length<6){ toast('Mínimo 6 caracteres',true); return; }
+  try{ await rpc('seg_cambiar_clave',{p_clave:CLAVE,p_nueva:n}); CLAVE=n; sessionStorageSet('seg_clave',n); $('nuevaClave').value=''; toast('Clave cambiada'); }catch(e){ toast(e.message,true); }
+}
+
+/* ===================== INICIO ===================== */
+(async function(){
+  if(CLAVE){ try{ if(await rpc('seg_login',{p_clave:CLAVE})) document.body.classList.add('admin'); else salirAdmin(); }catch(e){} }
+  let v=null; try{ v=localStorage.getItem('seg_vista'); }catch(e){}
+  if(v && $('v-'+v) && (v!=='config'||CLAVE)) cambiarVista(v);
+  cargarTodo();
+})();
+</script>
+</body>
+</html>
