@@ -66,3 +66,4 @@ FLOTA VEHICULAR/worker/*_local.sql
 FLOTA VEHICULAR/worker/carga_*.sql
 .wrangler/
 FLOTA VEHICULAR/worker/node_modules/
+SEGUIMIENTO OFICINA/CLAVE_AGENTE_NO_SUBIR.txt
