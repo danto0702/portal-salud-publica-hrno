@@ -2071,8 +2071,10 @@ pintarEntidad(); pintarConfig(); pintarSync(); pintarSupervisor(); pintarUndoPla
 renderResBar();
 ORDER.forEach(t=>{ renderTable(t); toggleCond(t); });
 updateAll();
-// sincronización automática al abrir (si está configurada): trae resoluciones + registros de todas
-if(config.url && config.autoSync!==false){ setTimeout(()=>syncPull(true),400); }
+// sincronización automática al abrir (si está configurada):
+//  1) registra en la nube las resoluciones de ESTE equipo (para que aparezcan en los demás);
+//  2) trae las resoluciones de los demás equipos + los registros de todas.
+if(config.url && config.autoSync!==false){ setTimeout(async()=>{ try{ await pushResRegistro(); }catch(e){} syncPull(true); },400); }
 </script>
 </body>
 </html>
