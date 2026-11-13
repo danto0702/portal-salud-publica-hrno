@@ -685,18 +685,19 @@ function ganador(a,b){
 // clave para DETECTAR duplicados: separa las anulaciones (E) del resto, porque una E corrige a la original (no es un duplicado)
 function dupKey(t,r){ return recordKey(t,r)+'¬'+(r.indicador==='E'?'E':'X'); }
 // GARANTÍA: colapsa cualquier duplicado en memoria (conserva CARGADO o el más reciente). Las anulaciones E se conservan (clave aparte).
-function dedupInline(){
+function dedupInline(S){
+  S=S||store;
   ORDER.forEach(t=>{
-    if(!Array.isArray(store[t])) return;
+    if(!Array.isArray(S[t])) return;
     const seen={}, keep=[];
-    store[t].forEach(r=>{
+    S[t].forEach(r=>{
       const k=dupKey(t,r);
       if(seen[k]===undefined){ seen[k]=keep.length; keep.push(r); }
       else{ const i=seen[k], cur=keep[i]; const win=ganador(r,cur);
         if(!win.rubro && cur.rubro) win.rubro=cur.rubro;   // conservar el rubro
         keep[i]=win; }
     });
-    store[t]=keep;
+    S[t]=keep;
   });
 }
 // cuenta registros duplicados (misma clave del anexo + período, mismo tipo de acción)
@@ -877,7 +878,13 @@ function crearResolucion(){
   document.getElementById('nueva_res_nombre').value='';
   document.getElementById('nueva_res_vigencia').value='';
   renderGestorRes();
+  pushResRegistro();   // registra la resolución en la nube para que aparezca en los demás equipos
   toast('Resolución creada: '+nombre,'ok');
+}
+// Envío ligero del registro de resoluciones (sin subir todos los registros)
+async function pushResRegistro(){
+  if(!config.url) return;
+  try{ await postSheet({action:'push', registros:[], resoluciones:listarRess()}); }catch(e){}
 }
 function eliminarRes(id){
   const ress=listarRess();
@@ -1567,24 +1574,62 @@ function recolectar(soloBorrador){
   }));
   return out;
 }
+// ── Sincronización multi-resolución ──────────────────────────────────────────
+// Carga el store de una resolución sin cambiar la activa (la activa usa el store en memoria)
+function storeDeRes(rid){
+  if(rid===(localStorage.getItem(LS_ACTIVA)||'')) return store;
+  const ls=computeLS(rid);
+  const s=load(ls.data,{2:[],3:[],4:[],5:[],6:[],7:[]});
+  [2,3,4,5,6,7].forEach(t=>{ if(!Array.isArray(s[t])) s[t]=[]; });
+  return s;
+}
+// Guarda el store de una resolución (dedup + persistencia) sin cambiar la activa
+function guardarStoreRes(rid,s){
+  if(rid===(localStorage.getItem(LS_ACTIVA)||'')){ save(LS.data,s); return; }
+  dedupInline(s);
+  try{ localStorage.setItem(computeLS(rid).data,JSON.stringify(s)); }catch(e){}
+}
+// Reúne los registros de TODAS las resoluciones, cada uno etiquetado con su rid
+function recolectarTodas(){
+  const out=[];
+  listarRess().forEach(rr=>{
+    const s=storeDeRes(rr.id);
+    ORDER.forEach(t=> (s[t]||[]).forEach(r=> out.push(Object.assign({tipo:t, rid:rr.id}, r))));
+  });
+  return out;
+}
+// Fusiona la lista de resoluciones entrante con el registro local; devuelve cuántas nuevas
+function mergeResoluciones(incoming){
+  if(!Array.isArray(incoming)) return 0;
+  const cur=listarRess(); const byId={}; cur.forEach(r=>byId[r.id]=r);
+  let add=0;
+  incoming.forEach(raw=>{
+    const id=String(raw.id||'').trim(); if(!id) return;
+    if(!byId[id]){ const nr={id,nombre:String(raw.nombre||id),vigencia:String(raw.vigencia||''),creada:String(raw.creada||'').slice(0,10)}; cur.push(nr); byId[id]=nr; add++; }
+    else{ if(!byId[id].nombre&&raw.nombre) byId[id].nombre=String(raw.nombre); if(!byId[id].vigencia&&raw.vigencia) byId[id].vigencia=String(raw.vigencia); }
+  });
+  if(add) guardarRess(cur);
+  return add;
+}
 function spin(txt){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> '+txt; }
 
-/* GUARDAR AVANCE EN LA NUBE (borradores + cargados, upsert por uid) */
+/* GUARDAR AVANCE EN LA NUBE (TODAS las resoluciones + su registro, upsert por uid) */
 async function syncPush(silent){
   if(!config.url){ if(!silent){toast('Configura la URL en Ajustes','err'); go('ajustes');} return false; }
-  const regs=recolectar(false);
-  if(!regs.length){ if(!silent) toast('No hay registros para guardar','info'); return false; }
+  const regs=recolectarTodas();                 // registros de todas las resoluciones, etiquetados con rid
+  const ress=listarRess();                       // registro de resoluciones (para que aparezcan en otros equipos)
+  if(!regs.length && !ress.length){ if(!silent) toast('No hay registros para guardar','info'); return false; }
   const btns=document.querySelectorAll('[data-sync="push"]'); const orig=[...btns].map(b=>b.innerHTML);
   btns.forEach(b=>{b.disabled=true; b.innerHTML=spin('Guardando…');});
   try{
-    const res=await postSheet({action:'push', registros:regs});
-    if(res&&res.ok){ config.lastSync=nowISO(); save(LS.cfg,config); pintarSync(); if(!silent) toast('Avance guardado en la nube ('+(res.filas||regs.length)+' registros)','ok'); return true; }
+    const res=await postSheet({action:'push', registros:regs, resoluciones:ress});
+    if(res&&res.ok){ config.lastSync=nowISO(); save(LS.cfg,config); pintarSync(); if(!silent) toast('Avance guardado en la nube ('+(res.filas||regs.length)+' registros · '+ress.length+' resolución(es))','ok'); return true; }
     if(!silent) toast('El script respondió: '+JSON.stringify(res).slice(0,120),'info'); return false;
   }catch(e){ if(!silent) toast('Error al guardar en la nube: '+e.message,'err'); return false; }
   finally{ btns.forEach((b,i)=>{b.disabled=false; b.innerHTML=orig[i];}); }
 }
 
-/* DESCARGAR DE LA NUBE (pull + merge por uid) */
+/* DESCARGAR DE LA NUBE (resoluciones + registros de TODAS, repartidos por rid) */
 async function syncPull(silent){
   if(!config.url){ if(!silent){toast('Configura la URL en Ajustes','err'); go('ajustes');} return false; }
   const btns=document.querySelectorAll('[data-sync="pull"]'); const orig=[...btns].map(b=>b.innerHTML);
@@ -1592,10 +1637,21 @@ async function syncPull(silent){
   try{
     const res=await postSheet({action:'pull'});
     if(res&&res.ok&&Array.isArray(res.registros)){
-      const {added,updated}=mergeRegistros(res.registros);
-      save(LS.data,store); ORDER.forEach(t=>renderTable(t)); updateAll();
+      const nuevasRes=mergeResoluciones(res.resoluciones);     // trae las resoluciones de otros equipos
+      const activaId=localStorage.getItem(LS_ACTIVA)||resolActiva().id;
+      // agrupa los registros por resolución (los antiguos sin rid caen en la resolución inicial)
+      const porRid={};
+      res.registros.forEach(raw=>{ const rid=String(raw.rid||'').trim()||'r0272_2026'; (porRid[rid]=porRid[rid]||[]).push(raw); });
+      let added=0, updated=0;
+      Object.keys(porRid).forEach(rid=>{
+        const s=storeDeRes(rid);
+        const r=mergeRegistros(porRid[rid], s);
+        added+=r.added; updated+=r.updated;
+        guardarStoreRes(rid,s);                                // persiste cada resolución (la activa queda en 'store')
+      });
+      ORDER.forEach(t=>renderTable(t)); updateAll(); renderResBar();
       config.lastSync=nowISO(); save(LS.cfg,config); pintarSync();
-      if(!silent) toast(`Descarga lista · ${added} nuevos, ${updated} actualizados`,'ok');
+      if(!silent) toast(`Descarga lista · ${added} nuevos, ${updated} actualizados`+(nuevasRes?` · ${nuevasRes} resolución(es) nueva(s)`:''),'ok');
       return true;
     }
     if(!silent) toast('Respuesta inesperada de la nube','info'); return false;
@@ -1603,11 +1659,12 @@ async function syncPull(silent){
   finally{ btns.forEach((b,i)=>{b.disabled=false; b.innerHTML=orig[i];}); }
 }
 // Fusiona registros entrantes por uid: gana CARGADO; si no, gana el más reciente (updatedAt)
-function mergeRegistros(incoming){
+function mergeRegistros(incoming, S){
+  S=S||store;
   let added=0, updated=0;
   const byUid={}, byKey={};
-  ORDER.forEach(t=>{ byUid[t]={}; byKey[t]={};
-    store[t].forEach((r,i)=>{ if(r.uid) byUid[t][r.uid]=i; const k=dupKey(t,r); if(byKey[t][k]===undefined) byKey[t][k]=i; });
+  ORDER.forEach(t=>{ byUid[t]={}; byKey[t]={}; if(!Array.isArray(S[t])) S[t]=[];
+    S[t].forEach((r,i)=>{ if(r.uid) byUid[t][r.uid]=i; const k=dupKey(t,r); if(byKey[t][k]===undefined) byKey[t][k]=i; });
   });
   incoming.forEach(raw=>{
     const t=parseInt(raw.tipo,10); if(!SCHEMA[t]) return;
@@ -1617,14 +1674,14 @@ function mergeRegistros(incoming){
     let pos=byUid[t][rec.uid];
     if(pos===undefined) pos=byKey[t][dupKey(t,rec)];
     if(pos===undefined){
-      store[t].push(rec); const ni=store[t].length-1;
+      S[t].push(rec); const ni=S[t].length-1;
       byUid[t][rec.uid]=ni; byKey[t][dupKey(t,rec)]=ni; added++;
     }else{
-      const cur=store[t][pos];
+      const cur=S[t][pos];
       if(ganador(rec,cur)===rec){
         rec.uid=cur.uid||rec.uid;                          // conserva un uid estable
         if(!rec.rubro) rec.rubro=cur.rubro||'';            // no perder el rubro (metadato local, no viaja en la hoja)
-        store[t][pos]=rec; byUid[t][rec.uid]=pos; updated++;
+        S[t][pos]=rec; byUid[t][rec.uid]=pos; updated++;
       }
     }
   });
@@ -1656,8 +1713,9 @@ async function confirmarCarga(){
     `Se marcarán ${nB} registro(s) como CARGADO. Quedarán bloqueados y no se volverán a incluir en el archivo. Hazlo solo después de haber subido y validado el archivo en PISIS. ¿Continuar?`,
     async ()=>{
       const per=entidad.fechaFin||'';
+      const ridA=resolActiva().id;
       const marcados=[];
-      ORDER.forEach(t=> store[t].forEach(r=>{ if(!esCargado(r)){ r.estado='CARGADO'; r.periodo=per; r.updatedAt=nowISO(); marcados.push(Object.assign({tipo:t},r)); } }));
+      ORDER.forEach(t=> store[t].forEach(r=>{ if(!esCargado(r)){ r.estado='CARGADO'; r.periodo=per; r.updatedAt=nowISO(); marcados.push(Object.assign({tipo:t, rid:ridA},r)); } }));
       save(LS.data,store); ORDER.forEach(t=>renderTable(t)); updateAll();
       toast(`${marcados.length} registro(s) marcados como CARGADO`,'ok');
       // sincronizar con la nube
@@ -2009,9 +2067,10 @@ ORDER.forEach(t=>buildDetailPanel(t));
 migrarRegistros();
 save(LS.data,store);   // consolida (dedup) el estado local al abrir
 pintarEntidad(); pintarConfig(); pintarSync(); pintarSupervisor(); pintarUndoPlano();
+renderResBar();
 ORDER.forEach(t=>{ renderTable(t); toggleCond(t); });
 updateAll();
-// sincronización automática al abrir (si está configurada)
+// sincronización automática al abrir (si está configurada): trae resoluciones + registros de todas
 if(config.url && config.autoSync!==false){ setTimeout(()=>syncPull(true),400); }
 </script>
 </body>
