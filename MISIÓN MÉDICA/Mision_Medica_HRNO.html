@@ -1162,7 +1162,7 @@ const CFG = {
   ],
   PERFILES: ['Médico(a)','Profesional de Enfermería','Psicología','Auxiliar de Enfermería','Nutricionista','Bacteriología','Odontología','Conductor de Ambulancia','Administrativo / Logístico','Otro'],
   TIPOS_DOC: ['Cédula de Ciudadanía','Cédula de Extranjería','Pasaporte','Tarjeta de Identidad'],
-  EMBLEMAS: ['Chaleco','Bandera','Peto'],
+  EMBLEMAS: ['Chaleco','Bandera','Peto','Gorra'],
   TALLAS: ['XS','S','M','L','XL','XXL','No aplica'],
   CARGOS: ['Médico(a)','Enfermero(a) Profesional','Auxiliar de Enfermería','Psicólogo(a)','Nutricionista','Bacteriólogo(a)','Odontólogo(a)','Conductor de Ambulancia','Promotor de Salud','Administrativo','Otro'],
   BANNER: 'https://res.cloudinary.com/dj7qylkqh/image/upload/v1769545405/A%C3%B1adir_un_t%C3%ADtulo_4_ivlcia.png'
@@ -1256,7 +1256,7 @@ function renderInicio(){
     <div class="grid-3" style="margin-bottom:1.5rem">
       ${[
         {icon:'⚠️',label:'Reportar Infracción',desc:'Registra infracciones o incidentes contra la Misión Médica',view:'reportar',color:'var(--red)'},
-        {icon:'🛡️',label:'Emblemas e Identificación',desc:'Solicita chaleco, bandera, peto o carnet de identificación',view:'emblemas',color:'var(--purple)'},
+        {icon:'🛡️',label:'Emblemas e Identificación',desc:'Solicita chaleco, bandera, peto, gorra o carnet de identificación',view:'emblemas',color:'var(--purple)'},
         {icon:'📚',label:'Capacitación',desc:'Lista de asistencia y evaluación pre/postest',view:'capacitacion',color:'var(--blue)'},
         {icon:'📖',label:'Marco Normativo',desc:'Documentos legales y manuales de referencia',view:'info',color:'var(--green)'},
       ].map(c=>`
@@ -1820,7 +1820,7 @@ function renderEmblemas(){
   <div class="section-hero">
     <span class="badge badge-purple" style="margin-bottom:.5rem">Identificación y Protección</span>
     <h1>Gestión de <span style="color:var(--purple)">Emblemas</span></h1>
-    <p>Solicita tu tarjeta de identificación o emblemas de protección (chaleco, bandera, peto) para el ejercicio de la Misión Médica.</p>
+    <p>Solicita tu tarjeta de identificación o emblemas de protección (chaleco, bandera, peto, gorra) para el ejercicio de la Misión Médica.</p>
   </div>
 
   <!-- Selector tipo -->
@@ -1838,7 +1838,7 @@ function renderEmblemas(){
       onmouseover="this.style.borderColor='var(--purple)';this.style.transform='translateY(-3px)'"
       onmouseout="this.style.borderColor='rgba(124,29,111,.4)';this.style.transform=''">
       <div style="font-size:2.5rem;margin-bottom:.75rem">🛡️</div>
-      <div style="font-weight:700;font-size:1rem;color:var(--purple);margin-bottom:.35rem">Chaleco / Bandera / Peto</div>
+      <div style="font-weight:700;font-size:1rem;color:var(--purple);margin-bottom:.35rem">Chaleco / Bandera / Peto / Gorra</div>
       <div style="font-size:.82rem;color:var(--muted);line-height:1.5">Solicita un emblema físico de protección para trabajo en campo o zona de conflicto.</div>
     </div>
   </div>
@@ -1946,7 +1946,7 @@ function renderEmblemas(){
           ${CFG.EMBLEMAS.map(em=>`
             <label class="radio-item" style="padding:.75rem;flex-direction:column;text-align:center;cursor:pointer">
               <input type="radio" name="tipo_emblema" value="${em}" required>
-              <span style="font-size:1.5rem;margin:.35rem 0">${em==='Chaleco'?'🦺':em==='Bandera'?'🚩':'🛡️'}</span>
+              <span style="font-size:1.5rem;margin:.35rem 0">${em==='Chaleco'?'🦺':em==='Bandera'?'🚩':em==='Gorra'?'🧢':'🛡️'}</span>
               <span style="font-weight:600;font-size:.85rem">${em}</span>
             </label>
           `).join('')}
