@@ -1,6 +1,7 @@
 /**
  * FLOTA VEHICULAR HRNO — aplicación
- * ESE Hospital Regional Noroccidental · Coordinación de Salud Pública
+ * Desarrollado por PascalIA para la ESE Hospital Regional Noroccidental
+ * Coordinación de Salud Pública
  *
  * Una sola página, sin framework. Tres roles: principal, coordinación, conductor.
  */

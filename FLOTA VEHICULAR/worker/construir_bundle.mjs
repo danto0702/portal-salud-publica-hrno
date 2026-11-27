@@ -21,7 +21,8 @@ const limpiar = (texto) => texto
 let salida = `/**
  * FLOTA VEHICULAR HRNO — Worker completo en un solo archivo
  *
- * ESE Hospital Regional Noroccidental · Coordinación de Salud Pública
+ * Desarrollado por PascalIA para la ESE Hospital Regional Noroccidental
+ * Coordinación de Salud Pública
  *
  * ARCHIVO GENERADO — no editar a mano.
  * Se produce con:  node construir_bundle.mjs

@@ -1,7 +1,8 @@
 /**
  * FLOTA VEHICULAR HRNO — punto de entrada del Worker
  *
- * ESE Hospital Regional Noroccidental · Coordinación de Salud Pública
+ * Desarrollado por PascalIA para la ESE Hospital Regional Noroccidental
+ * Coordinación de Salud Pública
  *
  * Reglas transversales que la API hace cumplir:
  *   1. La hora de toda marca la pone el servidor, nunca el dispositivo.

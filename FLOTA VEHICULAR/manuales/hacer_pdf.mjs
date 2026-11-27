@@ -147,21 +147,39 @@ h1,h2,h3,h4{ font-family:'Source Serif 4',Georgia,serif; line-height:1.2; margin
 
 /* ── Portada ─────────────────────────────────────────────── */
 .portada{
-  height:245mm; display:flex; flex-direction:column; justify-content:center;
+  height:245mm; display:flex; flex-direction:column; justify-content:space-between;
   page-break-after:always; text-align:left;
 }
-.portada .marca{ width:34mm; height:34mm; border-radius:5mm; margin-bottom:12mm; }
-.portada .entidad{
-  font:700 9.5pt/1.4 'Inter',sans-serif; letter-spacing:.09em;
-  text-transform:uppercase; color:var(--azul);
-}
-.portada h1{ font-size:34pt; margin:5mm 0 3mm; letter-spacing:-.015em; }
+.portada .alto{ padding-top:26mm; }
+.portada .marca{ width:34mm; height:34mm; border-radius:5mm; margin-bottom:13mm; }
+.portada h1{ font-size:34pt; margin:0 0 3mm; letter-spacing:-.015em; }
 .portada .sub{ font-size:13pt; color:var(--suave); }
 .portada .raya{
-  width:46mm; height:3.5mm; border-radius:2mm; margin:11mm 0;
+  width:46mm; height:3.5mm; border-radius:2mm; margin-top:11mm;
   background:linear-gradient(90deg,var(--amarillo),var(--azul));
 }
-.portada .pie{ font-size:8.6pt; color:var(--tenue); line-height:1.75; }
+/* Quién lo hizo y para quién. Va abajo y separado del título: la aplicación
+   es de PascalIA, la operación que administra es de la ESE, y el manual no
+   puede dar a entender lo contrario. */
+.portada .credito{ padding-bottom:4mm; }
+.portada .rotulo{
+  font:600 8.2pt/1.4 'Inter',sans-serif; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--tenue); margin-bottom:3.5mm;
+}
+/* pascalia.png lleva aire alrededor —el recorte útil empieza en el píxel 105
+   de 908—, así que a 11 mm de alto sobran 4,8 mm por la izquierda. Sin
+   corregirlo, el logotipo queda metido hacia adentro y desalineado del
+   «Desarrollado por» y del «para la ESE…» que lleva encima y debajo. */
+.portada .autor{
+  height:11mm; width:auto; display:block;
+  margin:0 0 5mm -4.8mm;
+}
+.portada .para{ font-size:10.5pt; color:var(--suave); line-height:1.6; }
+.portada .para strong{ color:var(--texto); }
+.portada .fecha{
+  margin-top:7mm; padding-top:4mm; border-top:.3mm solid var(--borde);
+  font-size:8.6pt; color:var(--tenue);
+}
 
 /* ── Índice ──────────────────────────────────────────────── */
 .indice{ page-break-after:always; }
@@ -240,6 +258,8 @@ figcaption{
 // ── Armado ──────────────────────────────────────────────────────────────────
 
 const logo = fs.readFileSync(path.join(AQUI, '../iconos/icono-512.png')).toString('base64');
+// La firma de PascalIA en horizontal, la misma del pie de la aplicación.
+const pascalia = fs.readFileSync(path.join(AQUI, '../iconos/pascalia.png')).toString('base64');
 const hoy = new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
 
 const nav = await chromium.launch(
@@ -267,14 +287,20 @@ for (const nombre of MANUALES) {
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>${ESTILO}</style></head><body>
 <section class="portada">
-  <img class="marca" src="data:image/png;base64,${logo}" alt="">
-  <div class="entidad">${esc(datos.entidad || '')}</div>
-  <h1>${esc(datos.titulo || nombre)}</h1>
-  <div class="sub">${esc(datos.subtitulo || '')}</div>
-  <div class="raya"></div>
-  <div class="pie">
-    Coordinación de Salud Pública<br>
-    Actualizado el ${hoy}
+  <div class="alto">
+    <img class="marca" src="data:image/png;base64,${logo}" alt="">
+    <h1>${esc(datos.titulo || nombre)}</h1>
+    <div class="sub">${esc(datos.subtitulo || '')}</div>
+    <div class="raya"></div>
+  </div>
+  <div class="credito">
+    <div class="rotulo">Desarrollado por</div>
+    <img class="autor" src="data:image/png;base64,${pascalia}" alt="${esc(datos.autor || '')}">
+    <div class="para">
+      para la <strong>${esc(datos.para || '')}</strong><br>
+      ${esc(datos.area || '')}
+    </div>
+    <div class="fecha">Actualizado el ${hoy}</div>
   </div>
 </section>
 ${indice}
@@ -296,7 +322,7 @@ ${aHtml(sinTitulo)}
     headerTemplate: '<div></div>',
     footerTemplate: `<div style="width:100%;margin:0 16mm;font:400 7pt Inter,sans-serif;
       color:#9aa5b1;display:flex;justify-content:space-between;">
-      <span>${esc(datos.titulo || '')} · Flota Vehicular · ESE HRNO</span>
+      <span>${esc(datos.titulo || '')} · Flota Vehicular · PascalIA para la ESE HRNO</span>
       <span class="pageNumber"></span></div>`,
     margin: { top: '18mm', bottom: '20mm', left: '16mm', right: '16mm' },
   });

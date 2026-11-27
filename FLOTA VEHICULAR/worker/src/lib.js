@@ -1,7 +1,8 @@
 /**
  * FLOTA VEHICULAR HRNO — API (Cloudflare Worker + D1)
  *
- * ESE Hospital Regional Noroccidental · Coordinación de Salud Pública
+ * Desarrollado por PascalIA para la ESE Hospital Regional Noroccidental
+ * Coordinación de Salud Pública
  *
  * Tres roles: principal, coordinacion, conductor. Ver PROJECT.md §5.12.
  *

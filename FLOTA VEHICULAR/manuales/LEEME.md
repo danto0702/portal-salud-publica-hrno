@@ -1,5 +1,11 @@
 # Manuales de Flota Vehicular
 
+> **Flota Vehicular es un desarrollo de PascalIA** para la ESE Hospital
+> Regional Noroccidental. La aplicación es de PascalIA; la operación que
+> administra —los vehículos, los conductores, los datos y los informes que
+> produce— es de la ESE. Las portadas y los pies de los manuales lo dicen así,
+> y los encabezados del código fuente también.
+
 Tres manuales, uno por rol. Separados a propósito: nadie lee el manual de otro,
 y un documento que le habla a los tres a la vez no le sirve a ninguno.
 

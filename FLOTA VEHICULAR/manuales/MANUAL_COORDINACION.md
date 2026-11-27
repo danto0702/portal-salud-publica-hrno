@@ -1,7 +1,9 @@
 ---
 titulo: Manual de coordinación
 subtitulo: Flota Vehicular · Misión Médica
-entidad: ESE Hospital Regional Noroccidental
+autor: PascalIA
+para: ESE Hospital Regional Noroccidental
+area: Coordinación de Salud Pública
 ---
 
 # Manual de coordinación

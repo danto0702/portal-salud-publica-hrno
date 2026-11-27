@@ -1,7 +1,8 @@
 /**
  * FLOTA VEHICULAR HRNO — Worker completo en un solo archivo
  *
- * ESE Hospital Regional Noroccidental · Coordinación de Salud Pública
+ * Desarrollado por PascalIA para la ESE Hospital Regional Noroccidental
+ * Coordinación de Salud Pública
  *
  * ARCHIVO GENERADO — no editar a mano.
  * Se produce con:  node construir_bundle.mjs
@@ -72,7 +73,8 @@ const rutasRegistradas = () => rutas;
 /**
  * FLOTA VEHICULAR HRNO — API (Cloudflare Worker + D1)
  *
- * ESE Hospital Regional Noroccidental · Coordinación de Salud Pública
+ * Desarrollado por PascalIA para la ESE Hospital Regional Noroccidental
+ * Coordinación de Salud Pública
  *
  * Tres roles: principal, coordinacion, conductor. Ver PROJECT.md §5.12.
  *
@@ -3976,7 +3978,8 @@ ruta('GET', '/api/informes/:id/versiones/:v', async ({ db, params }) => {
 /**
  * FLOTA VEHICULAR HRNO — punto de entrada del Worker
  *
- * ESE Hospital Regional Noroccidental · Coordinación de Salud Pública
+ * Desarrollado por PascalIA para la ESE Hospital Regional Noroccidental
+ * Coordinación de Salud Pública
  *
  * Reglas transversales que la API hace cumplir:
  *   1. La hora de toda marca la pone el servidor, nunca el dispositivo.

@@ -2,7 +2,7 @@
   "id": "flota-hrno",
   "name": "Flota Vehicular · ESE HRNO",
   "short_name": "Flota HRNO",
-  "description": "Gestión de vehículos de Misión Médica — ESE Hospital Regional Noroccidental. Los conductores registran salida y llegada desde el celular, aun sin señal.",
+  "description": "Gestión de vehículos de Misión Médica. Desarrollado por PascalIA para la ESE Hospital Regional Noroccidental. Los conductores registran salida y llegada desde el celular, aun sin señal.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

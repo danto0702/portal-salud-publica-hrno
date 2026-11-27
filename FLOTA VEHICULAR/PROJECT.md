@@ -1,6 +1,6 @@
 # PROJECT.md — Flota Vehicular HRNO
 
-> Borrador v1.1 · 16 sep 2026 · ESE Hospital Regional Noroccidental
+> Borrador v1.1 · 16 sep 2026 · PascalIA para la ESE Hospital Regional Noroccidental
 > Responsable: Danilo Torrado Blanco — Coordinador de Salud Pública
 > Estado: **arquitectura, roles y modelo de datos definidos.** Pendientes las preguntas de §11
 
@@ -1406,4 +1406,4 @@ Inconsistencias detectadas y ya resueltas:
 
 ---
 
-*Documento de planeación — ESE Hospital Regional Noroccidental · Coordinación de Salud Pública*
+*Documento de planeación — PascalIA para la ESE Hospital Regional Noroccidental · Coordinación de Salud Pública*
