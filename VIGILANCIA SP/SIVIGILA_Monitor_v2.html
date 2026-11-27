@@ -29,12 +29,14 @@ body{font-family:var(--fb);background:var(--bg);color:var(--text);display:flex;f
 .mode-badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:9px;font-weight:700;text-transform:uppercase;margin-top:5px;letter-spacing:.5px}
 .mode-badge.view{background:rgba(59,130,246,.15);color:var(--blue)}
 .mode-badge.admin{background:rgba(255,180,50,.2);color:var(--warn)}
+.mode-badge.ips{background:rgba(56,199,147,.15);color:var(--green)}
 .nav-s{padding:10px 8px 4px}
 .nav-lbl{font-size:10px;font-weight:600;color:var(--text2);letter-spacing:.8px;text-transform:uppercase;padding:0 8px;margin-bottom:3px}
 .ni{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text2);transition:background .15s,color .15s;margin-bottom:1px;position:relative}
 .ni:hover{background:var(--bg3);color:var(--text)}
 .ni.on{background:rgba(30,64,175,.2);color:var(--blue)}
 .ni.admin-only{display:none}
+.ni.role-carga{display:none}
 .ni svg{width:15px;height:15px;flex-shrink:0}
 .ni-bdg{position:absolute;right:10px;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;display:none}
 .ni-bdg.on{display:block}
@@ -267,7 +269,7 @@ pre.gas{background:var(--bg3);border:1px solid var(--border);border-radius:6px;p
       <div class="ni" id="nav-alertas" onclick="setV('alertas')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span>Alertas</span><span class="ni-bdg" id="alr-bdg">0</span></div>
-      <div class="ni admin-only" id="nav-carga" onclick="setV('carga')">
+      <div class="ni role-carga" id="nav-carga" onclick="setV('carga')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <span>Cargar datos</span></div>
       <div class="ni admin-only" id="nav-config" onclick="setV('config')">
@@ -278,7 +280,7 @@ pre.gas{background:var(--bg3);border:1px solid var(--border);border-radius:6px;p
   <div class="sb-foot">
     <div class="sb-dot" id="conn-dot"></div>
     <span class="sb-txt" id="conn-txt">Sin configurar</span>
-    <button class="btn bg" id="mode-btn" onclick="toggleAdmin()" style="font-size:11px;padding:3px 9px">Admin</button>
+    <button class="btn bg" id="mode-btn" onclick="toggleAdmin()" style="font-size:11px;padding:3px 9px">Iniciar sesión</button>
   </div>
 </aside>
 
@@ -290,7 +292,7 @@ pre.gas{background:var(--bg3);border:1px solid var(--border);border-radius:6px;p
       <select id="f-mun" onchange="filt()">
         <option value="">Todos</option><option value="ABREGO">Ábrego</option>
         <option value="CONVENCION">Convención</option><option value="EL CARMEN">El Carmen</option>
-        <option value="TEORAMA">Teorama</option>
+        <option value="GUAMALITO">Guamalito</option><option value="TEORAMA">Teorama</option>
       </select></div>
     <div class="fg"><span class="fl">Evento:</span>
       <select id="f-eve" onchange="filt()"><option value="">Todos</option></select></div>
@@ -498,9 +500,12 @@ pre.gas{background:var(--bg3);border:1px solid var(--border);border-radius:6px;p
       </div>
     </div>
 
-    <!-- CARGA (admin only) -->
+    <!-- CARGA (admin y IPS) -->
     <div class="view" id="view-carga">
       <div class="sh"><div class="st">Cargar notificaciones SIVIGILA</div></div>
+      <div id="ips-carga-banner" style="display:none;padding:10px 14px;background:rgba(56,199,147,.1);border:1px solid rgba(56,199,147,.4);border-radius:8px;margin-bottom:14px;font-size:13px">
+        Cargando como IPS: <strong id="ips-carga-nombre"></strong> — Los registros quedarán etiquetados con tu IPS.
+      </div>
       <div class="tabs">
         <div class="tab on" onclick="switchTab('carga','regular',this)">Carga regular (Semanal / Mensual)</div>
         <div class="tab" onclick="switchTab('carga','historico',this)">Carga histórica por año</div>
@@ -553,7 +558,7 @@ pre.gas{background:var(--bg3);border:1px solid var(--border);border-radius:6px;p
             <div class="fg"><span class="fl">Año:</span>
               <select id="hist-ano"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select></div>
             <div class="fg"><span class="fl">Municipio:</span>
-              <select id="hist-mun"><option value="ABREGO">Ábrego</option><option value="CONVENCION">Convención</option><option value="EL CARMEN">El Carmen</option><option value="TEORAMA">Teorama</option></select></div>
+              <select id="hist-mun"><option value="ABREGO">Ábrego</option><option value="CONVENCION">Convención</option><option value="EL CARMEN">El Carmen</option><option value="GUAMALITO">Guamalito</option><option value="TEORAMA">Teorama</option></select></div>
             <div class="upz" style="padding:8px 16px;display:inline-flex;align-items:center;gap:8px" onclick="document.getElementById('fi-hist').click()">
               <input type="file" id="fi-hist" accept=".xlsx,.xls,.csv" onchange="readFile(event,'HISTORICO')">
               <span style="font-size:12px;color:var(--text2)">▲ Seleccionar archivo histórico</span>
@@ -571,6 +576,7 @@ pre.gas{background:var(--bg3);border:1px solid var(--border);border-radius:6px;p
           <div class="tab on" onclick="switchTab('cfg','conexion',this)">Conexión GAS</div>
           <div class="tab" onclick="switchTab('cfg','criticos',this)">Eventos críticos</div>
           <div class="tab" onclick="switchTab('cfg','acceso',this)">Acceso</div>
+          <div class="tab" onclick="switchTab('cfg','usuarios',this)">Usuarios IPS</div>
           <div class="tab" onclick="switchTab('cfg','codigo',this)">Código Apps Script</div>
           <div class="tab" onclick="switchTab('cfg','datos',this)">Datos locales</div>
         </div>
@@ -591,6 +597,18 @@ pre.gas{background:var(--bg3);border:1px solid var(--border);border-radius:6px;p
             <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Marca los eventos que deseas monitorear como <strong>críticos</strong>. Aparecerán destacados en el dashboard con sus KPIs propios.</p>
             <div class="criticos-list" id="criticos-list"></div>
             <button class="btn bs" onclick="saveCriticos()" style="margin-top:12px">Guardar eventos críticos</button>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="cfg-usuarios">
+          <div class="cc">
+            <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Gestiona los usuarios de cada IPS para que puedan cargar sus propios datos SIVIGILA. Requiere URL del Apps Script configurada.</p>
+            <div class="sh" style="margin-bottom:10px">
+              <div style="font-size:13px;font-weight:600">Usuarios del sistema</div>
+              <button class="btn bp" onclick="openModal('m-nuevo-usuario')">+ Crear usuario IPS</button>
+            </div>
+            <div id="usr-list"><p style="font-size:12px;color:var(--text2)">Cargando…</p></div>
+            <button class="btn bg" onclick="cargarUsuarios()" style="margin-top:10px;font-size:11px">↻ Recargar lista</button>
           </div>
         </div>
 
@@ -628,6 +646,31 @@ pre.gas{background:var(--bg3);border:1px solid var(--border);border-radius:6px;p
   </div>
 </div>
 
+<!-- MODAL CREAR USUARIO IPS -->
+<div class="mbg" id="m-nuevo-usuario">
+  <div class="modal" style="width:400px">
+    <div class="modal-ttl">Crear usuario IPS</div>
+    <div class="fg2"><label>Nombre de usuario (para iniciar sesión)</label>
+      <input type="text" id="nu-usuario" placeholder="Ej: abrego.ips" style="width:100%" autocomplete="off"></div>
+    <div class="fg2"><label>Nombre visible</label>
+      <input type="text" id="nu-nombre" placeholder="Ej: IPS Ábrego" style="width:100%"></div>
+    <div class="fg2"><label>IPS / Municipio asignado</label>
+      <select id="nu-ips" style="width:100%">
+        <option value="ABREGO">Ábrego</option>
+        <option value="CONVENCION">Convención</option>
+        <option value="EL CARMEN">El Carmen</option>
+        <option value="GUAMALITO">Guamalito</option>
+        <option value="TEORAMA">Teorama</option>
+      </select></div>
+    <div class="fg2"><label>Contraseña inicial</label>
+      <input type="password" id="nu-pass" placeholder="Mínimo 4 caracteres" style="width:100%"></div>
+    <div class="mfoot">
+      <button class="btn bg" onclick="closeModal('m-nuevo-usuario')">Cancelar</button>
+      <button class="btn bs" onclick="crearUsuarioIPS()">Crear usuario</button>
+    </div>
+  </div>
+</div>
+
 <!-- LOADING -->
 <div class="lod" id="lod"><div class="spin"></div><p id="lod-t" style="font-size:13px;color:var(--text2)">Cargando…</p></div>
 <!-- TOASTS -->
@@ -640,7 +683,7 @@ pre.gas{background:var(--bg3);border:1px solid var(--border);border-radius:6px;p
     <div class="fg2"><label>Nombre *</label><input type="text" id="alr-nom" placeholder="Ej: Brote dengue Ábrego"></div>
     <div class="row2">
       <div class="fg2"><label>Municipio</label>
-        <select id="alr-mun"><option value="">Todos</option><option value="ABREGO">Ábrego</option><option value="CONVENCION">Convención</option><option value="EL CARMEN">El Carmen</option><option value="TEORAMA">Teorama</option></select></div>
+        <select id="alr-mun"><option value="">Todos</option><option value="ABREGO">Ábrego</option><option value="CONVENCION">Convención</option><option value="EL CARMEN">El Carmen</option><option value="GUAMALITO">Guamalito</option><option value="TEORAMA">Teorama</option></select></div>
       <div class="fg2"><label>Evento</label><select id="alr-eve"><option value="">Cualquier evento</option></select></div>
     </div>
     <div class="row2">
@@ -657,19 +700,20 @@ pre.gas{background:var(--bg3);border:1px solid var(--border);border-radius:6px;p
   </div>
 </div>
 
-<!-- MODAL ADMIN LOGIN -->
+<!-- MODAL LOGIN -->
 <div class="mbg" id="m-login">
-  <div class="modal" style="width:360px">
-    <div class="modal-ttl">Modo administrador</div>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Ingresa la contraseña para habilitar funciones de carga y configuración.</p>
-    <div class="fg2"><label>Contraseña</label><input type="password" id="login-pass" onkeydown="if(event.key==='Enter')checkLogin()"></div>
+  <div class="modal" style="width:380px">
+    <div class="modal-ttl">Iniciar sesión</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Ingresa tu usuario y contraseña. Los usuarios IPS necesitan conexión a internet.</p>
+    <div class="fg2"><label>Usuario</label><input type="text" id="login-user" placeholder="admin  ó  nombre.ips" autocomplete="username" style="width:100%" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()"></div>
+    <div class="fg2"><label>Contraseña</label><input type="password" id="login-pass" autocomplete="current-password" style="width:100%" onkeydown="if(event.key==='Enter')checkLogin()"></div>
     <div class="mfoot" style="flex-direction:column;gap:8px;align-items:stretch">
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button class="btn bg" onclick="closeModal('m-login')">Cancelar</button>
         <button class="btn bp" onclick="checkLogin()">Ingresar</button>
       </div>
       <button class="btn bg" style="font-size:11px;color:var(--text2);width:100%;justify-content:center"
-              onclick="abrirRecuperacion()">¿Olvidaste la contraseña? Recuperar acceso</button>
+              onclick="abrirRecuperacion()">¿Olvidaste la contraseña de admin? Recuperar acceso</button>
     </div>
   </div>
 </div>
@@ -740,13 +784,15 @@ const H_DATOS      = 'DATOS';
 const H_ALERTAS    = 'ALERTAS';
 const H_LOG_EMAIL  = 'LOG_EMAILS';
 const H_CONFIG     = 'CONFIG';
+const H_USUARIOS   = 'USUARIOS';
 
 function doGet(e) {
   const p = e.parameter || {};
   try {
-    if (p.accion === 'ping')    return J({ok:true, ts:new Date().toISOString(), total:count()});
-    if (p.accion === 'alertas') return J(getAlertas());
-    if (p.accion === 'config')  return J(getConfig());
+    if (p.accion === 'ping')     return J({ok:true, ts:new Date().toISOString(), total:count()});
+    if (p.accion === 'alertas')  return J(getAlertas());
+    if (p.accion === 'config')   return J(getConfig());
+    if (p.accion === 'usuarios') return J(getUsuarios());
     return J(getDatos(p));
   } catch(err) { return J({error:err.message}); }
 }
@@ -754,9 +800,12 @@ function doGet(e) {
 function doPost(e) {
   try {
     const d = JSON.parse(e.postData.contents);
-    if (d.accion === 'insertar') return J(insertar(d.registros, d.tipo_carga, d.email));
-    if (d.accion === 'alertas')  return J(saveAlertas(d.alertas));
-    if (d.accion === 'config')   return J(saveConfig(d.config));
+    if (d.accion === 'insertar')      return J(insertar(d.registros, d.tipo_carga, d.email, d.ips_codigo||''));
+    if (d.accion === 'alertas')       return J(saveAlertas(d.alertas));
+    if (d.accion === 'config')        return J(saveConfig(d.config));
+    if (d.accion === 'login')         return J(loginUsuario(d.usuario, d.password_hash));
+    if (d.accion === 'crearUsuario')  return J(crearUsuario(d));
+    if (d.accion === 'toggleUsuario') return J(toggleUsuario(d.usuario, d.activo));
     return J({error:'Accion desconocida'});
   } catch(err) { return J({error:err.message}); }
 }
@@ -784,7 +833,7 @@ function count() {
 }
 
 /* ---------- INSERTAR + DEDUP + EMAIL ---------- */
-function insertar(registros, tipo_carga, emailDest) {
+function insertar(registros, tipo_carga, emailDest, ips_codigo) {
   let h = SS.getSheetByName(H_DATOS);
   if (!h) h = SS.insertSheet(H_DATOS);
 
@@ -804,6 +853,7 @@ function insertar(registros, tipo_carga, emailDest) {
     const k = reg.tip_ide_+'|'+reg.num_ide_+'|'+reg.cod_eve+'|'+reg.semana+'|'+reg.año;
     if (claves.has(k)) { dup++; continue; }
     reg.tipo_carga = tipo_carga;
+    if (ips_codigo) reg.ips_codigo = ips_codigo;
     reg.fecha_carga = new Date().toISOString();
     if (!hd) { hd = Object.keys(reg); h.appendRow(hd); }
     h.appendRow(hd.map(k => reg[k] !== undefined ? reg[k] : ''));
@@ -938,6 +988,60 @@ function checkAlertasWeekly() {
   if (disp.length > 0) enviarCorreo(disp, email);
 }
 
+/* ---------- USUARIOS ---------- */
+function getUsuarios() {
+  const h = SS.getSheetByName(H_USUARIOS);
+  if (!h || h.getLastRow() < 2) return [];
+  const v = h.getDataRange().getValues(); const hd = v[0];
+  return v.slice(1).map(function(r) {
+    const o = {}; hd.forEach(function(k,i){ o[k]=r[i]; }); return o;
+  }).map(function(u) {
+    return {usuario:u.usuario,nombre:u.nombre,rol:u.rol,ips:u.ips||'',activo:!!u.activo,creado:u.creado||''};
+  });
+}
+
+function loginUsuario(usuario, passwordHash) {
+  const h = SS.getSheetByName(H_USUARIOS);
+  if (!h || h.getLastRow() < 2) return {ok:false, error:'Sin usuarios configurados'};
+  const v = h.getDataRange().getValues(); const hd = v[0];
+  const users = v.slice(1).map(function(r){const o={};hd.forEach(function(k,i){o[k]=r[i];});return o;});
+  const u = users.find(function(x){ return String(x.usuario).toLowerCase()===String(usuario).toLowerCase() && x.activo; });
+  if (!u) return {ok:false, error:'Usuario no encontrado o inactivo'};
+  if (String(u.password_hash) !== String(passwordHash)) return {ok:false, error:'Contrasena incorrecta'};
+  return {ok:true, nombre:u.nombre, rol:u.rol, ips:u.ips||''};
+}
+
+function crearUsuario(d) {
+  let h = SS.getSheetByName(H_USUARIOS);
+  if (!h) {
+    h = SS.insertSheet(H_USUARIOS);
+    h.appendRow(['usuario','nombre','rol','ips','password_hash','activo','creado']);
+  }
+  const v = h.getLastRow() > 0 ? h.getDataRange().getValues() : [[]];
+  const hd = v[0]; const ui = hd.indexOf('usuario');
+  if (ui >= 0 && v.length > 1 && v.slice(1).some(function(r){
+    return String(r[ui]).toLowerCase() === String(d.usuario).toLowerCase();
+  })) return {ok:false, error:'Usuario ya existe'};
+  h.appendRow([d.usuario, d.nombre, d.rol||'ips', d.ips||'', d.password_hash, true, new Date().toISOString()]);
+  SpreadsheetApp.flush();
+  return {ok:true};
+}
+
+function toggleUsuario(usuario, activo) {
+  const h = SS.getSheetByName(H_USUARIOS);
+  if (!h || h.getLastRow() < 2) return {ok:false, error:'Sin tabla de usuarios'};
+  const v = h.getDataRange().getValues(); const hd = v[0];
+  const ui = hd.indexOf('usuario'); const ai = hd.indexOf('activo');
+  for (var i = 1; i < v.length; i++) {
+    if (String(v[i][ui]).toLowerCase() === String(usuario).toLowerCase()) {
+      h.getRange(i+1, ai+1).setValue(activo);
+      SpreadsheetApp.flush();
+      return {ok:true};
+    }
+  }
+  return {ok:false, error:'Usuario no encontrado'};
+}
+
 function J(d) {
   return ContentService.createTextOutput(JSON.stringify(d))
     .setMimeType(ContentService.MimeType.JSON);
@@ -1046,10 +1150,11 @@ const MUN = {
   ABREGO:      {lat:8.0833, lng:-73.2333, nom:'Ábrego'},
   CONVENCION:  {lat:8.4625, lng:-73.3653, nom:'Convención'},
   'EL CARMEN': {lat:8.3000, lng:-73.5167, nom:'El Carmen'},
+  GUAMALITO:   {lat:8.0472, lng:-73.5500, nom:'Guamalito'},
   TEORAMA:     {lat:8.4000, lng:-73.3833, nom:'Teorama'},
 };
 const AÑOS    = ['2023','2024','2025','2026'];
-const MUNS    = ['ABREGO','CONVENCION','EL CARMEN','TEORAMA'];
+const MUNS    = ['ABREGO','CONVENCION','EL CARMEN','GUAMALITO','TEORAMA'];
 const COLS    = ['#3B82F6','#38c793','#ffb432','#e94560','#a78bfa','#34d399','#fb923c','#f472b6','#60a5fa','#4ade80'];
 const MESES   = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -1070,6 +1175,7 @@ const BASE_CHART = {
 // ============================================================
 let D_ALL=[], D_F=[], ALERTAS=[], CRITICOS=[], CHARTS={}, MAPA=null, MLAYERS=[];
 let PEND=null, PEND_TIPO='', ADMIN=false, PAG=0, INF_MODO='se';
+let SESSION=null; // {usuario, nombre, rol, ips} — null = sin sesión
 const PPP=100;
 
 // ============================================================
@@ -1103,6 +1209,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const c = ls('siv_datos');
   if(c){ try{ D_ALL=JSON.parse(c).map(nr); applyFilt(); toast(D_ALL.length.toLocaleString('es-CO')+' registros en caché','success'); }catch(e){ localStorage.removeItem('siv_datos'); } }
 
+  // Restaurar sesión previa
+  const savedSession=ls('siv_session');
+  if(savedSession){ try{ SESSION=JSON.parse(savedSession); ADMIN=(SESSION.rol==='admin'); updAdminUI(); if(SESSION.rol==='ips'&&SESSION.ips){const sel=document.getElementById('f-mun');if(sel)sel.value=SESSION.ips;} }catch(e){ localStorage.removeItem('siv_session'); } }
+
   updConn(); updCfgInfo();
   const url=ls('gas_url'); if(url) setTimeout(pullData,400);
 });
@@ -1111,38 +1221,58 @@ document.addEventListener('DOMContentLoaded', () => {
 // ADMIN MODE
 // ============================================================
 function toggleAdmin(){
-  if(ADMIN){ ADMIN=false; updAdminUI(); toast('Sesión de administrador cerrada','warn'); }
-  else      { openModal('m-login'); document.getElementById('login-pass').value=''; setTimeout(()=>document.getElementById('login-pass').focus(),100); }
+  if(SESSION){ SESSION=null; ADMIN=false; localStorage.removeItem('siv_session'); updAdminUI(); toast('Sesión cerrada','warn'); }
+  else { openModal('m-login'); document.getElementById('login-user').value=''; document.getElementById('login-pass').value=''; setTimeout(()=>document.getElementById('login-user').focus(),100); }
 }
 async function checkLogin(){
+  const user=(document.getElementById('login-user')?.value||'').trim().toLowerCase();
   const pw=document.getElementById('login-pass').value;
   if(!pw){toast('Ingresa la contraseña','error');return;}
-  let match=false;
-  const storedHash=ls('siv_pw_hash');
-  if(storedHash){
-    const pwHash=await hashPW(pw);
-    match=(pwHash===storedHash);
-  } else {
-    // Primer uso o migración desde versión legacy (contraseña en texto plano)
-    const legacy=ls('siv_pw')||'HRNO2026';
-    match=(pw===legacy);
-    if(match){
-      // Migrar a formato hash y generar clave de recuperación
-      const pwHash=await hashPW(pw);
-      localStorage.setItem('siv_pw_hash',pwHash);
-      localStorage.removeItem('siv_pw');
-      setTimeout(()=>mostrarClaveRec(),600);
+
+  // Admin: verificación local por hash
+  if(!user||user==='admin'){
+    let match=false;
+    const storedHash=ls('siv_pw_hash');
+    if(storedHash){ const pwHash=await hashPW(pw); match=(pwHash===storedHash); }
+    else {
+      const legacy=ls('siv_pw')||'HRNO2026'; match=(pw===legacy);
+      if(match){ const pwHash=await hashPW(pw); localStorage.setItem('siv_pw_hash',pwHash); localStorage.removeItem('siv_pw'); setTimeout(()=>mostrarClaveRec(),600); }
     }
+    if(match){
+      SESSION={usuario:'admin',nombre:'Administrador',rol:'admin',ips:''};
+      safeLSSet('siv_session',JSON.stringify(SESSION));
+      ADMIN=true; closeModal('m-login'); updAdminUI(); toast('Bienvenido, Administrador','success');
+    } else { toast('Contraseña incorrecta','error'); }
+    return;
   }
-  if(match){ ADMIN=true; closeModal('m-login'); updAdminUI(); toast('Modo administrador activo','success'); }
-  else { toast('Contraseña incorrecta','error'); }
+
+  // Usuario IPS: verificar contra GAS
+  const url=ls('gas_url');
+  if(!url){toast('URL del Apps Script no configurada. Contacta al administrador.','error');return;}
+  showLod('Verificando credenciales…');
+  try{
+    const pwHash=await hashPW(pw);
+    const res=await postGAS({accion:'login',usuario:user,password_hash:pwHash});
+    hideLod();
+    if(!res.ok){toast(res.error||'Usuario o contraseña incorrectos','error');return;}
+    SESSION={usuario:user,nombre:res.nombre,rol:res.rol,ips:res.ips||''};
+    safeLSSet('siv_session',JSON.stringify(SESSION));
+    ADMIN=(res.rol==='admin');
+    closeModal('m-login'); updAdminUI();
+    if(SESSION.rol==='ips'&&SESSION.ips){const sel=document.getElementById('f-mun');if(sel){sel.value=SESSION.ips;filt();}}
+    toast('Bienvenido/a, '+res.nombre,'success');
+  }catch(e){ hideLod(); toast('Error de conexión: '+e.message,'error'); }
 }
 function updAdminUI(){
-  document.querySelectorAll('.admin-only').forEach(el=>el.style.display=ADMIN?'flex':'none');
-  document.getElementById('mode-badge').textContent = ADMIN?'Admin':'Vista';
-  document.getElementById('mode-badge').className   = 'mode-badge '+(ADMIN?'admin':'view');
-  document.getElementById('mode-btn').textContent   = ADMIN?'Salir':'Admin';
-  if(!ADMIN && ['carga','config'].includes(currentVista())) setV('dashboard');
+  const isAdmin=SESSION?.rol==='admin', isIPS=SESSION?.rol==='ips';
+  document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'flex':'none');
+  document.querySelectorAll('.role-carga').forEach(el=>el.style.display=(isAdmin||isIPS)?'flex':'none');
+  const badge=document.getElementById('mode-badge');
+  badge.textContent=isAdmin?'Admin':isIPS?'IPS':'Vista';
+  badge.className='mode-badge '+(isAdmin?'admin':isIPS?'ips':'view');
+  document.getElementById('mode-btn').textContent=SESSION?'Cerrar sesión':'Iniciar sesión';
+  if(!SESSION&&['carga','config'].includes(currentVista())) setV('dashboard');
+  if(isIPS&&currentVista()==='config') setV('dashboard');
 }
 function currentVista(){ return document.querySelector('.view.on')?.id?.replace('view-','') || 'dashboard'; }
 async function changePass(){
@@ -1185,7 +1315,8 @@ function setV(v){
   if(v==='alertas')  renderAlertas();
   if(v==='informe')  { if(INF_MODO==='mensual'){fillInfEveSel();renderInformeMensual();}else if(INF_MODO==='anual'){fillInfEveSelAnual();renderInformeAnual();}else renderInforme(); }
   if(v==='dashboard'){renderDB();fillCriticosList();}
-  if(v==='config')   {fillCriticosList();updCfgInfo();}
+  if(v==='config')   {fillCriticosList();updCfgInfo();cargarUsuarios();}
+  if(v==='carga')    {const b=document.getElementById('ips-carga-banner');if(b&&SESSION?.rol==='ips'){b.style.display='block';document.getElementById('ips-carga-nombre').textContent=SESSION.nombre+' ('+SESSION.ips+')';}else if(b)b.style.display='none';}
 }
 
 // ============================================================
@@ -1243,6 +1374,7 @@ function nr(r){
       if(s.includes('ABREGO'))    {r.municipio='ABREGO';break;}
       if(s.includes('CONVENCION')){r.municipio='CONVENCION';break;}
       if(s.includes('CARMEN'))    {r.municipio='EL CARMEN';break;}
+      if(s.includes('GUAMALITO')) {r.municipio='GUAMALITO';break;}
       if(s.includes('TEORAMA'))   {r.municipio='TEORAMA';break;}
     }
     if(!r.municipio) r.municipio=String(r.nmun_notif||'').toUpperCase().trim()||'OTRO';
@@ -1649,12 +1781,13 @@ function showPrev(nuevos,dups,tipo,ano,mun){
 async function doLoad(){
   if(!PEND||!PEND.length){toast('No hay registros nuevos','warn');return;}
   showLod(`Cargando ${PEND.length} registros…`);
+  const ipsTag=SESSION?.rol==='ips'?SESSION.ips:'';
   let gasMsg='';
   try{
     const url=ls('gas_url');
-    if(url){ const res=await postGAS({accion:'insertar',registros:PEND,tipo_carga:PEND_TIPO,email:ls('gas_email')||''}); gasMsg=res.ok?` · GAS: ${res.insertados} insertados`:` · GAS error: ${res.error}`; }
+    if(url){ const res=await postGAS({accion:'insertar',registros:PEND,tipo_carga:PEND_TIPO,email:ls('gas_email')||'',ips_codigo:ipsTag}); gasMsg=res.ok?` · GAS: ${res.insertados} insertados`:` · GAS error: ${res.error}`; }
   }catch(e){ gasMsg=` · (GAS: ${e.message})`; }
-  D_ALL=[...D_ALL,...PEND.map(r=>({...r,tipo_carga:PEND_TIPO}))];
+  D_ALL=[...D_ALL,...PEND.map(r=>({...r,tipo_carga:PEND_TIPO,ips_codigo:ipsTag}))];
   safeLSSet('siv_datos',JSON.stringify(D_ALL));
   safeLSSet('siv_ts',new Date().toLocaleString('es-CO'));
 
@@ -2509,6 +2642,73 @@ function toast(msg,tipo='success'){
   setTimeout(()=>el.remove(),4500);
 }
 function ls(k){return localStorage.getItem(k);}
+
+// ============================================================
+// GESTIÓN USUARIOS IPS
+// ============================================================
+const IPS_NOMS={ABREGO:'Ábrego',CONVENCION:'Convención','EL CARMEN':'El Carmen',GUAMALITO:'Guamalito',TEORAMA:'Teorama'};
+
+async function cargarUsuarios(){
+  const url=ls('gas_url');
+  const el=document.getElementById('usr-list'); if(!el)return;
+  if(!url){el.innerHTML='<p style="font-size:12px;color:var(--text2)">URL GAS no configurada. Ve a "Conexión GAS" primero.</p>';return;}
+  el.innerHTML='<p style="font-size:12px;color:var(--text2)">Cargando…</p>';
+  try{
+    const r=await fetch(url+'?accion=usuarios',{redirect:'follow'});
+    const d=await r.json();
+    if(!Array.isArray(d)){el.innerHTML='<p style="font-size:12px;color:var(--red)">Error al cargar usuarios: '+(d.error||'respuesta inválida')+'</p>';return;}
+    renderUsuarios(d);
+  }catch(e){el.innerHTML='<p style="font-size:12px;color:var(--red)">Error de conexión: '+escH(e.message)+'</p>';}
+}
+
+function renderUsuarios(lista){
+  const el=document.getElementById('usr-list'); if(!el)return;
+  if(!lista.length){el.innerHTML='<p style="font-size:12px;color:var(--text2);padding:12px 0">No hay usuarios configurados. Crea el primero con "+ Crear usuario IPS".</p>';return;}
+  el.innerHTML='<div style="display:flex;flex-direction:column;gap:6px">'+
+    lista.map(u=>'<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg3);border-radius:6px;border:1px solid '+(u.activo?'var(--border)':'rgba(233,69,96,.3)')+'">'
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:13px;font-weight:600;color:var(--text)">'+escH(u.nombre)+' <span style="font-size:11px;color:var(--text2)">('+escH(u.usuario)+')</span></div>'
+        +'<div style="font-size:11px;color:var(--text2)">'+(IPS_NOMS[u.ips]||escH(u.ips||'—'))+' · '+(u.rol==='admin'?'<span style="color:var(--warn)">Admin</span>':'<span style="color:var(--green)">IPS</span>')+' · '+(u.activo?'<span style="color:var(--green)">Activo</span>':'<span style="color:var(--red)">Inactivo</span>')+'</div>'
+      +'</div>'
+      +'<button class="btn '+(u.activo?'bd':'bs')+'" onclick="toggleUsuarioIPS(\''+escH(u.usuario)+'\','+(!u.activo)+')" style="font-size:11px;padding:4px 10px">'+(u.activo?'Desactivar':'Activar')+'</button>'
+    +'</div>').join('')
+  +'</div>';
+}
+
+async function crearUsuarioIPS(){
+  const usuario=(document.getElementById('nu-usuario').value||'').trim().toLowerCase();
+  const nombre=(document.getElementById('nu-nombre').value||'').trim();
+  const ips=document.getElementById('nu-ips').value;
+  const pass=document.getElementById('nu-pass').value;
+  if(!usuario||!nombre||!pass){toast('Completa todos los campos','error');return;}
+  if(pass.length<4){toast('La contraseña debe tener al menos 4 caracteres','error');return;}
+  const url=ls('gas_url');
+  if(!url){toast('URL GAS no configurada','warn');return;}
+  showLod('Creando usuario…');
+  try{
+    const pwHash=await hashPW(pass);
+    const res=await postGAS({accion:'crearUsuario',usuario,nombre,rol:'ips',ips,password_hash:pwHash});
+    hideLod();
+    if(!res.ok){toast(res.error||'Error al crear usuario','error');return;}
+    closeModal('m-nuevo-usuario');
+    ['nu-usuario','nu-nombre','nu-pass'].forEach(id=>document.getElementById(id).value='');
+    toast('Usuario "'+usuario+'" creado','success');
+    cargarUsuarios();
+  }catch(e){hideLod();toast('Error: '+e.message,'error');}
+}
+
+async function toggleUsuarioIPS(usuario, activo){
+  const url=ls('gas_url');
+  if(!url){toast('URL GAS no configurada','warn');return;}
+  showLod('Actualizando usuario…');
+  try{
+    const res=await postGAS({accion:'toggleUsuario',usuario,activo});
+    hideLod();
+    if(!res.ok){toast(res.error||'Error','error');return;}
+    toast('Usuario '+(activo?'activado':'desactivado'),'success');
+    cargarUsuarios();
+  }catch(e){hideLod();toast('Error: '+e.message,'error');}
+}
 </script>
 </body>
 </html>

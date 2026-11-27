@@ -34,8 +34,9 @@ const CAMPOS = {
   7: ['idRecurso','nit','indicador','tipoActo','numActo','fecha','codEntidad','nitBanco','numCuenta','valor','fechaConsig','portafolio']
 };
 const HOJA = { 2:'INCORPORACION', 3:'CONTRATOS', 4:'POLIZAS', 5:'SEGUIMIENTO', 6:'REINT_RECURSOS', 7:'REINT_RENDIM' };
-const CTRL = ['uid','estado','periodo','updatedAt'];           // columnas de control (antes de los campos)
+const CTRL = ['uid','rid','estado','periodo','updatedAt'];      // columnas de control (antes de los campos); 'rid' = id de la resolución
 const H_ENVIOS = ['FechaHora','NombreArchivo','Periodo','TipoIdEntidad','NumIdEntidad','IDRecurso','NITBeneficiaria','FechaIni','FechaFin','TotalCargados'];
+const RES_HEADERS = ['id','nombre','vigencia','creada','updatedAt'];   // hoja RESOLUCIONES (registro de resoluciones de todos los equipos)
 // Clave del anexo por tipo (para detectar duplicados). Debe coincidir con SCHEMA[t].key del aplicativo.
 const KEY = {
   2: ['idRecurso','nit','tipoActo','numActo','fecha'],
@@ -57,7 +58,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (TOKEN && body.token !== TOKEN) return json({ ok:false, error:'Token invalido' });
     switch (body.action) {
-      case 'ping':          return json({ ok:true, msg:'pong', version:'2.4' });
+      case 'ping':          return json({ ok:true, msg:'pong', version:'2.5' });
       case 'push':          return pushRegistros(body);
       case 'pull':          return pullRegistros(body);
       case 'dedup':         return dedupHoja(body);
@@ -118,31 +119,67 @@ function pushRegistros(body) {
     });
     if (nuevas.length) sh.getRange(sh.getLastRow()+1, 1, nuevas.length, headers.length).setValues(nuevas);
   });
+  // Registro de resoluciones (para que todas las resoluciones de un equipo aparezcan en los demás)
+  if (body.resoluciones) pushResoluciones(ss, body.resoluciones);
   return json({ ok:true, filas: total });
 }
 
 function fila_de(t, r, ahora){
-  const ctrl = [ r.uid || '', (r.estado === 'CARGADO' ? 'CARGADO' : 'BORRADOR'), r.periodo || '', r.updatedAt || ahora ];
+  const ctrl = [ r.uid || '', r.rid || '', (r.estado === 'CARGADO' ? 'CARGADO' : 'BORRADOR'), r.periodo || '', r.updatedAt || ahora ];
   return ctrl.concat(CAMPOS[t].map(function(k){ return r[k] != null ? r[k] : ''; }));
 }
 
-// Devuelve todos los registros de todas las hojas de tipo
+// Inserta/actualiza el registro de resoluciones por 'id'
+function pushResoluciones(ss, arr){
+  if (!arr || !arr.length) return;
+  const sh = getSheet(ss, 'RESOLUCIONES', RES_HEADERS);
+  const last = sh.getLastRow();
+  const idCol = last > 1 ? sh.getRange(2,1,last-1,1).getValues().map(function(x){return String(x[0]);}) : [];
+  const idx = {}; idCol.forEach(function(u,i){ idx[u] = i + 2; });
+  const ahora = new Date().toISOString();
+  const nuevas = [];
+  arr.forEach(function(r){
+    const id = String(r.id || ''); if (!id) return;
+    const fila = [ id, r.nombre || '', r.vigencia || '', r.creada || '', r.updatedAt || ahora ];
+    if (idx[id]) sh.getRange(idx[id], 1, 1, RES_HEADERS.length).setValues([fila]);
+    else nuevas.push(fila);
+  });
+  if (nuevas.length) sh.getRange(sh.getLastRow()+1, 1, nuevas.length, RES_HEADERS.length).setValues(nuevas);
+}
+
+// Devuelve el registro de resoluciones
+function pullResoluciones(ss){
+  const sh = ss.getSheetByName('RESOLUCIONES'); if (!sh) return [];
+  const last = sh.getLastRow(); if (last < 2) return [];
+  const vals = sh.getRange(2, 1, last-1, RES_HEADERS.length).getValues();
+  const out = [];
+  vals.forEach(function(row){
+    if (!String(row[0]).trim()) return;
+    out.push({ id:String(row[0]), nombre:String(row[1]), vigencia:String(row[2]), creada:String(row[3]), updatedAt:String(row[4]) });
+  });
+  return out;
+}
+
+// Devuelve todos los registros de todas las hojas de tipo (leyendo por nombre de columna, robusto ante migraciones)
 function pullRegistros(body) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const out = [];
   Object.keys(HOJA).forEach(function(t){
     const sh = ss.getSheetByName(HOJA[t]); if (!sh) return;
+    ensureHeaders(sh, headersDe(t));                      // añade la columna 'rid' si venía de una versión anterior
     const last = sh.getLastRow(); if (last < 2) return;
-    const headers = headersDe(t);
-    const vals = sh.getRange(2, 1, last-1, headers.length).getValues();
+    const lastCol = sh.getLastColumn();
+    const hdr = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(x){ return String(x); });
+    const uidIdx = hdr.indexOf('uid');
+    const vals = sh.getRange(2, 1, last-1, lastCol).getValues();
     vals.forEach(function(row){
-      if (!String(row[0]).trim()) return;                 // sin uid -> ignora
+      if (uidIdx < 0 || !String(row[uidIdx]).trim()) return;   // sin uid -> ignora
       const rec = { tipo: parseInt(t,10) };
-      headers.forEach(function(h, i){ rec[h] = row[i]; });
+      hdr.forEach(function(h, i){ if (h) rec[h] = row[i]; });
       out.push(rec);
     });
   });
-  return json({ ok:true, registros: out });
+  return json({ ok:true, registros: out, resoluciones: pullResoluciones(ss) });
 }
 
 // Elimina filas duplicadas en cada hoja de tipo (misma clave del anexo + periodo + tipo de accion),
@@ -152,6 +189,7 @@ function dedupHoja(body) {
   var removed = 0, porTipo = {};
   Object.keys(HOJA).forEach(function(t){
     const sh = ss.getSheetByName(HOJA[t]); if (!sh) return;
+    ensureHeaders(sh, headersDe(t));                       // asegura la columna 'rid'
     const last = sh.getLastRow(); if (last < 3) return;   // encabezado + <2 filas: nada que deduplicar
     const headers = headersDe(t);
     const width = headers.length;
@@ -163,8 +201,9 @@ function dedupHoja(body) {
       if (!String(row[0]).trim()) return;   // sin uid: se descarta
       const periodo = PERKEY[t] ? monthEndG(row[col['periodo']]) : '';
       const indicador = String(row[col['indicador']]);
+      const rid = keyNormG(row[col['rid']]);              // la resolución forma parte de la identidad
       const kparts = keyFields.map(function(f){ return keyNormG(row[col[f]]); });
-      const key = t + '|' + kparts.join('~') + '|' + periodo + '|' + (indicador === 'E' ? 'E' : 'X');
+      const key = t + '|' + rid + '|' + kparts.join('~') + '|' + periodo + '|' + (indicador === 'E' ? 'E' : 'X');
       if (seen[key] === undefined) { seen[key] = keep.length; keep.push(row); }
       else {
         const idx = seen[key], cur = keep[idx];
@@ -196,6 +235,7 @@ function borrarUids(body) {
   var removed = 0;
   Object.keys(HOJA).forEach(function(t){
     const sh = ss.getSheetByName(HOJA[t]); if (!sh) return;
+    ensureHeaders(sh, headersDe(t));                       // asegura la columna 'rid'
     const last = sh.getLastRow(); if (last < 2) return;
     const width = headersDe(t).length;
     const vals = sh.getRange(2, 1, last-1, width).getValues();
@@ -220,17 +260,23 @@ function guardarEnvio(body) {
 
 function getSheet(ss, nombre, headers) {
   let sh = ss.getSheetByName(nombre);
-  if (!sh) {
-    sh = ss.insertSheet(nombre);
-    sh.getRange(1, 1, 1, headers.length).setValues([headers])
-      .setFontWeight('bold').setBackground('#0f4c81').setFontColor('#ffffff');
-    sh.setFrozenRows(1);
-  } else if (sh.getLastRow() === 0) {
-    sh.getRange(1, 1, 1, headers.length).setValues([headers])
-      .setFontWeight('bold').setBackground('#0f4c81').setFontColor('#ffffff');
-    sh.setFrozenRows(1);
-  }
+  if (!sh) sh = ss.insertSheet(nombre);
+  ensureHeaders(sh, headers);
   return sh;
+}
+
+// Asegura que la fila de encabezados sea 'headers'. Si la hoja venía de una versión
+// anterior (columna 'uid' sin 'rid'), inserta la columna 'rid' tras 'uid' SIN perder datos:
+// insertColumnAfter corre las columnas existentes a la derecha, conservando la alineación.
+function ensureHeaders(sh, headers) {
+  const lastCol = sh.getLastColumn();
+  const cur = lastCol > 0 ? sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function(x){ return String(x); }) : [];
+  if (cur.length && cur[0] === 'uid' && cur.indexOf('rid') === -1 && headers.indexOf('rid') === 1) {
+    sh.insertColumnAfter(1);                 // nueva columna en blanco en la posición 2 (los datos se corren a la derecha)
+  }
+  sh.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight('bold').setBackground('#0f4c81').setFontColor('#ffffff');
+  sh.setFrozenRows(1);
 }
 
 function json(obj) {
